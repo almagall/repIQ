@@ -11,6 +11,7 @@ final class AuthViewModel {
     var isSignUp = false
     var isLoading = false
     var errorMessage: String?
+    var successMessage: String?
 
     // Apple Sign-In nonce
     private var currentNonce: String?
@@ -48,12 +49,19 @@ final class AuthViewModel {
         }
         isLoading = true
         errorMessage = nil
+        successMessage = nil
         do {
             try await authService.signUp(
                 email: email,
                 password: password,
                 displayName: displayName
             )
+            // If email confirmation is enabled, session won't be set yet.
+            // Check if we got a session — if not, the user needs to confirm email.
+            let session = try? await supabase.auth.session
+            if session == nil {
+                successMessage = "Account created! Check your email to confirm, then sign in."
+            }
         } catch {
             errorMessage = mapAuthError(error)
         }

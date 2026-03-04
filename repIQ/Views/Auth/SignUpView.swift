@@ -43,6 +43,18 @@ struct SignUpView: View {
                 )
             }
 
+            // Success
+            if let success = viewModel.successMessage {
+                Text(success)
+                    .font(RQTypography.footnote)
+                    .foregroundColor(RQColors.success)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, RQSpacing.md)
+                    .padding(.vertical, RQSpacing.sm)
+                    .background(RQColors.success.opacity(0.1))
+                    .cornerRadius(RQRadius.small)
+            }
+
             // Error
             if let error = viewModel.errorMessage {
                 Text(error)
