@@ -23,12 +23,12 @@ struct RQTextField: View {
         .font(RQTypography.body)
         .foregroundColor(RQColors.textPrimary)
         .padding(.horizontal, RQSpacing.lg)
-        .frame(height: 50)
-        .background(RQColors.surfaceTertiary)
+        .frame(height: 48)
+        .background(Color.clear)
         .cornerRadius(RQRadius.medium)
         .overlay(
             RoundedRectangle(cornerRadius: RQRadius.medium)
-                .stroke(isFocused ? RQColors.accent : Color.clear, lineWidth: 1)
+                .stroke(isFocused ? RQColors.accent : RQColors.textTertiary, lineWidth: 1)
         )
     }
 }

@@ -24,7 +24,9 @@ struct DashboardView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: RQSpacing.xs) {
                                 Text("Recent Workout")
-                                    .font(RQTypography.footnote)
+                                    .font(RQTypography.label)
+                                    .textCase(.uppercase)
+                                    .tracking(1.5)
                                     .foregroundColor(RQColors.textSecondary)
                                 if let session = viewModel.recentSession {
                                     Text(session.completedAt?.relativeDisplay ?? "Completed")
@@ -53,7 +55,9 @@ struct DashboardView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: RQSpacing.xs) {
                                 Text("This Week")
-                                    .font(RQTypography.footnote)
+                                    .font(RQTypography.label)
+                                    .textCase(.uppercase)
+                                    .tracking(1.5)
                                     .foregroundColor(RQColors.textSecondary)
                                 Text("\(viewModel.weeklySetCount) sets")
                                     .font(RQTypography.numbers)
@@ -76,7 +80,9 @@ struct DashboardView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: RQSpacing.xs) {
                                 Text("Templates")
-                                    .font(RQTypography.footnote)
+                                    .font(RQTypography.label)
+                                    .textCase(.uppercase)
+                                    .tracking(1.5)
                                     .foregroundColor(RQColors.textSecondary)
                                 Text("\(viewModel.templateCount)")
                                     .font(RQTypography.numbers)

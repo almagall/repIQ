@@ -10,10 +10,13 @@ struct AuthView: View {
                 VStack(spacing: RQSpacing.md) {
                     Text("repIQ")
                         .font(RQTypography.largeTitle)
+                        .tracking(4)
                         .foregroundColor(RQColors.accent)
 
                     Text("Intelligent Workout Planning")
-                        .font(RQTypography.subheadline)
+                        .font(RQTypography.label)
+                        .textCase(.uppercase)
+                        .tracking(2)
                         .foregroundColor(RQColors.textSecondary)
                 }
                 .padding(.top, RQSpacing.xxxl)

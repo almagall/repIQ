@@ -194,13 +194,15 @@ struct ActiveWorkoutView: View {
                 let completed = viewModel.exercises.filter(\.isAllSetsCompleted).count
                 if completed > 0 {
                     Text("\(completed) done")
-                        .font(RQTypography.caption)
+                        .font(RQTypography.label)
+                        .textCase(.uppercase)
+                        .tracking(1)
                         .foregroundColor(RQColors.success)
                 }
             }
             .padding(.horizontal, RQSpacing.screenHorizontal)
             .padding(.vertical, RQSpacing.md)
-            .background(RQColors.surfacePrimary)
+            .background(RQColors.background)
         }
     }
 
@@ -248,7 +250,7 @@ struct ActiveWorkoutView: View {
         }
         .padding(.horizontal, RQSpacing.screenHorizontal)
         .padding(.bottom, RQSpacing.sm)
-        .background(RQColors.surfacePrimary)
+        .background(RQColors.background)
     }
 
     // MARK: - Rest Timer Settings
@@ -263,8 +265,9 @@ struct ActiveWorkoutView: View {
                     Image(systemName: viewModel.restTimerEnabled ? "timer" : "timer.slash")
                         .font(.system(size: 14))
                     Text("Rest")
-                        .font(RQTypography.caption)
-                        .fontWeight(.medium)
+                        .font(RQTypography.label)
+                        .textCase(.uppercase)
+                        .tracking(1.5)
                 }
                 .foregroundColor(viewModel.restTimerEnabled ? RQColors.accent : RQColors.textTertiary)
             }
@@ -311,7 +314,7 @@ struct ActiveWorkoutView: View {
         }
         .padding(.horizontal, RQSpacing.screenHorizontal)
         .padding(.vertical, RQSpacing.sm)
-        .background(RQColors.surfacePrimary)
+        .background(RQColors.background)
     }
 
     // MARK: - Helpers

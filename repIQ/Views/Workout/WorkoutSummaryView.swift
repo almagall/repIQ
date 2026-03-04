@@ -43,8 +43,10 @@ struct WorkoutSummaryView: View {
                     if !summary.exerciseSummaries.isEmpty {
                         VStack(alignment: .leading, spacing: RQSpacing.md) {
                             Text("Exercise Breakdown")
-                                .font(RQTypography.title3)
-                                .foregroundColor(RQColors.textPrimary)
+                                .font(RQTypography.label)
+                                .textCase(.uppercase)
+                                .tracking(1.5)
+                                .foregroundColor(RQColors.textSecondary)
 
                             ForEach(summary.exerciseSummaries) { exercise in
                                 exerciseCard(exercise)
@@ -84,7 +86,9 @@ struct WorkoutSummaryView: View {
                     .foregroundColor(RQColors.textPrimary)
 
                 Text(label)
-                    .font(RQTypography.caption)
+                    .font(RQTypography.label)
+                    .textCase(.uppercase)
+                    .tracking(1.5)
                     .foregroundColor(RQColors.textSecondary)
             }
             .frame(maxWidth: .infinity)

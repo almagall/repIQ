@@ -125,7 +125,7 @@ struct ExercisePickerView: View {
                                     } label: {
                                         exerciseRow(exercise)
                                     }
-                                    .listRowBackground(RQColors.surfacePrimary)
+                                    .listRowBackground(Color.clear)
                                 }
                             } header: {
                                 Text(group)
@@ -181,12 +181,18 @@ struct ExercisePickerView: View {
     private func filterChip(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(RQTypography.caption)
+                .font(RQTypography.label)
+                .textCase(.uppercase)
+                .tracking(1)
                 .foregroundColor(isSelected ? RQColors.background : RQColors.textSecondary)
                 .padding(.horizontal, RQSpacing.md)
                 .padding(.vertical, RQSpacing.sm)
-                .background(isSelected ? RQColors.accent : RQColors.surfaceTertiary)
-                .cornerRadius(RQRadius.extraLarge)
+                .background(isSelected ? RQColors.accent : Color.clear)
+                .cornerRadius(RQRadius.small)
+                .overlay(
+                    RoundedRectangle(cornerRadius: RQRadius.small)
+                        .stroke(isSelected ? RQColors.accent : RQColors.textTertiary, lineWidth: 1)
+                )
         }
     }
 }

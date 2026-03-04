@@ -39,8 +39,10 @@ struct ProfileView: View {
                     RQCard {
                         VStack(alignment: .leading, spacing: RQSpacing.lg) {
                             Text("Settings")
-                                .font(RQTypography.headline)
-                                .foregroundColor(RQColors.textPrimary)
+                                .font(RQTypography.label)
+                                .textCase(.uppercase)
+                                .tracking(1.5)
+                                .foregroundColor(RQColors.textSecondary)
 
                             // Weight Unit
                             Button {

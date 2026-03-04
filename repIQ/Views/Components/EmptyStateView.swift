@@ -10,11 +10,13 @@ struct EmptyStateView: View {
     var body: some View {
         VStack(spacing: RQSpacing.lg) {
             Image(systemName: icon)
-                .font(.system(size: 48))
+                .font(.system(size: 40))
                 .foregroundColor(RQColors.textTertiary)
 
             Text(title)
                 .font(RQTypography.title3)
+                .textCase(.uppercase)
+                .tracking(1)
                 .foregroundColor(RQColors.textPrimary)
 
             if let message {

@@ -22,8 +22,12 @@ struct RPESelector: View {
                             .font(compact ? RQTypography.caption : RQTypography.numbersSmall)
                             .foregroundColor(selectedRPE == value ? RQColors.background : RQColors.textSecondary)
                             .frame(width: compact ? 32 : 40, height: compact ? 32 : 40)
-                            .background(selectedRPE == value ? modeColor : RQColors.surfaceTertiary)
-                            .clipShape(Circle())
+                            .background(selectedRPE == value ? modeColor : Color.clear)
+                            .cornerRadius(RQRadius.small)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: RQRadius.small)
+                                    .stroke(selectedRPE == value ? modeColor : RQColors.textTertiary, lineWidth: 1)
+                            )
                     }
                 }
             }

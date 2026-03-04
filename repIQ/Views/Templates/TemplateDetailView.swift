@@ -39,8 +39,10 @@ struct TemplateDetailView: View {
                 if let days = template.workoutDays, !days.isEmpty {
                     VStack(alignment: .leading, spacing: RQSpacing.md) {
                         Text("Workout Days")
-                            .font(RQTypography.title3)
-                            .foregroundColor(RQColors.textPrimary)
+                            .font(RQTypography.label)
+                            .textCase(.uppercase)
+                            .tracking(1.5)
+                            .foregroundColor(RQColors.textSecondary)
 
                         ForEach(days) { day in
                             dayCard(day)

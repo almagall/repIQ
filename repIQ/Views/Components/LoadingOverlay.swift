@@ -20,8 +20,12 @@ struct LoadingOverlay: View {
                 }
             }
             .padding(RQSpacing.xxl)
-            .background(RQColors.surfacePrimary)
+            .background(Color.clear)
             .cornerRadius(RQRadius.large)
+            .overlay(
+                RoundedRectangle(cornerRadius: RQRadius.large)
+                    .stroke(RQColors.textTertiary, lineWidth: 1)
+            )
         }
     }
 }

@@ -17,8 +17,10 @@ struct TemplateEditorView: View {
                     VStack(alignment: .leading, spacing: RQSpacing.lg) {
                         HStack {
                             Text("Template Info")
-                                .font(RQTypography.headline)
-                                .foregroundColor(RQColors.textPrimary)
+                                .font(RQTypography.label)
+                                .textCase(.uppercase)
+                                .tracking(1.5)
+                                .foregroundColor(RQColors.textSecondary)
 
                             Spacer()
 
@@ -52,8 +54,10 @@ struct TemplateEditorView: View {
                 VStack(alignment: .leading, spacing: RQSpacing.md) {
                     HStack {
                         Text("Workout Days")
-                            .font(RQTypography.title3)
-                            .foregroundColor(RQColors.textPrimary)
+                            .font(RQTypography.label)
+                            .textCase(.uppercase)
+                            .tracking(1.5)
+                            .foregroundColor(RQColors.textSecondary)
                         Spacer()
                         Button {
                             if viewModel.isFormValid {

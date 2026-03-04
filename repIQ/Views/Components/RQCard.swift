@@ -10,11 +10,11 @@ struct RQCard<Content: View>: View {
         }
         .padding(padding)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RQColors.surfacePrimary)
+        .background(Color.clear)
         .cornerRadius(RQSpacing.cardCornerRadius)
         .overlay(
             RoundedRectangle(cornerRadius: RQSpacing.cardCornerRadius)
-                .stroke(RQColors.surfaceTertiary, lineWidth: 0.5)
+                .stroke(RQColors.textTertiary, lineWidth: 1)
         )
     }
 }

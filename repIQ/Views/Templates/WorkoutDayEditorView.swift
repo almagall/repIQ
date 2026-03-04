@@ -30,8 +30,10 @@ struct WorkoutDayEditorView: View {
                 // Exercises Header
                 HStack {
                     Text("Exercises")
-                        .font(RQTypography.title3)
-                        .foregroundColor(RQColors.textPrimary)
+                        .font(RQTypography.label)
+                        .textCase(.uppercase)
+                        .tracking(1.5)
+                        .foregroundColor(RQColors.textSecondary)
                     Spacer()
                     Button {
                         showExercisePicker = true
@@ -156,7 +158,9 @@ struct WorkoutDayEditorView: View {
                 // Training mode toggle
                 HStack {
                     Text("Mode")
-                        .font(RQTypography.subheadline)
+                        .font(RQTypography.label)
+                        .textCase(.uppercase)
+                        .tracking(1.5)
                         .foregroundColor(RQColors.textSecondary)
                     Spacer()
                     trainingModeToggle(dayExercise)
@@ -165,7 +169,9 @@ struct WorkoutDayEditorView: View {
                 // Target sets
                 HStack {
                     Text("Target Sets")
-                        .font(RQTypography.subheadline)
+                        .font(RQTypography.label)
+                        .textCase(.uppercase)
+                        .tracking(1.5)
                         .foregroundColor(RQColors.textSecondary)
                     Spacer()
                     HStack(spacing: RQSpacing.md) {
@@ -205,7 +211,9 @@ struct WorkoutDayEditorView: View {
                 // Rep range indicator
                 HStack {
                     Text("Rep Range")
-                        .font(RQTypography.subheadline)
+                        .font(RQTypography.label)
+                        .textCase(.uppercase)
+                        .tracking(1.5)
                         .foregroundColor(RQColors.textSecondary)
                     Spacer()
                     let range = dayExercise.trainingMode.repRange
