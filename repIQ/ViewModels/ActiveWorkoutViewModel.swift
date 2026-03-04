@@ -6,6 +6,7 @@ import UIKit
 final class ActiveWorkoutViewModel {
     // MARK: - Workout State
     var exercises: [ExerciseLogEntry] = []
+    var currentExerciseIndex: Int = 0
     var sessionId: UUID?
     var startTime: Date = Date()
     var elapsedSeconds: Int = 0
@@ -70,6 +71,35 @@ final class ActiveWorkoutViewModel {
     var restTimerProgress: Double {
         guard restTimerTarget > 0 else { return 0 }
         return Double(restTimerTarget - restTimerRemaining) / Double(restTimerTarget)
+    }
+
+    var currentExercise: ExerciseLogEntry? {
+        exercises[safe: currentExerciseIndex]
+    }
+
+    var canGoToPrevious: Bool {
+        currentExerciseIndex > 0
+    }
+
+    var canGoToNext: Bool {
+        currentExerciseIndex < exercises.count - 1
+    }
+
+    // MARK: - Exercise Navigation
+
+    func goToPreviousExercise() {
+        guard canGoToPrevious else { return }
+        currentExerciseIndex -= 1
+    }
+
+    func goToNextExercise() {
+        guard canGoToNext else { return }
+        currentExerciseIndex += 1
+    }
+
+    func goToExercise(at index: Int) {
+        guard exercises.indices.contains(index) else { return }
+        currentExerciseIndex = index
     }
 
     // MARK: - Lifecycle
@@ -272,20 +302,67 @@ final class ActiveWorkoutViewModel {
         }
     }
 
-    func addSet(exerciseIndex: Int) {
+    func addSet(exerciseIndex: Int, setType: SetType = .working) {
         guard exercises.indices.contains(exerciseIndex) else { return }
 
         let currentSets = exercises[exerciseIndex].sets
-        let lastSet = currentSets.last
+        // Find the last set of the same type for pre-filling weight
+        let lastSameType = currentSets.last(where: { $0.setType == setType })
+        let lastAny = currentSets.last
         let newSetNumber = (currentSets.last?.setNumber ?? 0) + 1
+
+        let prefillWeight: Double
+        switch setType {
+        case .warmup:
+            // Warm-up: use half of last working set weight, or 0
+            let workingWeight = currentSets.last(where: { $0.setType == .working })?.weight ?? 0
+            prefillWeight = lastSameType?.weight ?? (workingWeight * 0.5)
+        case .cooldown:
+            let workingWeight = currentSets.last(where: { $0.setType == .working })?.weight ?? 0
+            prefillWeight = lastSameType?.weight ?? (workingWeight * 0.5)
+        default:
+            prefillWeight = lastSameType?.weight ?? lastAny?.weight ?? 0
+        }
 
         let newSet = SetEntry(
             setNumber: newSetNumber,
-            setType: .working,
-            weight: lastSet?.weight ?? 0,
+            setType: setType,
+            weight: prefillWeight,
             reps: 0
         )
-        exercises[exerciseIndex].sets.append(newSet)
+
+        // Insert in the right position: group by type sort order
+        let insertIndex = findInsertIndex(for: setType, in: currentSets)
+        exercises[exerciseIndex].sets.insert(newSet, at: insertIndex)
+
+        // Renumber all sets
+        renumberSets(exerciseIndex: exerciseIndex)
+    }
+
+    /// Find the correct insertion index to keep sets grouped by type.
+    private func findInsertIndex(for setType: SetType, in sets: [SetEntry]) -> Int {
+        // Find the last set with the same or lower sort order
+        var insertAt = sets.count
+        for (index, existingSet) in sets.enumerated().reversed() {
+            if existingSet.setType.sortOrder <= setType.sortOrder {
+                insertAt = index + 1
+                break
+            }
+        }
+        // If no set with lower/equal sort order found, insert at beginning
+        if insertAt == sets.count && !sets.isEmpty {
+            if let first = sets.first, first.setType.sortOrder > setType.sortOrder {
+                insertAt = 0
+            }
+        }
+        return insertAt
+    }
+
+    private func renumberSets(exerciseIndex: Int) {
+        guard exercises.indices.contains(exerciseIndex) else { return }
+        for i in exercises[exerciseIndex].sets.indices {
+            exercises[exerciseIndex].sets[i].setNumber = i + 1
+        }
     }
 
     func removeSet(exerciseIndex: Int, setIndex: Int) async {
@@ -305,11 +382,7 @@ final class ActiveWorkoutViewModel {
         }
 
         exercises[exerciseIndex].sets.remove(at: setIndex)
-
-        // Renumber remaining sets
-        for i in exercises[exerciseIndex].sets.indices {
-            exercises[exerciseIndex].sets[i].setNumber = i + 1
-        }
+        renumberSets(exerciseIndex: exerciseIndex)
     }
 
     func updateWeight(exerciseIndex: Int, setIndex: Int, weight: Double) {

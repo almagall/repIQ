@@ -19,11 +19,32 @@ enum SetType: String, Codable, CaseIterable, Sendable {
 
     var shortName: String {
         switch self {
-        case .warmup: return "W"
-        case .working: return "S"
-        case .cooldown: return "C"
+        case .warmup: return "WU"
+        case .working: return "W"
+        case .cooldown: return "CD"
         case .drop: return "D"
         case .failure: return "F"
+        }
+    }
+
+    /// Display order for grouping sets by type within an exercise.
+    var sortOrder: Int {
+        switch self {
+        case .warmup: return 0
+        case .working: return 1
+        case .drop: return 2
+        case .failure: return 3
+        case .cooldown: return 4
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .warmup: return "flame"
+        case .working: return "dumbbell"
+        case .cooldown: return "snowflake"
+        case .drop: return "arrow.down.circle"
+        case .failure: return "bolt.fill"
         }
     }
 }

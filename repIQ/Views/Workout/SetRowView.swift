@@ -4,6 +4,7 @@ struct SetRowView: View {
     @Bindable var viewModel: ActiveWorkoutViewModel
     let exerciseIndex: Int
     let setIndex: Int
+    var onDelete: (() -> Void)?
 
     @FocusState private var focusedField: Field?
 
@@ -35,22 +36,6 @@ struct SetRowView: View {
                     .frame(width: 26, height: 26)
                     .background(set.isCompleted ? setTypeColor : setTypeColor.opacity(0.2))
                     .clipShape(Circle())
-
-                // Set type (tappable)
-                Menu {
-                    ForEach(SetType.allCases, id: \.self) { type in
-                        Button(type.displayName) {
-                            viewModel.updateSetType(exerciseIndex: exerciseIndex, setIndex: setIndex, setType: type)
-                        }
-                    }
-                } label: {
-                    Text(set.setType.shortName)
-                        .font(RQTypography.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(setTypeColor)
-                        .frame(width: 24)
-                }
-                .disabled(set.isCompleted)
 
                 // Weight input
                 TextField("0", text: $weightText)
@@ -108,14 +93,23 @@ struct SetRowView: View {
                 } label: {
                     if set.isSaving {
                         ProgressView()
-                            .frame(width: 32, height: 32)
+                            .frame(width: 28, height: 28)
                     } else {
                         Image(systemName: set.isCompleted ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 24))
+                            .font(.system(size: 22))
                             .foregroundColor(set.isCompleted ? RQColors.success : RQColors.textTertiary)
                     }
                 }
                 .disabled(set.isSaving)
+
+                // Delete button
+                Button {
+                    onDelete?()
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 14))
+                        .foregroundColor(RQColors.error.opacity(0.6))
+                }
             }
             .padding(.vertical, RQSpacing.xs)
             .opacity(set.isCompleted ? 0.7 : 1.0)

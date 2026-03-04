@@ -98,27 +98,31 @@ struct ActiveWorkoutView: View {
 
     @ViewBuilder
     private var workoutContent: some View {
-        ScrollView {
-            LazyVStack(spacing: RQSpacing.lg) {
-                // Error message
-                if let error = viewModel.errorMessage {
-                    Text(error)
-                        .font(RQTypography.footnote)
-                        .foregroundColor(RQColors.error)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, RQSpacing.md)
-                }
+        VStack(spacing: 0) {
+            // Exercise selector dropdown
+            if !viewModel.exercises.isEmpty {
+                exerciseSelector
+            }
 
-                // Exercise cards
-                ForEach(viewModel.exercises.indices, id: \.self) { index in
+            // Current exercise
+            ScrollView {
+                VStack(spacing: RQSpacing.lg) {
+                    // Error message
+                    if let error = viewModel.errorMessage {
+                        Text(error)
+                            .font(RQTypography.footnote)
+                            .foregroundColor(RQColors.error)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, RQSpacing.md)
+                    }
+
+                    // Single exercise card
                     ExerciseLogView(
                         viewModel: viewModel,
-                        exerciseIndex: index
+                        exerciseIndex: viewModel.currentExerciseIndex
                     )
-                }
 
-                // Abandon workout button
-                if !viewModel.exercises.isEmpty {
+                    // Abandon workout button
                     Button {
                         viewModel.showAbandonConfirmation = true
                     } label: {
@@ -128,11 +132,119 @@ struct ActiveWorkoutView: View {
                     }
                     .padding(.top, RQSpacing.lg)
                 }
+                .padding(.horizontal, RQSpacing.screenHorizontal)
+                .padding(.top, RQSpacing.lg)
+                .padding(.bottom, RQSpacing.xxxl)
+            }
+
+            // Previous / Next navigation bar
+            if !viewModel.exercises.isEmpty {
+                exerciseNavigationBar
+            }
+        }
+    }
+
+    // MARK: - Exercise Selector Dropdown
+
+    private var exerciseSelector: some View {
+        Menu {
+            ForEach(viewModel.exercises.indices, id: \.self) { index in
+                let exercise = viewModel.exercises[index]
+                Button {
+                    viewModel.goToExercise(at: index)
+                } label: {
+                    HStack {
+                        Text(exercise.exerciseName)
+                        if exercise.isAllSetsCompleted {
+                            Image(systemName: "checkmark.circle.fill")
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: RQSpacing.sm) {
+                if let exercise = viewModel.currentExercise {
+                    // Exercise counter
+                    Text("\(viewModel.currentExerciseIndex + 1)/\(viewModel.exercises.count)")
+                        .font(RQTypography.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(RQColors.background)
+                        .padding(.horizontal, RQSpacing.sm)
+                        .padding(.vertical, RQSpacing.xxs)
+                        .background(RQColors.accent)
+                        .cornerRadius(RQRadius.small)
+
+                    Text(exercise.exerciseName)
+                        .font(RQTypography.headline)
+                        .foregroundColor(RQColors.textPrimary)
+                        .lineLimit(1)
+
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(RQColors.textTertiary)
+                }
+
+                Spacer()
+
+                // Overall progress
+                let completed = viewModel.exercises.filter(\.isAllSetsCompleted).count
+                if completed > 0 {
+                    Text("\(completed) done")
+                        .font(RQTypography.caption)
+                        .foregroundColor(RQColors.success)
+                }
             }
             .padding(.horizontal, RQSpacing.screenHorizontal)
-            .padding(.top, RQSpacing.lg)
-            .padding(.bottom, RQSpacing.xxxl)
+            .padding(.vertical, RQSpacing.md)
+            .background(RQColors.surfacePrimary)
         }
+    }
+
+    // MARK: - Navigation Bar
+
+    private var exerciseNavigationBar: some View {
+        HStack(spacing: RQSpacing.md) {
+            // Previous button
+            if viewModel.canGoToPrevious {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        viewModel.goToPreviousExercise()
+                    }
+                } label: {
+                    HStack(spacing: RQSpacing.xs) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("Previous")
+                            .font(RQTypography.subheadline)
+                    }
+                    .foregroundColor(RQColors.accent)
+                    .padding(.vertical, RQSpacing.md)
+                }
+            }
+
+            Spacer()
+
+            // Next button
+            if viewModel.canGoToNext {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        viewModel.goToNextExercise()
+                    }
+                } label: {
+                    HStack(spacing: RQSpacing.xs) {
+                        Text("Next")
+                            .font(RQTypography.subheadline)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    .foregroundColor(RQColors.accent)
+                    .padding(.vertical, RQSpacing.md)
+                }
+            }
+        }
+        .padding(.horizontal, RQSpacing.screenHorizontal)
+        .padding(.bottom, RQSpacing.sm)
+        .background(RQColors.surfacePrimary)
     }
 
     // MARK: - Helpers
