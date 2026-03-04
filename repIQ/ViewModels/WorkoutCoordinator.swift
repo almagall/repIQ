@@ -5,11 +5,13 @@ final class WorkoutCoordinator {
     var showActiveWorkout = false
     var selectedTemplate: Template?
     var selectedWorkoutDay: WorkoutDay?
+    var selectedWorkoutDate: Date?
 
     /// Called from TemplateDetailView or Dashboard to start a workout.
-    func startWorkout(template: Template, day: WorkoutDay) {
+    func startWorkout(template: Template, day: WorkoutDay, date: Date) {
         selectedTemplate = template
         selectedWorkoutDay = day
+        selectedWorkoutDate = date
         showActiveWorkout = true
     }
 
@@ -18,5 +20,6 @@ final class WorkoutCoordinator {
         showActiveWorkout = false
         selectedTemplate = nil
         selectedWorkoutDay = nil
+        selectedWorkoutDate = nil
     }
 }

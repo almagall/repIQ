@@ -112,8 +112,8 @@ struct DashboardView: View {
             }
             .sheet(isPresented: $showDayPicker) {
                 if let template = selectedTemplate {
-                    WorkoutDayPickerView(template: template) { day in
-                        workoutCoordinator.startWorkout(template: template, day: day)
+                    WorkoutDayPickerView(template: template) { day, date in
+                        workoutCoordinator.startWorkout(template: template, day: day, date: date)
                     }
                 }
             }

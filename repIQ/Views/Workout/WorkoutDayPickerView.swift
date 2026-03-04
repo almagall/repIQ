@@ -2,9 +2,10 @@ import SwiftUI
 
 struct WorkoutDayPickerView: View {
     let template: Template
-    let onDaySelected: (WorkoutDay) -> Void
+    let onDaySelected: (WorkoutDay, Date) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @State private var workoutDate = Date()
 
     var body: some View {
         NavigationStack {
@@ -20,13 +21,39 @@ struct WorkoutDayPickerView: View {
                             .font(RQTypography.subheadline)
                             .foregroundColor(RQColors.textSecondary)
                     }
-                    .padding(.bottom, RQSpacing.md)
+                    .padding(.bottom, RQSpacing.sm)
+
+                    // Workout date picker
+                    RQCard {
+                        HStack {
+                            VStack(alignment: .leading, spacing: RQSpacing.xxs) {
+                                Text("Workout Date")
+                                    .font(RQTypography.caption)
+                                    .foregroundColor(RQColors.textSecondary)
+                                if Calendar.current.isDateInToday(workoutDate) {
+                                    Text("Today")
+                                        .font(RQTypography.footnote)
+                                        .foregroundColor(RQColors.accent)
+                                }
+                            }
+                            Spacer()
+                            DatePicker(
+                                "",
+                                selection: $workoutDate,
+                                in: ...Date(),
+                                displayedComponents: .date
+                            )
+                            .labelsHidden()
+                            .tint(RQColors.accent)
+                        }
+                    }
+                    .padding(.bottom, RQSpacing.sm)
 
                     // Day cards
                     if let days = template.workoutDays {
                         ForEach(days.sorted(by: { $0.sortOrder < $1.sortOrder })) { day in
                             Button {
-                                onDaySelected(day)
+                                onDaySelected(day, workoutDate)
                                 dismiss()
                             } label: {
                                 dayCard(day)

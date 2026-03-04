@@ -109,7 +109,7 @@ final class ActiveWorkoutViewModel {
 
     // MARK: - Lifecycle
 
-    func startWorkout(template: Template, day: WorkoutDay) async {
+    func startWorkout(template: Template, day: WorkoutDay, date: Date = Date()) async {
         isLoading = true
         errorMessage = nil
         templateName = template.name
@@ -122,11 +122,12 @@ final class ActiveWorkoutViewModel {
                 return
             }
 
-            // 1. Create session in Supabase
+            // 1. Create session in Supabase with selected date
             let session = try await workoutService.createSession(
                 userId: userId,
                 templateId: template.id,
-                workoutDayId: day.id
+                workoutDayId: day.id,
+                startDate: date
             )
             sessionId = session.id
             startTime = session.startedAt

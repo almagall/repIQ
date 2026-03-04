@@ -79,8 +79,8 @@ struct TemplateDetailView: View {
             }
         }
         .sheet(isPresented: $showDayPicker) {
-            WorkoutDayPickerView(template: template) { day in
-                workoutCoordinator.startWorkout(template: template, day: day)
+            WorkoutDayPickerView(template: template) { day, date in
+                workoutCoordinator.startWorkout(template: template, day: day, date: date)
             }
         }
         .alert("Delete Template?", isPresented: $showDeleteConfirmation) {

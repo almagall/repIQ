@@ -99,10 +99,12 @@ struct WorkoutService: Sendable {
     // MARK: - Session CRUD
 
     /// Creates a new in-progress workout session.
+    /// - Parameter startDate: The date to record for this workout. Defaults to now.
     func createSession(
         userId: UUID,
         templateId: UUID?,
-        workoutDayId: UUID?
+        workoutDayId: UUID?,
+        startDate: Date = Date()
     ) async throws -> WorkoutSession {
         struct CreateSession: Encodable {
             let id: UUID
@@ -123,7 +125,7 @@ struct WorkoutService: Sendable {
             template_id: templateId?.uuidString,
             workout_day_id: workoutDayId?.uuidString,
             status: "in_progress",
-            started_at: formatter.string(from: Date())
+            started_at: formatter.string(from: startDate)
         )
 
         let session: WorkoutSession = try await supabase.from("workout_sessions")

@@ -87,7 +87,8 @@ struct ActiveWorkoutView: View {
             .task {
                 if let template = coordinator.selectedTemplate,
                    let day = coordinator.selectedWorkoutDay {
-                    await viewModel.startWorkout(template: template, day: day)
+                    let date = coordinator.selectedWorkoutDate ?? Date()
+                    await viewModel.startWorkout(template: template, day: day, date: date)
                 }
             }
             .interactiveDismissDisabled()
