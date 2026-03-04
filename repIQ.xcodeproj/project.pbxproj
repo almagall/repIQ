@@ -65,6 +65,7 @@
 			);
 			name = repIQ;
 			packageProductDependencies = (
+				AABB00022F57000100000002 /* Supabase */,
 			);
 			productName = repIQ;
 			productReference = 05F208252F56CC0D00E0AE4C /* repIQ.app */;
@@ -95,6 +96,9 @@
 			mainGroup = 05F2081C2F56CC0D00E0AE4C;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
+			packageReferences = (
+				AABB00012F57000100000001 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+			);
 			productRefGroup = 05F208262F56CC0D00E0AE4C /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -328,6 +332,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		AABB00012F57000100000001 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase/supabase-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		AABB00022F57000100000002 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AABB00012F57000100000001 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 05F2081D2F56CC0D00E0AE4C /* Project object */;
 }
