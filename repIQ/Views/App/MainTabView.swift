@@ -6,6 +6,8 @@ struct MainTabView: View {
     @State private var activeWorkoutViewModel: ActiveWorkoutViewModel?
 
     var body: some View {
+        @Bindable var coordinator = workoutCoordinator
+
         TabView(selection: $selectedTab) {
             Tab("Dashboard", systemImage: "house.fill", value: 0) {
                 DashboardView()
@@ -25,7 +27,7 @@ struct MainTabView: View {
         }
         .tint(RQColors.accent)
         .environment(workoutCoordinator)
-        .fullScreenCover(isPresented: $workoutCoordinator.showActiveWorkout) {
+        .fullScreenCover(isPresented: $coordinator.showActiveWorkout) {
             // Clean up when dismissed
             activeWorkoutViewModel = nil
         } content: {
@@ -35,6 +37,7 @@ struct MainTabView: View {
                 ActiveWorkoutView(viewModel: vm) {
                     workoutCoordinator.dismissWorkout()
                 }
+                .environment(workoutCoordinator)
             }
         }
     }
