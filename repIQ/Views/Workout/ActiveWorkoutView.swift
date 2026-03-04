@@ -104,6 +104,9 @@ struct ActiveWorkoutView: View {
                 exerciseSelector
             }
 
+            // Rest timer settings
+            restTimerSettingsBar
+
             // Current exercise
             ScrollView {
                 VStack(spacing: RQSpacing.lg) {
@@ -247,7 +250,81 @@ struct ActiveWorkoutView: View {
         .background(RQColors.surfacePrimary)
     }
 
+    // MARK: - Rest Timer Settings
+
+    private var restTimerSettingsBar: some View {
+        HStack(spacing: RQSpacing.sm) {
+            // Toggle
+            Button {
+                viewModel.restTimerEnabled.toggle()
+            } label: {
+                HStack(spacing: RQSpacing.xs) {
+                    Image(systemName: viewModel.restTimerEnabled ? "timer" : "timer.slash")
+                        .font(.system(size: 14))
+                    Text("Rest")
+                        .font(RQTypography.caption)
+                        .fontWeight(.medium)
+                }
+                .foregroundColor(viewModel.restTimerEnabled ? RQColors.accent : RQColors.textTertiary)
+            }
+
+            if viewModel.restTimerEnabled {
+                Spacer()
+
+                // Decrease duration
+                Button {
+                    viewModel.adjustRestTimerDuration(by: -15)
+                } label: {
+                    Image(systemName: "minus")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(RQColors.textSecondary)
+                        .frame(width: 28, height: 28)
+                        .background(RQColors.surfaceTertiary)
+                        .clipShape(Circle())
+                }
+
+                // Duration display
+                Text(formattedRestDuration)
+                    .font(RQTypography.numbersSmall)
+                    .foregroundColor(RQColors.textPrimary)
+                    .frame(minWidth: 44)
+
+                // Increase duration
+                Button {
+                    viewModel.adjustRestTimerDuration(by: 15)
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(RQColors.textSecondary)
+                        .frame(width: 28, height: 28)
+                        .background(RQColors.surfaceTertiary)
+                        .clipShape(Circle())
+                }
+            } else {
+                Spacer()
+
+                Text("Off")
+                    .font(RQTypography.caption)
+                    .foregroundColor(RQColors.textTertiary)
+            }
+        }
+        .padding(.horizontal, RQSpacing.screenHorizontal)
+        .padding(.vertical, RQSpacing.sm)
+        .background(RQColors.surfacePrimary)
+    }
+
     // MARK: - Helpers
+
+    private var formattedRestDuration: String {
+        let minutes = viewModel.restTimerDuration / 60
+        let seconds = viewModel.restTimerDuration % 60
+        if minutes > 0 && seconds == 0 {
+            return "\(minutes)m"
+        } else if minutes > 0 {
+            return String(format: "%d:%02d", minutes, seconds)
+        }
+        return "\(seconds)s"
+    }
 
     private var formattedVolume: String {
         let volume = viewModel.totalVolume

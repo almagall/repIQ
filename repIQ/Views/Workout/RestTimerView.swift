@@ -34,6 +34,35 @@ struct RestTimerView: View {
                 }
             }
 
+            // +/- time adjustments
+            HStack(spacing: RQSpacing.lg) {
+                Button {
+                    viewModel.adjustRunningTimer(by: -15)
+                } label: {
+                    Text("-15s")
+                        .font(RQTypography.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(RQColors.textSecondary)
+                        .padding(.horizontal, RQSpacing.md)
+                        .padding(.vertical, RQSpacing.sm)
+                        .background(RQColors.surfaceTertiary)
+                        .cornerRadius(RQRadius.medium)
+                }
+
+                Button {
+                    viewModel.adjustRunningTimer(by: 15)
+                } label: {
+                    Text("+15s")
+                        .font(RQTypography.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(RQColors.textSecondary)
+                        .padding(.horizontal, RQSpacing.md)
+                        .padding(.vertical, RQSpacing.sm)
+                        .background(RQColors.surfaceTertiary)
+                        .cornerRadius(RQRadius.medium)
+                }
+            }
+
             // Skip button
             Button {
                 viewModel.cancelRestTimer()

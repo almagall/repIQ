@@ -22,6 +22,11 @@ final class ActiveWorkoutViewModel {
     var restTimerRemaining: Int = 0
     var restTimerTarget: Int = 0
     var restTimerActive = false
+    var restTimerEnabled = true
+    var restTimerDuration: Int = AppConstants.Defaults.restTimerSeconds
+
+    /// Preset durations available for quick selection (in seconds).
+    static let timerPresets: [Int] = [30, 60, 90, 120, 150, 180, 240, 300]
 
     // MARK: - Context
     private(set) var templateName: String = ""
@@ -272,9 +277,10 @@ final class ActiveWorkoutViewModel {
             exercises[exerciseIndex].sets[setIndex].isCompleted = true
             exercises[exerciseIndex].sets[setIndex].isSaving = false
 
-            // Start rest timer
-            let restSeconds = exercises[exerciseIndex].restSeconds
-            startRestTimer(seconds: restSeconds)
+            // Start rest timer if enabled
+            if restTimerEnabled {
+                startRestTimer(seconds: restTimerDuration)
+            }
 
             // Haptic feedback
             let generator = UIImpactFeedbackGenerator(style: .medium)
@@ -428,6 +434,23 @@ final class ActiveWorkoutViewModel {
                 guard let self, !Task.isCancelled else { break }
                 self.elapsedSeconds = Int(Date().timeIntervalSince(self.startTime))
             }
+        }
+    }
+
+    func adjustRestTimerDuration(by delta: Int) {
+        let newDuration = restTimerDuration + delta
+        restTimerDuration = max(15, min(600, newDuration)) // 15s – 10min
+    }
+
+    /// Add time to the currently running rest timer.
+    func adjustRunningTimer(by delta: Int) {
+        guard restTimerActive else { return }
+        let newRemaining = restTimerRemaining + delta
+        let newTarget = restTimerTarget + delta
+        restTimerRemaining = max(0, newRemaining)
+        restTimerTarget = max(1, newTarget)
+        if restTimerRemaining == 0 {
+            cancelRestTimer()
         }
     }
 
