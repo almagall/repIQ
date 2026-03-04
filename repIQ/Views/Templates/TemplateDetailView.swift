@@ -97,12 +97,7 @@ struct TemplateDetailView: View {
 
     private func startWorkout() {
         guard let days = template.workoutDays, !days.isEmpty else { return }
-
-        if days.count == 1, let day = days.first {
-            workoutCoordinator.startWorkout(template: template, day: day)
-        } else {
-            showDayPicker = true
-        }
+        showDayPicker = true
     }
 
     private func dayCard(_ day: WorkoutDay) -> some View {

@@ -6,6 +6,8 @@ struct TemplateEditorView: View {
     @State private var showAddDay = false
     @State private var newDayName = ""
     @State private var newDayDescription = ""
+    @State private var dayToDelete: WorkoutDay?
+    @State private var showDeleteDayConfirmation = false
 
     var body: some View {
         ScrollView {
@@ -74,13 +76,18 @@ struct TemplateEditorView: View {
                         }
                     } else {
                         ForEach(viewModel.workoutDays) { day in
-                            NavigationLink {
-                                WorkoutDayEditorView(
-                                    day: day,
-                                    viewModel: viewModel
-                                )
-                            } label: {
-                                workoutDayCard(day)
+                            SwipeToDeleteWrapper {
+                                NavigationLink {
+                                    WorkoutDayEditorView(
+                                        day: day,
+                                        viewModel: viewModel
+                                    )
+                                } label: {
+                                    workoutDayCard(day)
+                                }
+                            } onDelete: {
+                                dayToDelete = day
+                                showDeleteDayConfirmation = true
                             }
                         }
                     }
@@ -128,6 +135,28 @@ struct TemplateEditorView: View {
             Button("Cancel", role: .cancel) {
                 newDayName = ""
                 newDayDescription = ""
+            }
+        }
+        .alert("Delete Workout Day?", isPresented: $showDeleteDayConfirmation) {
+            Button("Delete", role: .destructive) {
+                if let day = dayToDelete {
+                    Task { await viewModel.deleteWorkoutDay(day) }
+                }
+                dayToDelete = nil
+            }
+            Button("Cancel", role: .cancel) {
+                dayToDelete = nil
+            }
+        } message: {
+            if let day = dayToDelete {
+                let count = day.exercises?.count ?? 0
+                if count > 0 {
+                    Text("This will permanently delete \"\(day.name)\" and its \(count) exercise\(count == 1 ? "" : "s").")
+                } else {
+                    Text("This will permanently delete \"\(day.name)\".")
+                }
+            } else {
+                Text("Are you sure you want to delete this workout day?")
             }
         }
     }

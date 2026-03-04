@@ -46,9 +46,9 @@ struct WorkoutDayEditorView: View {
                 }
 
                 // Exercise List
-                if let exercises = currentDay.exercises, !exercises.isEmpty {
-                    ForEach(exercises) { dayExercise in
-                        exerciseCard(dayExercise)
+                if let exercises = currentDay.exercises?.sorted(by: { $0.sortOrder < $1.sortOrder }), !exercises.isEmpty {
+                    ForEach(Array(exercises.enumerated()), id: \.element.id) { index, dayExercise in
+                        exerciseCard(dayExercise, index: index, total: exercises.count)
                     }
                 } else {
                     RQCard {
@@ -89,15 +89,43 @@ struct WorkoutDayEditorView: View {
         }
     }
 
-    private func exerciseCard(_ dayExercise: WorkoutDayExercise) -> some View {
+    private func exerciseCard(_ dayExercise: WorkoutDayExercise, index: Int, total: Int) -> some View {
         RQCard {
             VStack(alignment: .leading, spacing: RQSpacing.md) {
-                // Exercise name and remove button
-                HStack {
+                // Exercise name, reorder, and remove
+                HStack(spacing: RQSpacing.sm) {
+                    // Reorder buttons
+                    VStack(spacing: 2) {
+                        Button {
+                            Task {
+                                await viewModel.moveExercise(in: currentDay, from: index, to: index - 1)
+                            }
+                        } label: {
+                            Image(systemName: "chevron.up")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(index > 0 ? RQColors.textSecondary : RQColors.surfaceTertiary)
+                        }
+                        .disabled(index == 0)
+
+                        Button {
+                            Task {
+                                await viewModel.moveExercise(in: currentDay, from: index, to: index + 1)
+                            }
+                        } label: {
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(index < total - 1 ? RQColors.textSecondary : RQColors.surfaceTertiary)
+                        }
+                        .disabled(index == total - 1)
+                    }
+                    .frame(width: 24)
+
                     Text(dayExercise.exercise?.name ?? "Unknown Exercise")
                         .font(RQTypography.headline)
                         .foregroundColor(RQColors.textPrimary)
+
                     Spacer()
+
                     Button {
                         Task {
                             await viewModel.removeExercise(dayExercise, from: currentDay)

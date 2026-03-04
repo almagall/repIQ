@@ -223,6 +223,37 @@ final class TemplateEditorViewModel {
         }
     }
 
+    // MARK: - Reorder Exercises
+
+    func moveExercise(in day: WorkoutDay, from sourceIndex: Int, to destinationIndex: Int) async {
+        guard let dayIndex = workoutDays.firstIndex(where: { $0.id == day.id }),
+              var exercises = workoutDays[dayIndex].exercises,
+              exercises.indices.contains(sourceIndex),
+              destinationIndex >= 0 && destinationIndex < exercises.count else { return }
+
+        // Swap locally
+        let moved = exercises.remove(at: sourceIndex)
+        exercises.insert(moved, at: destinationIndex)
+
+        // Update sort orders locally
+        for i in exercises.indices {
+            exercises[i].sortOrder = i
+        }
+        workoutDays[dayIndex].exercises = exercises
+
+        // Persist all sort orders to Supabase
+        do {
+            for exercise in exercises {
+                try await templateService.updateDayExerciseSortOrder(
+                    id: exercise.id,
+                    sortOrder: exercise.sortOrder
+                )
+            }
+        } catch {
+            errorMessage = "Failed to reorder exercises."
+        }
+    }
+
     // MARK: - Reload
 
     func reload() async {

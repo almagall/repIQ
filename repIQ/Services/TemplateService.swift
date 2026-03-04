@@ -120,6 +120,13 @@ struct TemplateService: Sendable {
             .execute()
     }
 
+    func updateDayExerciseSortOrder(id: UUID, sortOrder: Int) async throws {
+        try await supabase.from("workout_day_exercises")
+            .update(["sort_order": "\(sortOrder)"])
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
     func removeDayExercise(id: UUID) async throws {
         try await supabase.from("workout_day_exercises")
             .delete()

@@ -14,15 +14,7 @@ struct DashboardView: View {
                 VStack(spacing: RQSpacing.lg) {
                     // Quick Start
                     QuickStartCard {
-                        if viewModel.templates.count == 1, let template = viewModel.templates.first {
-                            // Single template — skip template picker
-                            selectedTemplate = template
-                            if let days = template.workoutDays, days.count == 1, let day = days.first {
-                                workoutCoordinator.startWorkout(template: template, day: day)
-                            } else {
-                                showDayPicker = true
-                            }
-                        } else if !viewModel.templates.isEmpty {
+                        if !viewModel.templates.isEmpty {
                             showTemplatePicker = true
                         }
                     }
@@ -140,13 +132,9 @@ struct DashboardView: View {
                             selectedTemplate = template
                             showTemplatePicker = false
 
-                            if let days = template.workoutDays, days.count == 1, let day = days.first {
-                                workoutCoordinator.startWorkout(template: template, day: day)
-                            } else {
-                                // Slight delay so the sheet dismiss animation completes
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                    showDayPicker = true
-                                }
+                            // Always show day picker after selecting template
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                showDayPicker = true
                             }
                         } label: {
                             RQCard {
