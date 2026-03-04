@@ -13,9 +13,16 @@ struct TemplateEditorView: View {
                 // Template Info
                 RQCard {
                     VStack(alignment: .leading, spacing: RQSpacing.lg) {
-                        Text("Template Info")
-                            .font(RQTypography.headline)
-                            .foregroundColor(RQColors.textPrimary)
+                        HStack {
+                            Text("Template Info")
+                                .font(RQTypography.headline)
+                                .foregroundColor(RQColors.textPrimary)
+
+                            Spacer()
+
+                            // Auto-save status indicator
+                            saveStatusView
+                        }
 
                         VStack(alignment: .leading, spacing: RQSpacing.sm) {
                             Text("Name")
@@ -39,52 +46,41 @@ struct TemplateEditorView: View {
                     }
                 }
 
-                // Save button (creates template so we can add days)
-                if viewModel.workoutDays.isEmpty && !viewModel.isSaved {
-                    RQButton(
-                        title: "Save & Add Workout Days",
-                        isLoading: viewModel.isLoading,
-                        isDisabled: !viewModel.isFormValid
-                    ) {
-                        Task {
-                            await viewModel.save()
+                // Workout Days — always visible
+                VStack(alignment: .leading, spacing: RQSpacing.md) {
+                    HStack {
+                        Text("Workout Days")
+                            .font(RQTypography.title3)
+                            .foregroundColor(RQColors.textPrimary)
+                        Spacer()
+                        Button {
+                            if viewModel.isFormValid {
+                                showAddDay = true
+                            } else {
+                                viewModel.errorMessage = "Please enter a template name first."
+                            }
+                        } label: {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 24))
+                                .foregroundColor(viewModel.isFormValid ? RQColors.accent : RQColors.textTertiary)
                         }
                     }
-                }
 
-                // Workout Days
-                if viewModel.isSaved || !viewModel.workoutDays.isEmpty {
-                    VStack(alignment: .leading, spacing: RQSpacing.md) {
-                        HStack {
-                            Text("Workout Days")
-                                .font(RQTypography.title3)
-                                .foregroundColor(RQColors.textPrimary)
-                            Spacer()
-                            Button {
-                                showAddDay = true
-                            } label: {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.system(size: 24))
-                                    .foregroundColor(RQColors.accent)
-                            }
+                    if viewModel.workoutDays.isEmpty {
+                        RQCard {
+                            Text("No workout days yet. Tap + to add your first day.")
+                                .font(RQTypography.subheadline)
+                                .foregroundColor(RQColors.textSecondary)
                         }
-
-                        if viewModel.workoutDays.isEmpty {
-                            RQCard {
-                                Text("No workout days yet. Tap + to add your first day.")
-                                    .font(RQTypography.subheadline)
-                                    .foregroundColor(RQColors.textSecondary)
-                            }
-                        } else {
-                            ForEach(viewModel.workoutDays) { day in
-                                NavigationLink {
-                                    WorkoutDayEditorView(
-                                        day: day,
-                                        viewModel: viewModel
-                                    )
-                                } label: {
-                                    workoutDayCard(day)
-                                }
+                    } else {
+                        ForEach(viewModel.workoutDays) { day in
+                            NavigationLink {
+                                WorkoutDayEditorView(
+                                    day: day,
+                                    viewModel: viewModel
+                                )
+                            } label: {
+                                workoutDayCard(day)
                             }
                         }
                     }
@@ -102,20 +98,18 @@ struct TemplateEditorView: View {
             .padding(.bottom, RQSpacing.xxxl)
         }
         .background(RQColors.background)
-        .navigationTitle(viewModel.workoutDays.isEmpty ? "New Template" : viewModel.templateName)
+        .navigationTitle(viewModel.isSaved ? viewModel.templateName : "New Template")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
-            if viewModel.isSaved || !viewModel.workoutDays.isEmpty {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        Task {
-                            await viewModel.save()
-                            dismiss()
-                        }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Done") {
+                    Task {
+                        await viewModel.flushSave()
+                        dismiss()
                     }
-                    .foregroundColor(RQColors.accent)
                 }
+                .foregroundColor(RQColors.accent)
             }
         }
         .alert("Add Workout Day", isPresented: $showAddDay) {
@@ -137,6 +131,42 @@ struct TemplateEditorView: View {
             }
         }
     }
+
+    // MARK: - Save Status Indicator
+
+    @ViewBuilder
+    private var saveStatusView: some View {
+        switch viewModel.saveStatus {
+        case .idle:
+            EmptyView()
+        case .saving:
+            HStack(spacing: RQSpacing.xxs) {
+                ProgressView()
+                    .scaleEffect(0.6)
+                Text("Saving…")
+                    .font(RQTypography.caption)
+                    .foregroundColor(RQColors.textTertiary)
+            }
+        case .saved:
+            HStack(spacing: RQSpacing.xxs) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 10))
+                Text("Saved")
+                    .font(RQTypography.caption)
+            }
+            .foregroundColor(RQColors.success)
+        case .error(let message):
+            HStack(spacing: RQSpacing.xxs) {
+                Image(systemName: "exclamationmark.circle.fill")
+                    .font(.system(size: 10))
+                Text(message)
+                    .font(RQTypography.caption)
+            }
+            .foregroundColor(RQColors.error)
+        }
+    }
+
+    // MARK: - Day Card
 
     private func workoutDayCard(_ day: WorkoutDay) -> some View {
         RQCard {

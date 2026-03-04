@@ -1,18 +1,48 @@
 import Foundation
 import Supabase
 
+enum SaveStatus: Equatable {
+    case idle
+    case saving
+    case saved
+    case error(String)
+}
+
 @Observable
 final class TemplateEditorViewModel {
-    var templateName = ""
-    var templateDescription = ""
+    var templateName = "" {
+        didSet {
+            if templateName != oldValue {
+                scheduleAutoSave()
+            }
+        }
+    }
+    var templateDescription = "" {
+        didSet {
+            if templateDescription != oldValue {
+                scheduleAutoSave()
+            }
+        }
+    }
     var workoutDays: [WorkoutDay] = []
     var isLoading = false
     var errorMessage: String?
-    var isSaved = false
+    var saveStatus: SaveStatus = .idle
+
+    /// Whether the template exists in the database (has been created).
+    var isSaved: Bool { templateId != nil }
 
     private var templateId: UUID?
     private var isEditing: Bool { templateId != nil }
     private let templateService = TemplateService()
+    private var autoSaveTask: Task<Void, Never>?
+
+    /// Debounce interval for auto-save (seconds).
+    private let autoSaveDelay: Duration = .milliseconds(800)
+
+    deinit {
+        autoSaveTask?.cancel()
+    }
 
     var isFormValid: Bool {
         !templateName.trimmingCharacters(in: .whitespaces).isEmpty
@@ -25,27 +55,46 @@ final class TemplateEditorViewModel {
         templateName = template.name
         templateDescription = template.description ?? ""
         workoutDays = template.workoutDays ?? []
+        saveStatus = .saved
     }
 
-    // MARK: - Save Template
+    // MARK: - Auto-Save
 
-    func save() async {
+    private func scheduleAutoSave() {
+        autoSaveTask?.cancel()
+        autoSaveTask = Task { [weak self] in
+            try? await Task.sleep(for: self?.autoSaveDelay ?? .milliseconds(800))
+            guard let self, !Task.isCancelled else { return }
+            await self.autoSave()
+        }
+    }
+
+    /// Creates the template if it doesn't exist, or updates it if it does.
+    private func autoSave() async {
         guard isFormValid else {
-            errorMessage = "Please enter a template name."
+            // Don't save if name is empty, but clear any previous error
+            if case .error = saveStatus {} else {
+                saveStatus = .idle
+            }
             return
         }
-        isLoading = true
-        errorMessage = nil
+
+        saveStatus = .saving
 
         do {
             if let templateId {
+                // Update existing
                 try await templateService.updateTemplate(
                     id: templateId,
                     name: templateName.trimmingCharacters(in: .whitespaces),
                     description: templateDescription.isEmpty ? nil : templateDescription
                 )
             } else {
-                guard let userId = try? await supabase.auth.session.user.id else { return }
+                // Create new
+                guard let userId = try? await supabase.auth.session.user.id else {
+                    saveStatus = .error("Not authenticated.")
+                    return
+                }
                 let template = try await templateService.createTemplate(
                     userId: userId,
                     name: templateName.trimmingCharacters(in: .whitespaces),
@@ -53,20 +102,35 @@ final class TemplateEditorViewModel {
                 )
                 templateId = template.id
             }
-            isSaved = true
+            saveStatus = .saved
+            errorMessage = nil
         } catch {
+            saveStatus = .error("Failed to save.")
             errorMessage = "Failed to save template."
         }
-        isLoading = false
+    }
+
+    /// Force-save immediately (e.g. before dismissing).
+    func flushSave() async {
+        autoSaveTask?.cancel()
+        guard isFormValid else { return }
+        await autoSave()
     }
 
     // MARK: - Workout Days
 
     func addWorkoutDay(name: String, description: String?) async {
-        guard let templateId else {
-            errorMessage = "Save the template first before adding days."
-            return
+        // Auto-create template if it hasn't been saved yet
+        if templateId == nil {
+            guard isFormValid else {
+                errorMessage = "Please enter a template name first."
+                return
+            }
+            await autoSave()
+            guard templateId != nil else { return }
         }
+
+        guard let templateId else { return }
         isLoading = true
         do {
             let day = try await templateService.createWorkoutDay(
