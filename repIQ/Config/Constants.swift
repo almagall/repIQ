@@ -29,7 +29,7 @@ enum AppConstants {
     }
 
     enum RPE {
-        static let range: ClosedRange<Double> = 6.0...10.0
+        static let range: ClosedRange<Double> = 1.0...10.0
         static let step: Double = 0.5
     }
 }

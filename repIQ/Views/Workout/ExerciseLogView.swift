@@ -58,15 +58,16 @@ struct ExerciseLogView: View {
 
                         // Set rows
                         ForEach(group.sets, id: \.entry.id) { item in
-                            SetRowView(
-                                viewModel: viewModel,
-                                exerciseIndex: exerciseIndex,
-                                setIndex: item.index,
-                                onDelete: {
-                                    setToDelete = item.index
-                                    showDeleteConfirmation = true
-                                }
-                            )
+                            SwipeToDeleteWrapper {
+                                SetRowView(
+                                    viewModel: viewModel,
+                                    exerciseIndex: exerciseIndex,
+                                    setIndex: item.index
+                                )
+                            } onDelete: {
+                                setToDelete = item.index
+                                showDeleteConfirmation = true
+                            }
                         }
                     }
 
@@ -210,7 +211,7 @@ struct ExerciseLogView: View {
             Text("RPE")
             Spacer()
             Text("")
-                .frame(width: 56) // checkmark + delete spacer
+                .frame(width: 28) // checkmark spacer
         }
         .font(RQTypography.caption)
         .foregroundColor(RQColors.textTertiary)

@@ -4,8 +4,6 @@ struct SetRowView: View {
     @Bindable var viewModel: ActiveWorkoutViewModel
     let exerciseIndex: Int
     let setIndex: Int
-    var onDelete: (() -> Void)?
-
     @FocusState private var focusedField: Field?
 
     private enum Field {
@@ -101,15 +99,6 @@ struct SetRowView: View {
                     }
                 }
                 .disabled(set.isSaving)
-
-                // Delete button
-                Button {
-                    onDelete?()
-                } label: {
-                    Image(systemName: "trash")
-                        .font(.system(size: 14))
-                        .foregroundColor(RQColors.error.opacity(0.6))
-                }
             }
             .padding(.vertical, RQSpacing.xs)
             .opacity(set.isCompleted ? 0.7 : 1.0)
@@ -163,7 +152,7 @@ struct SetRowView: View {
         trainingMode == .hypertrophy ? RQColors.hypertrophy : RQColors.strength
     }
 
-    private let rpeValues: [Double] = [6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0]
+    private let rpeValues: [Double] = stride(from: 1.0, through: 10.0, by: 0.5).map { $0 }
 
     private func formatRPE(_ value: Double) -> String {
         value.truncatingRemainder(dividingBy: 1) == 0
