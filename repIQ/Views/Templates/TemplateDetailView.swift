@@ -4,7 +4,10 @@ struct TemplateDetailView: View {
     let template: Template
     @State private var editorViewModel = TemplateEditorViewModel()
     @State private var showDeleteConfirmation = false
+    @State private var showDayPicker = false
     var onDelete: (() -> Void)?
+
+    @Environment(WorkoutCoordinator.self) private var workoutCoordinator
 
     var body: some View {
         ScrollView {
@@ -29,7 +32,7 @@ struct TemplateDetailView: View {
 
                 // Start Workout Button
                 RQButton(title: "Start Workout") {
-                    // Will navigate to workout start in Phase 4
+                    startWorkout()
                 }
 
                 // Workout Days
@@ -75,6 +78,11 @@ struct TemplateDetailView: View {
                 }
             }
         }
+        .sheet(isPresented: $showDayPicker) {
+            WorkoutDayPickerView(template: template) { day in
+                workoutCoordinator.startWorkout(template: template, day: day)
+            }
+        }
         .alert("Delete Template?", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) {
                 onDelete?()
@@ -82,6 +90,18 @@ struct TemplateDetailView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This will permanently delete \"\(template.name)\" and all its workout days. This cannot be undone.")
+        }
+    }
+
+    // MARK: - Start Workout
+
+    private func startWorkout() {
+        guard let days = template.workoutDays, !days.isEmpty else { return }
+
+        if days.count == 1, let day = days.first {
+            workoutCoordinator.startWorkout(template: template, day: day)
+        } else {
+            showDayPicker = true
         }
     }
 

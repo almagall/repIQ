@@ -7,6 +7,7 @@ final class DashboardViewModel {
     var weeklySetCount: Int = 0
     var isLoading = false
     var templateCount: Int = 0
+    var templates: [Template] = []
 
     private let workoutService = WorkoutService()
     private let templateService = TemplateService()
@@ -22,7 +23,9 @@ final class DashboardViewModel {
 
             recentSession = try await sessions.first
             weeklySetCount = try await setCount
-            templateCount = try await templates.count
+            let loadedTemplates = try await templates
+            self.templates = loadedTemplates
+            templateCount = loadedTemplates.count
         } catch {
             // Silently handle - dashboard is non-critical
         }

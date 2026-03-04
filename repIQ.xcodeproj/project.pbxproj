@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		05F2098D2F57CBE700E0AE4C /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = AABB00022F57000100000002 /* Supabase */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		05F208252F56CC0D00E0AE4C /* repIQ.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = repIQ.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				05F2098D2F57CBE700E0AE4C /* Supabase in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -95,10 +100,10 @@
 			);
 			mainGroup = 05F2081C2F56CC0D00E0AE4C;
 			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
 			packageReferences = (
 				AABB00012F57000100000001 /* XCRemoteSwiftPackageReference "supabase-swift" */,
 			);
+			preferredProjectObjectVersion = 77;
 			productRefGroup = 05F208262F56CC0D00E0AE4C /* Products */;
 			projectDirPath = "";
 			projectRoot = "";

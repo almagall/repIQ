@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct QuickStartCard: View {
+    var onStartWorkout: () -> Void
+
     var body: some View {
         RQCard {
             VStack(alignment: .leading, spacing: RQSpacing.md) {
@@ -17,7 +19,7 @@ struct QuickStartCard: View {
                 }
 
                 RQButton(title: "Start Workout") {
-                    // Will navigate to workout start in Phase 4
+                    onStartWorkout()
                 }
             }
         }
