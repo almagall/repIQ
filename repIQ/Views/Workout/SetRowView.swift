@@ -127,10 +127,9 @@ struct SetRowView: View {
             }
         } label: {
             Text(set.rpe.map { "@\(formatRPE($0))" } ?? "RPE")
-                .font(RQTypography.caption)
+                .font(RQTypography.numbersSmall)
                 .foregroundColor(set.rpe != nil ? modeColor : RQColors.textTertiary)
-                .padding(.horizontal, RQSpacing.sm)
-                .padding(.vertical, RQSpacing.xs)
+                .frame(width: 56, height: 36)
                 .background(set.rpe != nil ? modeColor.opacity(0.15) : RQColors.surfaceTertiary)
                 .cornerRadius(RQRadius.small)
         }
@@ -138,13 +137,13 @@ struct SetRowView: View {
     }
 
     private var setTypeColor: Color {
-        guard let set else { return RQColors.accent }
+        guard let set else { return RQColors.working }
         switch set.setType {
         case .warmup: return RQColors.warmup
-        case .working: return RQColors.accent
-        case .cooldown: return RQColors.textTertiary
-        case .drop: return RQColors.warning
-        case .failure: return RQColors.error
+        case .working: return RQColors.working
+        case .cooldown: return RQColors.cooldown
+        case .drop: return RQColors.dropSet
+        case .failure: return RQColors.failure
         }
     }
 

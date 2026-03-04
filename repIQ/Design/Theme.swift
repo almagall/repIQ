@@ -28,9 +28,11 @@ enum RQColors {
     static let strength = Color(hex: "FF6B35")
 
     // Set Types
-    static let warmup = Color(hex: "5AC8FA")
-    static let working = accent
-    static let cooldown = Color(hex: "999999")
+    static let warmup = Color(hex: "FF9500")
+    static let working = Color(hex: "34C759")
+    static let cooldown = Color(hex: "5AC8FA")
+    static let dropSet = Color(hex: "9B59B6")
+    static let failure = Color(hex: "FF3B30")
 }
 
 enum RQSpacing {

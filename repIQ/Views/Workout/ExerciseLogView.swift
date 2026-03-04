@@ -250,10 +250,10 @@ struct ExerciseLogView: View {
     private func colorForSetType(_ type: SetType) -> Color {
         switch type {
         case .warmup: return RQColors.warmup
-        case .working: return RQColors.accent
-        case .cooldown: return RQColors.textTertiary
-        case .drop: return RQColors.warning
-        case .failure: return RQColors.error
+        case .working: return RQColors.working
+        case .cooldown: return RQColors.cooldown
+        case .drop: return RQColors.dropSet
+        case .failure: return RQColors.failure
         }
     }
 

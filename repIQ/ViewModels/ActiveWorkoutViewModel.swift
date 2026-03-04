@@ -31,6 +31,7 @@ final class ActiveWorkoutViewModel {
     // MARK: - Context
     private(set) var templateName: String = ""
     private(set) var dayName: String = ""
+    private(set) var timerStarted = false
 
     // MARK: - Private
     private let workoutService = WorkoutService()
@@ -46,6 +47,7 @@ final class ActiveWorkoutViewModel {
     // MARK: - Computed
 
     var elapsedDisplay: String {
+        if !timerStarted { return "0:00" }
         let hours = elapsedSeconds / 3600
         let minutes = (elapsedSeconds % 3600) / 60
         let seconds = elapsedSeconds % 60
@@ -177,10 +179,7 @@ final class ActiveWorkoutViewModel {
                 )
             }
 
-            // 5. Start elapsed timer
-            startElapsedTimer()
-
-            // 6. Keep screen awake during workout
+            // 5. Keep screen awake during workout
             UIApplication.shared.isIdleTimerDisabled = true
 
         } catch {
@@ -277,6 +276,13 @@ final class ActiveWorkoutViewModel {
             exercises[exerciseIndex].sets[setIndex].savedSetId = savedSet.id
             exercises[exerciseIndex].sets[setIndex].isCompleted = true
             exercises[exerciseIndex].sets[setIndex].isSaving = false
+
+            // Start elapsed timer on first confirmed set
+            if !timerStarted {
+                startTime = Date()
+                startElapsedTimer()
+                timerStarted = true
+            }
 
             // Start rest timer if enabled
             if restTimerEnabled {
