@@ -405,12 +405,17 @@ struct ProgressionService: Sendable {
     }
 
     private func weightIncrement(for equipment: String) -> Double {
+        Self.weightIncrement(for: equipment)
+    }
+
+    /// Public static accessor so per-set target logic can use equipment-specific increments.
+    static func weightIncrement(for equipment: String) -> Double {
         switch equipment {
-        case "barbell", "smith_machine": return 5.0
-        case "dumbbell": return 5.0
-        case "cable", "machine": return 5.0
+        case "barbell", "smith_machine": return AppConstants.WeightIncrements.barbellLbs
+        case "dumbbell": return AppConstants.WeightIncrements.dumbbellLbs
+        case "cable", "machine": return AppConstants.WeightIncrements.cableLbs
         case "bodyweight": return 0.0
-        default: return 5.0
+        default: return AppConstants.WeightIncrements.barbellLbs
         }
     }
 

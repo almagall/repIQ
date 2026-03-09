@@ -93,6 +93,97 @@ final class ActiveWorkoutViewModel {
         currentExerciseIndex < exercises.count - 1
     }
 
+    // MARK: - Per-Set Target Computation
+
+    /// Computes a mode-aware per-set target by applying the progression decision
+    /// to a specific previous set's data.
+    ///
+    /// Anchors to each set's individual previous weight/reps — this automatically
+    /// preserves the user's training style (straight sets, ramping, etc.).
+    ///
+    /// RPE model differs by training mode:
+    /// - **Hypertrophy**: ascending RPE across sets (+0.5 per set, capped at 9.5).
+    ///   Models the natural fatigue drift that is productive for hypertrophy.
+    /// - **Strength**: flat RPE across all sets (targetRPE, typically 8.5).
+    ///   Consistent moderate effort produces better strength gains.
+    ///
+    /// - Parameters:
+    ///   - target: The exercise-level progression target (decision + rep ranges).
+    ///   - prev: The previous session's set data for this specific set position.
+    ///   - trainingMode: Hypertrophy or strength — drives RPE model.
+    ///   - setPosition: 0-indexed position within working sets.
+    ///   - equipment: Equipment type for weight increment calculation.
+    /// - Returns: A named tuple of (weight, reps, rpe) for this set position.
+    static func perSetTarget(
+        decision target: ProgressionTarget?,
+        previousSet prev: WorkoutSet?,
+        trainingMode: TrainingMode,
+        setPosition: Int,
+        equipment: String = ""
+    ) -> (weight: Double, reps: Int, rpe: Double) {
+        // No progression target: use previous data or zeros
+        guard let target else {
+            let rpe = expectedRPE(
+                baseRPE: trainingMode.targetRPE,
+                trainingMode: trainingMode,
+                setPosition: setPosition
+            )
+            return (prev?.weight ?? 0, prev?.reps ?? 0, rpe)
+        }
+
+        // No previous set for this position: use exercise-level target
+        guard let prev else {
+            let rpe = expectedRPE(
+                baseRPE: target.targetRPE,
+                trainingMode: trainingMode,
+                setPosition: setPosition
+            )
+            return (target.targetWeight, target.targetRepsLow, rpe)
+        }
+
+        let increment = ProgressionService.weightIncrement(for: equipment)
+        let rpe = expectedRPE(
+            baseRPE: target.targetRPE,
+            trainingMode: trainingMode,
+            setPosition: setPosition
+        )
+
+        switch target.decision {
+        case .increaseWeight:
+            // Full weight bump applied to this set's own previous weight
+            // Preserves user's pattern: ramp stays ramp, straight stays straight
+            return (prev.weight + increment, prev.reps, rpe)
+
+        case .increaseReps:
+            // Keep per-set weight, aim for one more rep (capped at target high)
+            return (prev.weight, min(prev.reps + 1, target.targetRepsHigh), rpe)
+
+        case .maintain:
+            // Repeat what you did on this specific set
+            return (prev.weight, prev.reps, rpe)
+
+        case .deload, .deloadVolume:
+            // Reduced weight from target, use target rep range
+            return (target.targetWeight, target.targetRepsLow, rpe)
+        }
+    }
+
+    /// Computes the expected RPE for a given set position based on training mode.
+    /// - Hypertrophy: ascending RPE (+0.5 per set from base, capped at 9.5)
+    /// - Strength: flat RPE across all sets
+    private static func expectedRPE(
+        baseRPE: Double,
+        trainingMode: TrainingMode,
+        setPosition: Int
+    ) -> Double {
+        switch trainingMode {
+        case .hypertrophy:
+            return min(baseRPE + Double(setPosition) * 0.5, 9.5)
+        case .strength:
+            return baseRPE
+        }
+    }
+
     // MARK: - Exercise Navigation
 
     func goToPreviousExercise() {
@@ -160,16 +251,23 @@ final class ActiveWorkoutViewModel {
                     ?? dayExercise.exercise?.defaultRestSeconds
                     ?? AppConstants.Defaults.restTimerSeconds
 
-                // Pre-fill sets: use progression target weight/reps if available, else previous session
-                let prefillWeight = target?.targetWeight ?? prevSets.first?.weight ?? 0
-                let prefillReps = target?.targetRepsLow ?? 0
+                // Pre-fill sets: compute per-set targets from progression decision + previous set data
+                let equipmentType = dayExercise.exercise?.equipment ?? ""
                 var sets: [SetEntry] = []
                 for i in 1...dayExercise.targetSets {
+                    let prev = prevSets[safe: i - 1]
+                    let (w, r, _) = Self.perSetTarget(
+                        decision: target,
+                        previousSet: prev,
+                        trainingMode: dayExercise.trainingMode,
+                        setPosition: i - 1,
+                        equipment: equipmentType
+                    )
                     sets.append(SetEntry(
                         setNumber: i,
                         setType: .working,
-                        weight: prefillWeight,
-                        reps: prefillReps
+                        weight: w,
+                        reps: r
                     ))
                 }
 

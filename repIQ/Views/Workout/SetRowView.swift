@@ -6,6 +6,7 @@ struct SetRowView: View {
     let setIndex: Int
     var previousSet: WorkoutSet? = nil
     var progressionTarget: ProgressionTarget? = nil
+    var setPosition: Int = 0
     @FocusState private var focusedField: Field?
 
     private enum Field {
@@ -20,6 +21,10 @@ struct SetRowView: View {
         viewModel.exercises[safe: exerciseIndex]?.trainingMode ?? .hypertrophy
     }
 
+    private var equipment: String {
+        viewModel.exercises[safe: exerciseIndex]?.equipment ?? ""
+    }
+
     @State private var weightText: String = ""
     @State private var repsText: String = ""
 
@@ -28,9 +33,15 @@ struct SetRowView: View {
 
         return AnyView(
             VStack(alignment: .leading, spacing: 0) {
-                // Ghost row — target (preferred) or previous session fallback
+                // Ghost row — per-set target (decision + previous set) or previous fallback
                 if let target = progressionTarget {
-                    // Show target: what to aim for
+                    // Compute mode-aware per-set target from progression decision + this set's previous data
+                    let (targetW, targetR, targetRPE) = ActiveWorkoutViewModel.perSetTarget(
+                        decision: target, previousSet: previousSet,
+                        trainingMode: trainingMode, setPosition: setPosition,
+                        equipment: equipment
+                    )
+
                     HStack(spacing: RQSpacing.sm) {
                         Spacer().frame(width: 32)
 
@@ -38,11 +49,11 @@ struct SetRowView: View {
                             .font(RQTypography.caption)
                             .foregroundColor(RQColors.accent.opacity(0.5))
 
-                        Text("\(formatWeight(target.targetWeight)) × \(target.targetRepRangeDisplay)")
+                        Text("\(formatWeight(targetW)) × \(targetR)")
                             .font(RQTypography.caption)
                             .foregroundColor(RQColors.accent.opacity(0.5))
 
-                        Text("@\(formatRPE(target.targetRPE))")
+                        Text("@\(formatRPE(targetRPE))")
                             .font(RQTypography.caption)
                             .foregroundColor(RQColors.accent.opacity(0.35))
 
@@ -50,7 +61,7 @@ struct SetRowView: View {
                     }
                     .padding(.bottom, 2)
                 } else if let prev = previousSet {
-                    // Fallback: show previous session data
+                    // No progression target: show raw previous session data
                     HStack(spacing: RQSpacing.sm) {
                         Spacer().frame(width: 32)
 
@@ -186,12 +197,17 @@ struct SetRowView: View {
         .disabled(set.isCompleted)
     }
 
-    /// Returns green if the completed set meets the target, yellow/warning if it missed.
-    /// Falls back to green when no target exists.
+    /// Returns green if the completed set meets the per-set target, yellow/warning if it missed.
+    /// Falls back to green when no progression target exists.
     private func completionColor(for set: SetEntry) -> Color {
         guard let target = progressionTarget else { return RQColors.success }
-        let hitWeight = set.weight >= target.targetWeight
-        let hitReps = set.reps >= target.targetRepsLow
+        let (targetW, targetR, _) = ActiveWorkoutViewModel.perSetTarget(
+            decision: target, previousSet: previousSet,
+            trainingMode: trainingMode, setPosition: setPosition,
+            equipment: equipment
+        )
+        let hitWeight = set.weight >= targetW
+        let hitReps = set.reps >= targetR
         return (hitWeight && hitReps) ? RQColors.success : RQColors.warning
     }
 
