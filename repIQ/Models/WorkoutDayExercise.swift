@@ -21,7 +21,7 @@ enum TrainingMode: String, Codable, CaseIterable, Sendable {
     var targetRPE: Double {
         switch self {
         case .hypertrophy: return 8.0
-        case .strength: return 8.5
+        case .strength: return 8.0
         }
     }
 }

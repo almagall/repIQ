@@ -102,10 +102,11 @@ final class ActiveWorkoutViewModel {
     /// preserves the user's training style (straight sets, ramping, etc.).
     ///
     /// RPE model differs by training mode:
-    /// - **Hypertrophy**: ascending RPE across sets (+0.5 per set, capped at 9.5).
-    ///   Models the natural fatigue drift that is productive for hypertrophy.
-    /// - **Strength**: flat RPE across all sets (targetRPE, typically 8.5).
-    ///   Consistent moderate effort produces better strength gains.
+    /// - **Hypertrophy**: gently ascending RPE across sets (+0.25 per set, capped at 9.0).
+    ///   Acknowledges natural fatigue drift without over-prescribing near-failure effort.
+    ///   Keeps all sets within the evidence-based RPE 7–9 range (Robinson 2024, Refalo 2023).
+    /// - **Strength**: flat RPE across all sets (targetRPE 8.0 / 2 RIR).
+    ///   Submaximal effort preserves technique and reduces fatigue (Nuckols, Robinson 2024).
     ///
     /// - Parameters:
     ///   - target: The exercise-level progression target (decision + rep ranges).
@@ -169,7 +170,7 @@ final class ActiveWorkoutViewModel {
     }
 
     /// Computes the expected RPE for a given set position based on training mode.
-    /// - Hypertrophy: ascending RPE (+0.5 per set from base, capped at 9.5)
+    /// - Hypertrophy: gently ascending RPE (+0.25 per set from base, capped at 9.0)
     /// - Strength: flat RPE across all sets
     private static func expectedRPE(
         baseRPE: Double,
@@ -178,7 +179,7 @@ final class ActiveWorkoutViewModel {
     ) -> Double {
         switch trainingMode {
         case .hypertrophy:
-            return min(baseRPE + Double(setPosition) * 0.5, 9.5)
+            return min(baseRPE + Double(setPosition) * 0.25, 9.0)
         case .strength:
             return baseRPE
         }
