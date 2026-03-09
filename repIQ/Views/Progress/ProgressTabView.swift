@@ -105,32 +105,52 @@ struct ProgressTabView: View {
     // MARK: - Session Row
 
     private func sessionRow(_ session: WorkoutSession) -> some View {
-        RQCard {
+        let date = session.completedAt ?? session.startedAt
+        let workout = viewModel.dayName(for: session)
+        let template = viewModel.templateName(for: session)
+
+        return RQCard {
             HStack(spacing: RQSpacing.md) {
-                // Date circle
-                VStack(spacing: RQSpacing.xxs) {
-                    Text(dayOfMonth(session.completedAt ?? session.startedAt))
+                // Date badge
+                VStack(spacing: 2) {
+                    Text(dayOfMonth(date))
                         .font(RQTypography.title3)
                         .foregroundColor(RQColors.textPrimary)
-                    Text(monthAbbrev(session.completedAt ?? session.startedAt))
+                    Text(monthAbbrev(date))
                         .font(RQTypography.label)
                         .textCase(.uppercase)
                         .foregroundColor(RQColors.textSecondary)
                 }
                 .frame(width: 44)
 
-                // Divider line
+                // Divider
                 RoundedRectangle(cornerRadius: 1)
-                    .fill(RQColors.textTertiary)
-                    .frame(width: 1, height: 36)
+                    .fill(RQColors.surfaceTertiary)
+                    .frame(width: 1, height: 44)
 
                 // Session info
                 VStack(alignment: .leading, spacing: RQSpacing.xxs) {
-                    Text(dayOfWeek(session.completedAt ?? session.startedAt))
+                    // Workout day name (primary)
+                    Text(workout ?? dayOfWeek(date))
                         .font(RQTypography.headline)
                         .foregroundColor(RQColors.textPrimary)
+                        .lineLimit(1)
 
+                    // Template name + metadata
                     HStack(spacing: RQSpacing.sm) {
+                        if let template {
+                            Text(template)
+                                .font(RQTypography.caption)
+                                .foregroundColor(RQColors.accent)
+                                .lineLimit(1)
+                        }
+
+                        if template != nil, session.durationSeconds != nil {
+                            Text("·")
+                                .font(RQTypography.caption)
+                                .foregroundColor(RQColors.textTertiary)
+                        }
+
                         if let duration = session.durationSeconds {
                             Label(formatDuration(duration), systemImage: "clock")
                                 .font(RQTypography.caption)

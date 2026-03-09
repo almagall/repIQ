@@ -39,8 +39,9 @@ struct WorkoutSummaryView: View {
                         )
                     }
 
-                    // PR celebrations
-                    if !summary.newPRs.isEmpty {
+                    // PR celebrations (exclude volume — not actionable insight)
+                    let displayPRs = summary.newPRs.filter { $0.recordType != .volume }
+                    if !displayPRs.isEmpty {
                         VStack(alignment: .leading, spacing: RQSpacing.md) {
                             Text("New Personal Records")
                                 .font(RQTypography.label)
@@ -48,7 +49,7 @@ struct WorkoutSummaryView: View {
                                 .tracking(1.5)
                                 .foregroundColor(RQColors.textSecondary)
 
-                            ForEach(summary.newPRs) { pr in
+                            ForEach(displayPRs) { pr in
                                 prCard(pr)
                             }
                         }
@@ -196,22 +197,32 @@ struct WorkoutSummaryView: View {
     private func progressionCard(_ progression: ProgressionSummary) -> some View {
         RQCard {
             VStack(alignment: .leading, spacing: RQSpacing.sm) {
+                // Exercise name
+                Text(progression.exerciseName)
+                    .font(RQTypography.body)
+                    .foregroundColor(RQColors.textPrimary)
+
+                // Decision + target
                 HStack(spacing: RQSpacing.sm) {
                     Image(systemName: decisionIcon(progression.decision))
-                        .font(.system(size: 14))
+                        .font(.system(size: 12))
                         .foregroundColor(decisionColor(progression.decision))
 
-                    Text(progression.exerciseName)
-                        .font(RQTypography.body)
-                        .foregroundColor(RQColors.textPrimary)
+                    Text(progression.decision.displayName)
+                        .font(RQTypography.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(decisionColor(progression.decision))
 
-                    Spacer()
+                    Text("→")
+                        .font(RQTypography.caption)
+                        .foregroundColor(RQColors.textTertiary)
 
-                    Text("\(formatWeight(progression.targetWeight)) × \(progression.targetReps)")
+                    Text("\(formatWeight(progression.targetWeight)) lbs for \(progression.targetReps) reps")
                         .font(RQTypography.numbersSmall)
                         .foregroundColor(RQColors.textPrimary)
                 }
 
+                // Reasoning
                 Text(progression.reasoning)
                     .font(RQTypography.caption)
                     .foregroundColor(RQColors.textSecondary)
@@ -231,7 +242,7 @@ struct WorkoutSummaryView: View {
     private func decisionColor(_ decision: ProgressionDecision) -> Color {
         switch decision {
         case .increaseWeight: return RQColors.success
-        case .increaseReps: return RQColors.accent
+        case .increaseReps: return RQColors.success
         case .maintain: return RQColors.warning
         case .deload, .deloadVolume: return RQColors.error
         }

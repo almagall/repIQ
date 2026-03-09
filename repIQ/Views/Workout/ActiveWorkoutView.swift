@@ -29,34 +29,33 @@ struct ActiveWorkoutView: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    // Elapsed timer
-                    HStack(spacing: RQSpacing.xs) {
-                        Image(systemName: "timer")
-                            .font(.system(size: 12))
-                        Text(viewModel.elapsedDisplay)
-                            .font(RQTypography.numbersSmall)
-                    }
-                    .foregroundColor(RQColors.accent)
+                    // Elapsed timer — passive display, no icon
+                    Text(viewModel.elapsedDisplay)
+                        .font(RQTypography.numbersSmall)
+                        .foregroundColor(RQColors.textSecondary)
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Finish") {
-                        viewModel.showFinishConfirmation = true
-                    }
-                    .font(RQTypography.headline)
-                    .foregroundColor(RQColors.success)
-                }
-
-                ToolbarItem(placement: .keyboard) {
-                    HStack {
-                        Spacer()
-                        Button("Done") {
-                            UIApplication.shared.sendAction(
-                                #selector(UIResponder.resignFirstResponder),
-                                to: nil, from: nil, for: nil
-                            )
+                    HStack(spacing: RQSpacing.lg) {
+                        // Overflow menu (abandon lives here)
+                        Menu {
+                            Button(role: .destructive) {
+                                viewModel.showAbandonConfirmation = true
+                            } label: {
+                                Label("Abandon Workout", systemImage: "xmark.circle")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(RQColors.textSecondary)
                         }
-                        .foregroundColor(RQColors.accent)
+
+                        // Finish button
+                        Button("Finish") {
+                            viewModel.showFinishConfirmation = true
+                        }
+                        .font(RQTypography.headline)
+                        .foregroundColor(RQColors.success)
                     }
                 }
             }
@@ -100,7 +99,7 @@ struct ActiveWorkoutView: View {
     @ViewBuilder
     private var workoutContent: some View {
         VStack(spacing: 0) {
-            // Exercise selector dropdown
+            // Exercise selector with integrated navigation
             if !viewModel.exercises.isEmpty {
                 exerciseSelector
             }
@@ -125,195 +124,165 @@ struct ActiveWorkoutView: View {
                         viewModel: viewModel,
                         exerciseIndex: viewModel.currentExerciseIndex
                     )
-
-                    // Abandon workout button
-                    Button {
-                        viewModel.showAbandonConfirmation = true
-                    } label: {
-                        Text("Abandon Workout")
-                            .font(RQTypography.subheadline)
-                            .foregroundColor(RQColors.error)
-                    }
-                    .padding(.top, RQSpacing.lg)
                 }
                 .padding(.horizontal, RQSpacing.screenHorizontal)
                 .padding(.top, RQSpacing.lg)
                 .padding(.bottom, RQSpacing.xxxl)
             }
-
-            // Previous / Next navigation bar
-            if !viewModel.exercises.isEmpty {
-                exerciseNavigationBar
-            }
+            .scrollDismissesKeyboard(.interactively)
         }
     }
 
-    // MARK: - Exercise Selector Dropdown
+    // MARK: - Exercise Selector with Navigation
 
     private var exerciseSelector: some View {
-        Menu {
-            ForEach(viewModel.exercises.indices, id: \.self) { index in
-                let exercise = viewModel.exercises[index]
-                Button {
-                    viewModel.goToExercise(at: index)
-                } label: {
-                    HStack {
-                        Text(exercise.exerciseName)
-                        if exercise.isAllSetsCompleted {
-                            Image(systemName: "checkmark.circle.fill")
+        HStack(spacing: RQSpacing.sm) {
+            // Previous button
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    viewModel.goToPreviousExercise()
+                }
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(viewModel.canGoToPrevious ? RQColors.accent : RQColors.textTertiary.opacity(0.3))
+                    .frame(width: 36, height: 36)
+            }
+            .disabled(!viewModel.canGoToPrevious)
+
+            // Exercise dropdown
+            Menu {
+                ForEach(viewModel.exercises.indices, id: \.self) { index in
+                    let exercise = viewModel.exercises[index]
+                    Button {
+                        viewModel.goToExercise(at: index)
+                    } label: {
+                        HStack {
+                            Text(exercise.exerciseName)
+                            if exercise.isAllSetsCompleted {
+                                Image(systemName: "checkmark.circle.fill")
+                            }
                         }
                     }
                 }
-            }
-        } label: {
-            HStack(spacing: RQSpacing.sm) {
-                if let exercise = viewModel.currentExercise {
-                    // Exercise counter
-                    Text("\(viewModel.currentExerciseIndex + 1)/\(viewModel.exercises.count)")
-                        .font(RQTypography.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(RQColors.background)
-                        .padding(.horizontal, RQSpacing.sm)
-                        .padding(.vertical, RQSpacing.xxs)
-                        .background(RQColors.accent)
-                        .cornerRadius(RQRadius.small)
+            } label: {
+                HStack(spacing: RQSpacing.sm) {
+                    if let exercise = viewModel.currentExercise {
+                        // Exercise counter badge
+                        Text("\(viewModel.currentExerciseIndex + 1)/\(viewModel.exercises.count)")
+                            .font(RQTypography.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(RQColors.background)
+                            .padding(.horizontal, RQSpacing.sm)
+                            .padding(.vertical, RQSpacing.xxs)
+                            .background(RQColors.accent)
+                            .cornerRadius(RQRadius.small)
 
-                    Text(exercise.exerciseName)
-                        .font(RQTypography.headline)
-                        .foregroundColor(RQColors.textPrimary)
-                        .lineLimit(1)
+                        Text(exercise.exerciseName)
+                            .font(RQTypography.headline)
+                            .foregroundColor(RQColors.textPrimary)
+                            .lineLimit(1)
 
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(RQColors.textTertiary)
-                }
-
-                Spacer()
-
-                // Overall progress
-                let completed = viewModel.exercises.filter(\.isAllSetsCompleted).count
-                if completed > 0 {
-                    Text("\(completed) done")
-                        .font(RQTypography.label)
-                        .textCase(.uppercase)
-                        .tracking(1)
-                        .foregroundColor(RQColors.success)
-                }
-            }
-            .padding(.horizontal, RQSpacing.screenHorizontal)
-            .padding(.vertical, RQSpacing.md)
-            .background(RQColors.background)
-        }
-    }
-
-    // MARK: - Navigation Bar
-
-    private var exerciseNavigationBar: some View {
-        HStack(spacing: RQSpacing.md) {
-            // Previous button
-            if viewModel.canGoToPrevious {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        viewModel.goToPreviousExercise()
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(RQColors.textTertiary)
                     }
-                } label: {
-                    HStack(spacing: RQSpacing.xs) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 14, weight: .semibold))
-                        Text("Previous")
-                            .font(RQTypography.subheadline)
+
+                    Spacer()
+
+                    // Overall progress
+                    let completed = viewModel.exercises.filter(\.isAllSetsCompleted).count
+                    if completed > 0 {
+                        Text("\(completed) done")
+                            .font(RQTypography.label)
+                            .textCase(.uppercase)
+                            .tracking(1)
+                            .foregroundColor(RQColors.success)
                     }
-                    .foregroundColor(RQColors.accent)
-                    .padding(.vertical, RQSpacing.md)
                 }
             }
-
-            Spacer()
 
             // Next button
-            if viewModel.canGoToNext {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        viewModel.goToNextExercise()
-                    }
-                } label: {
-                    HStack(spacing: RQSpacing.xs) {
-                        Text("Next")
-                            .font(RQTypography.subheadline)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 14, weight: .semibold))
-                    }
-                    .foregroundColor(RQColors.accent)
-                    .padding(.vertical, RQSpacing.md)
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    viewModel.goToNextExercise()
                 }
+            } label: {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(viewModel.canGoToNext ? RQColors.accent : RQColors.textTertiary.opacity(0.3))
+                    .frame(width: 36, height: 36)
             }
+            .disabled(!viewModel.canGoToNext)
         }
-        .padding(.horizontal, RQSpacing.screenHorizontal)
-        .padding(.bottom, RQSpacing.sm)
+        .padding(.horizontal, RQSpacing.sm)
+        .padding(.vertical, RQSpacing.sm)
         .background(RQColors.background)
     }
 
     // MARK: - Rest Timer Settings
 
     private var restTimerSettingsBar: some View {
-        HStack(spacing: RQSpacing.sm) {
-            // Toggle
+        HStack(spacing: RQSpacing.md) {
+            // Toggle pill
             Button {
                 viewModel.restTimerEnabled.toggle()
             } label: {
-                HStack(spacing: RQSpacing.xs) {
+                HStack(spacing: RQSpacing.sm) {
                     Image(systemName: viewModel.restTimerEnabled ? "timer" : "timer.slash")
-                        .font(.system(size: 14))
+                        .font(.system(size: 13))
+
                     Text("Rest")
-                        .font(RQTypography.label)
-                        .textCase(.uppercase)
-                        .tracking(1.5)
+                        .font(RQTypography.caption)
+                        .fontWeight(.semibold)
+
+                    Text(viewModel.restTimerEnabled ? "ON" : "OFF")
+                        .font(RQTypography.caption)
+                        .fontWeight(.bold)
                 }
                 .foregroundColor(viewModel.restTimerEnabled ? RQColors.accent : RQColors.textTertiary)
+                .padding(.horizontal, RQSpacing.md)
+                .padding(.vertical, RQSpacing.sm)
+                .background(viewModel.restTimerEnabled ? RQColors.accent.opacity(0.15) : RQColors.surfaceTertiary)
+                .cornerRadius(RQRadius.large)
             }
 
+            // Duration controls (only when enabled)
             if viewModel.restTimerEnabled {
-                Spacer()
-
-                // Decrease duration
+                // Decrease
                 Button {
                     viewModel.adjustRestTimerDuration(by: -15)
                 } label: {
                     Image(systemName: "minus")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundColor(RQColors.textSecondary)
                         .frame(width: 28, height: 28)
                         .background(RQColors.surfaceTertiary)
                         .clipShape(Circle())
                 }
 
-                // Duration display
                 Text(formattedRestDuration)
                     .font(RQTypography.numbersSmall)
                     .foregroundColor(RQColors.textPrimary)
-                    .frame(minWidth: 44)
+                    .frame(minWidth: 40)
 
-                // Increase duration
+                // Increase
                 Button {
                     viewModel.adjustRestTimerDuration(by: 15)
                 } label: {
                     Image(systemName: "plus")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundColor(RQColors.textSecondary)
                         .frame(width: 28, height: 28)
                         .background(RQColors.surfaceTertiary)
                         .clipShape(Circle())
                 }
-            } else {
-                Spacer()
-
-                Text("Off")
-                    .font(RQTypography.caption)
-                    .foregroundColor(RQColors.textTertiary)
             }
+
+            Spacer()
         }
         .padding(.horizontal, RQSpacing.screenHorizontal)
-        .padding(.vertical, RQSpacing.sm)
+        .padding(.vertical, RQSpacing.xs)
         .background(RQColors.background)
     }
 

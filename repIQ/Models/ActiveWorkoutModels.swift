@@ -45,7 +45,6 @@ struct ExerciseLogEntry: Identifiable {
     let sortOrder: Int
     var sets: [SetEntry]
     var previousSets: [[WorkoutSet]] // last session's sets for reference
-    var isExpanded: Bool // whether previous sets are shown
     var progressionTarget: ProgressionTarget? // progression target for this exercise
 
     var completedSetCount: Int {

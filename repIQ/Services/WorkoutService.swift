@@ -264,4 +264,36 @@ struct WorkoutService: Sendable {
             .eq("id", value: id.uuidString)
             .execute()
     }
+
+    // MARK: - Name Lookups
+
+    /// Batch-fetch template names by ID.
+    func fetchTemplateNames(ids: [UUID]) async throws -> [UUID: String] {
+        guard !ids.isEmpty else { return [:] }
+
+        struct NameRow: Decodable { let id: UUID; let name: String }
+
+        let rows: [NameRow] = try await supabase.from("templates")
+            .select("id, name")
+            .in("id", values: ids.map(\.uuidString))
+            .execute()
+            .value
+
+        return Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0.name) })
+    }
+
+    /// Batch-fetch workout day names by ID.
+    func fetchWorkoutDayNames(ids: [UUID]) async throws -> [UUID: String] {
+        guard !ids.isEmpty else { return [:] }
+
+        struct NameRow: Decodable { let id: UUID; let name: String }
+
+        let rows: [NameRow] = try await supabase.from("workout_days")
+            .select("id, name")
+            .in("id", values: ids.map(\.uuidString))
+            .execute()
+            .value
+
+        return Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0.name) })
+    }
 }

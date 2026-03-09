@@ -4,6 +4,8 @@ import Supabase
 @Observable
 final class ProgressViewModel {
     var sessions: [WorkoutSession] = []
+    var templateNames: [UUID: String] = [:]
+    var dayNames: [UUID: String] = [:]
     var isLoading = false
 
     // Detail view state
@@ -31,6 +33,18 @@ final class ProgressViewModel {
         sessions.count
     }
 
+    // MARK: - Name Helpers
+
+    func templateName(for session: WorkoutSession) -> String? {
+        guard let id = session.templateId else { return nil }
+        return templateNames[id]
+    }
+
+    func dayName(for session: WorkoutSession) -> String? {
+        guard let id = session.workoutDayId else { return nil }
+        return dayNames[id]
+    }
+
     // MARK: - Loading
 
     func loadHistory() async {
@@ -38,6 +52,16 @@ final class ProgressViewModel {
         do {
             guard let userId = try? await supabase.auth.session.user.id else { return }
             sessions = try await workoutService.fetchAllSessions(userId: userId)
+
+            // Batch-fetch template and workout day names in parallel
+            let templateIds = Array(Set(sessions.compactMap(\.templateId)))
+            let dayIds = Array(Set(sessions.compactMap(\.workoutDayId)))
+
+            async let templateTask = workoutService.fetchTemplateNames(ids: templateIds)
+            async let dayTask = workoutService.fetchWorkoutDayNames(ids: dayIds)
+
+            templateNames = (try? await templateTask) ?? [:]
+            dayNames = (try? await dayTask) ?? [:]
         } catch {
             // Silently handle - non-critical
         }

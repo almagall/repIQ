@@ -22,7 +22,7 @@ final class ActiveWorkoutViewModel {
     var restTimerRemaining: Int = 0
     var restTimerTarget: Int = 0
     var restTimerActive = false
-    var restTimerEnabled = true
+    var restTimerEnabled = false
     var restTimerDuration: Int = AppConstants.Defaults.restTimerSeconds
 
     /// Preset durations available for quick selection (in seconds).
@@ -185,7 +185,6 @@ final class ActiveWorkoutViewModel {
                     sortOrder: dayExercise.sortOrder,
                     sets: sets,
                     previousSets: prevSets.isEmpty ? [] : [prevSets],
-                    isExpanded: false,
                     progressionTarget: target
                 )
             }
@@ -516,11 +515,6 @@ final class ActiveWorkoutViewModel {
               exercises[exerciseIndex].sets.indices.contains(setIndex),
               !exercises[exerciseIndex].sets[setIndex].isCompleted else { return }
         exercises[exerciseIndex].sets[setIndex].setType = setType
-    }
-
-    func togglePreviousSets(exerciseIndex: Int) {
-        guard exercises.indices.contains(exerciseIndex) else { return }
-        exercises[exerciseIndex].isExpanded.toggle()
     }
 
     // MARK: - Timers

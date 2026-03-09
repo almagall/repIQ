@@ -4,6 +4,7 @@ struct SetRowView: View {
     @Bindable var viewModel: ActiveWorkoutViewModel
     let exerciseIndex: Int
     let setIndex: Int
+    var previousSet: WorkoutSet? = nil
     @FocusState private var focusedField: Field?
 
     private enum Field {
@@ -25,80 +26,105 @@ struct SetRowView: View {
         guard let set else { return AnyView(EmptyView()) }
 
         return AnyView(
-            HStack(spacing: RQSpacing.sm) {
-                // Set number badge
-                Text("\(set.setNumber)")
-                    .font(RQTypography.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(set.isCompleted ? RQColors.background : setTypeColor)
-                    .frame(width: 26, height: 26)
-                    .background(set.isCompleted ? setTypeColor : setTypeColor.opacity(0.2))
-                    .clipShape(Circle())
+            VStack(alignment: .leading, spacing: 0) {
+                // Ghost row — previous session data
+                if let prev = previousSet {
+                    HStack(spacing: RQSpacing.sm) {
+                        // Offset to align under weight/reps columns (past the set badge + spacing)
+                        Spacer()
+                            .frame(width: 32) // set badge width + spacing
 
-                // Weight input
-                TextField("0", text: $weightText)
-                    .font(RQTypography.numbersSmall)
-                    .foregroundColor(set.isCompleted ? RQColors.textSecondary : RQColors.textPrimary)
-                    .keyboardType(.decimalPad)
-                    .multilineTextAlignment(.center)
-                    .frame(width: 64, height: 36)
-                    .background(RQColors.surfaceTertiary)
-                    .cornerRadius(RQRadius.small)
-                    .focused($focusedField, equals: .weight)
-                    .disabled(set.isCompleted)
-                    .onChange(of: weightText) { _, newValue in
-                        if let weight = Double(newValue) {
-                            viewModel.updateWeight(exerciseIndex: exerciseIndex, setIndex: setIndex, weight: weight)
+                        Text("\(formatWeight(prev.weight)) × \(prev.reps)")
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.textTertiary)
+
+                        if let rpe = prev.rpe {
+                            Text("@\(formatRPE(rpe))")
+                                .font(RQTypography.caption)
+                                .foregroundColor(RQColors.textTertiary.opacity(0.6))
                         }
+
+                        Spacer()
                     }
-
-                Text("×")
-                    .font(RQTypography.caption)
-                    .foregroundColor(RQColors.textTertiary)
-
-                // Reps input
-                TextField("0", text: $repsText)
-                    .font(RQTypography.numbersSmall)
-                    .foregroundColor(set.isCompleted ? RQColors.textSecondary : RQColors.textPrimary)
-                    .keyboardType(.numberPad)
-                    .multilineTextAlignment(.center)
-                    .frame(width: 48, height: 36)
-                    .background(RQColors.surfaceTertiary)
-                    .cornerRadius(RQRadius.small)
-                    .focused($focusedField, equals: .reps)
-                    .disabled(set.isCompleted)
-                    .onChange(of: repsText) { _, newValue in
-                        if let reps = Int(newValue) {
-                            viewModel.updateReps(exerciseIndex: exerciseIndex, setIndex: setIndex, reps: reps)
-                        }
-                    }
-
-                // RPE badge
-                rpeBadge(set: set)
-
-                Spacer()
-
-                // Checkmark button
-                Button {
-                    Task {
-                        if set.isCompleted {
-                            await viewModel.uncompleteSet(exerciseIndex: exerciseIndex, setIndex: setIndex)
-                        } else {
-                            await viewModel.completeSet(exerciseIndex: exerciseIndex, setIndex: setIndex)
-                            focusedField = nil
-                        }
-                    }
-                } label: {
-                    if set.isSaving {
-                        ProgressView()
-                            .frame(width: 28, height: 28)
-                    } else {
-                        Image(systemName: set.isCompleted ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 22))
-                            .foregroundColor(set.isCompleted ? RQColors.success : RQColors.textTertiary)
-                    }
+                    .padding(.bottom, 2)
                 }
-                .disabled(set.isSaving)
+
+                // Input row
+                HStack(spacing: RQSpacing.sm) {
+                    // Set number badge
+                    Text("\(set.setNumber)")
+                        .font(RQTypography.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(set.isCompleted ? RQColors.background : setTypeColor)
+                        .frame(width: 26, height: 26)
+                        .background(set.isCompleted ? setTypeColor : setTypeColor.opacity(0.2))
+                        .clipShape(Circle())
+
+                    // Weight input
+                    TextField("0", text: $weightText)
+                        .font(RQTypography.numbersSmall)
+                        .foregroundColor(set.isCompleted ? RQColors.textSecondary : RQColors.textPrimary)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.center)
+                        .frame(width: 64, height: 36)
+                        .background(RQColors.surfaceTertiary)
+                        .cornerRadius(RQRadius.small)
+                        .focused($focusedField, equals: .weight)
+                        .disabled(set.isCompleted)
+                        .onChange(of: weightText) { _, newValue in
+                            if let weight = Double(newValue) {
+                                viewModel.updateWeight(exerciseIndex: exerciseIndex, setIndex: setIndex, weight: weight)
+                            }
+                        }
+
+                    Text("×")
+                        .font(RQTypography.caption)
+                        .foregroundColor(RQColors.textTertiary)
+
+                    // Reps input
+                    TextField("0", text: $repsText)
+                        .font(RQTypography.numbersSmall)
+                        .foregroundColor(set.isCompleted ? RQColors.textSecondary : RQColors.textPrimary)
+                        .keyboardType(.numberPad)
+                        .multilineTextAlignment(.center)
+                        .frame(width: 48, height: 36)
+                        .background(RQColors.surfaceTertiary)
+                        .cornerRadius(RQRadius.small)
+                        .focused($focusedField, equals: .reps)
+                        .disabled(set.isCompleted)
+                        .onChange(of: repsText) { _, newValue in
+                            if let reps = Int(newValue) {
+                                viewModel.updateReps(exerciseIndex: exerciseIndex, setIndex: setIndex, reps: reps)
+                            }
+                        }
+
+                    // RPE badge
+                    rpeBadge(set: set)
+
+                    Spacer()
+
+                    // Checkmark button
+                    Button {
+                        Task {
+                            if set.isCompleted {
+                                await viewModel.uncompleteSet(exerciseIndex: exerciseIndex, setIndex: setIndex)
+                            } else {
+                                await viewModel.completeSet(exerciseIndex: exerciseIndex, setIndex: setIndex)
+                                focusedField = nil
+                            }
+                        }
+                    } label: {
+                        if set.isSaving {
+                            ProgressView()
+                                .frame(width: 28, height: 28)
+                        } else {
+                            Image(systemName: set.isCompleted ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: 22))
+                                .foregroundColor(set.isCompleted ? RQColors.success : RQColors.textTertiary)
+                        }
+                    }
+                    .disabled(set.isSaving)
+                }
             }
             .padding(.vertical, RQSpacing.xs)
             .opacity(set.isCompleted ? 0.7 : 1.0)

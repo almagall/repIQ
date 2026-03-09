@@ -42,13 +42,6 @@ struct ExerciseLogView: View {
 
                     Divider().background(RQColors.surfaceTertiary)
 
-                    // Previous session data
-                    PreviousSetsView(
-                        previousSets: exercise.previousSets,
-                        isExpanded: exercise.isExpanded,
-                        onToggle: { viewModel.togglePreviousSets(exerciseIndex: exerciseIndex) }
-                    )
-
                     // Grouped set sections
                     ForEach(groupedSets, id: \.type) { group in
                         sectionHeader(for: group.type, count: group.sets.count)
@@ -57,12 +50,13 @@ struct ExerciseLogView: View {
                         columnHeaders
 
                         // Set rows
-                        ForEach(group.sets, id: \.entry.id) { item in
+                        ForEach(Array(group.sets.enumerated()), id: \.element.entry.id) { groupIndex, item in
                             SwipeToDeleteWrapper {
                                 SetRowView(
                                     viewModel: viewModel,
                                     exerciseIndex: exerciseIndex,
-                                    setIndex: item.index
+                                    setIndex: item.index,
+                                    previousSet: previousSet(for: group.type, groupIndex: groupIndex)
                                 )
                             } onDelete: {
                                 setToDelete = item.index
@@ -217,7 +211,7 @@ struct ExerciseLogView: View {
     private func decisionColor(_ decision: ProgressionDecision) -> Color {
         switch decision {
         case .increaseWeight: return RQColors.success
-        case .increaseReps: return RQColors.accent
+        case .increaseReps: return RQColors.success
         case .maintain: return RQColors.warning
         case .deload: return RQColors.error
         case .deloadVolume: return RQColors.error
@@ -291,13 +285,17 @@ struct ExerciseLogView: View {
         } label: {
             HStack(spacing: RQSpacing.sm) {
                 Image(systemName: "plus.circle")
-                    .font(.system(size: 16))
+                    .font(.system(size: 14))
                 Text("Add Set")
-                    .font(RQTypography.subheadline)
+                    .font(RQTypography.caption)
+                    .fontWeight(.semibold)
             }
             .foregroundColor(RQColors.accent)
-            .frame(maxWidth: .infinity)
+            .padding(.horizontal, RQSpacing.lg)
             .padding(.vertical, RQSpacing.sm)
+            .background(RQColors.accent.opacity(0.1))
+            .cornerRadius(RQRadius.medium)
+            .frame(maxWidth: .infinity)
         }
     }
 
@@ -305,6 +303,13 @@ struct ExerciseLogView: View {
 
     private var modeColor: Color {
         exercise?.trainingMode == .hypertrophy ? RQColors.hypertrophy : RQColors.strength
+    }
+
+    /// Returns the previous session's set data for a given set type and position within that group.
+    /// Only working sets get ghost rows (previous session context is most useful there).
+    private func previousSet(for type: SetType, groupIndex: Int) -> WorkoutSet? {
+        guard type == .working, let exercise else { return nil }
+        return exercise.previousSets.first?[safe: groupIndex]
     }
 
     private func colorForSetType(_ type: SetType) -> Color {
