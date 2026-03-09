@@ -39,6 +39,21 @@ struct WorkoutSummaryView: View {
                         )
                     }
 
+                    // PR celebrations
+                    if !summary.newPRs.isEmpty {
+                        VStack(alignment: .leading, spacing: RQSpacing.md) {
+                            Text("New Personal Records")
+                                .font(RQTypography.label)
+                                .textCase(.uppercase)
+                                .tracking(1.5)
+                                .foregroundColor(RQColors.textSecondary)
+
+                            ForEach(summary.newPRs) { pr in
+                                prCard(pr)
+                            }
+                        }
+                    }
+
                     // Exercise breakdown
                     if !summary.exerciseSummaries.isEmpty {
                         VStack(alignment: .leading, spacing: RQSpacing.md) {
@@ -50,6 +65,21 @@ struct WorkoutSummaryView: View {
 
                             ForEach(summary.exerciseSummaries) { exercise in
                                 exerciseCard(exercise)
+                            }
+                        }
+                    }
+
+                    // Next session progression
+                    if !summary.progressionDecisions.isEmpty {
+                        VStack(alignment: .leading, spacing: RQSpacing.md) {
+                            Text("Next Session")
+                                .font(RQTypography.label)
+                                .textCase(.uppercase)
+                                .tracking(1.5)
+                                .foregroundColor(RQColors.textSecondary)
+
+                            ForEach(summary.progressionDecisions) { progression in
+                                progressionCard(progression)
                             }
                         }
                     }
@@ -134,6 +164,89 @@ struct WorkoutSummaryView: View {
                         .foregroundColor(RQColors.textTertiary)
                 }
             }
+        }
+    }
+
+    private func prCard(_ pr: PRSummary) -> some View {
+        RQCard {
+            HStack(spacing: RQSpacing.md) {
+                Image(systemName: "trophy.fill")
+                    .font(.system(size: 20))
+                    .foregroundColor(RQColors.warning)
+
+                VStack(alignment: .leading, spacing: RQSpacing.xxs) {
+                    Text(pr.exerciseName)
+                        .font(RQTypography.body)
+                        .foregroundColor(RQColors.textPrimary)
+
+                    Text(pr.recordType.displayName)
+                        .font(RQTypography.caption)
+                        .foregroundColor(RQColors.textSecondary)
+                }
+
+                Spacer()
+
+                Text(formatPRValue(pr.value, type: pr.recordType))
+                    .font(RQTypography.numbersSmall)
+                    .foregroundColor(RQColors.warning)
+            }
+        }
+    }
+
+    private func progressionCard(_ progression: ProgressionSummary) -> some View {
+        RQCard {
+            VStack(alignment: .leading, spacing: RQSpacing.sm) {
+                HStack(spacing: RQSpacing.sm) {
+                    Image(systemName: decisionIcon(progression.decision))
+                        .font(.system(size: 14))
+                        .foregroundColor(decisionColor(progression.decision))
+
+                    Text(progression.exerciseName)
+                        .font(RQTypography.body)
+                        .foregroundColor(RQColors.textPrimary)
+
+                    Spacer()
+
+                    Text("\(formatWeight(progression.targetWeight)) × \(progression.targetReps)")
+                        .font(RQTypography.numbersSmall)
+                        .foregroundColor(RQColors.textPrimary)
+                }
+
+                Text(progression.reasoning)
+                    .font(RQTypography.caption)
+                    .foregroundColor(RQColors.textSecondary)
+            }
+        }
+    }
+
+    private func decisionIcon(_ decision: ProgressionDecision) -> String {
+        switch decision {
+        case .increaseWeight: return "arrow.up.circle.fill"
+        case .increaseReps: return "arrow.up.right.circle.fill"
+        case .maintain: return "arrow.right.circle.fill"
+        case .deload, .deloadVolume: return "arrow.down.circle.fill"
+        }
+    }
+
+    private func decisionColor(_ decision: ProgressionDecision) -> Color {
+        switch decision {
+        case .increaseWeight: return RQColors.success
+        case .increaseReps: return RQColors.accent
+        case .maintain: return RQColors.warning
+        case .deload, .deloadVolume: return RQColors.error
+        }
+    }
+
+    private func formatPRValue(_ value: Double, type: RecordType) -> String {
+        switch type {
+        case .weight:
+            return "\(formatWeight(value)) lbs"
+        case .reps:
+            return "\(Int(value)) reps"
+        case .volume:
+            return formatVolume(value)
+        case .estimated1rm:
+            return "\(formatWeight(value)) lbs"
         }
     }
 

@@ -140,34 +140,94 @@ struct ExerciseLogView: View {
     // MARK: - Progress Row
 
     private func progressRow(_ exercise: ExerciseLogEntry) -> some View {
-        HStack(spacing: RQSpacing.sm) {
-            let workingSets = exercise.sets.filter { $0.setType == .working }
-            let completedWorking = workingSets.filter(\.isCompleted).count
-            Text("\(completedWorking)/\(exercise.targetSets) working sets")
-                .font(RQTypography.caption)
-                .foregroundColor(
-                    completedWorking >= exercise.targetSets
-                        ? RQColors.success
-                        : RQColors.textSecondary
-                )
+        VStack(spacing: RQSpacing.sm) {
+            // Target row (if progression target exists)
+            if let target = exercise.progressionTarget {
+                HStack(spacing: RQSpacing.sm) {
+                    Image(systemName: decisionIcon(target.decision))
+                        .font(.system(size: 11))
+                        .foregroundColor(decisionColor(target.decision))
 
-            if completedWorking >= exercise.targetSets {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 12))
-                    .foregroundColor(RQColors.success)
+                    Text(target.decision.displayName)
+                        .font(RQTypography.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(decisionColor(target.decision))
+
+                    Text("·")
+                        .foregroundColor(RQColors.textTertiary)
+
+                    Text("\(formatWeight(target.targetWeight)) lbs × \(target.targetRepRangeDisplay)")
+                        .font(RQTypography.numbersSmall)
+                        .foregroundColor(RQColors.textPrimary)
+
+                    Spacer()
+
+                    Text("RPE \(formatRPE(target.targetRPE))")
+                        .font(RQTypography.caption)
+                        .foregroundColor(RQColors.textTertiary)
+                }
             }
 
-            Spacer()
+            // Set count + rep range
+            HStack(spacing: RQSpacing.sm) {
+                let workingSets = exercise.sets.filter { $0.setType == .working }
+                let completedWorking = workingSets.filter(\.isCompleted).count
+                Text("\(completedWorking)/\(exercise.targetSets) working sets")
+                    .font(RQTypography.caption)
+                    .foregroundColor(
+                        completedWorking >= exercise.targetSets
+                            ? RQColors.success
+                            : RQColors.textSecondary
+                    )
 
-            let range = exercise.trainingMode.repRange
-            Text("\(range.lowerBound)-\(range.upperBound) reps")
-                .font(RQTypography.caption)
-                .foregroundColor(RQColors.textTertiary)
+                if completedWorking >= exercise.targetSets {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(RQColors.success)
+                }
 
-            Text("RPE \(formatRPE(exercise.trainingMode.targetRPE))")
-                .font(RQTypography.caption)
-                .foregroundColor(RQColors.textTertiary)
+                Spacer()
+
+                if exercise.progressionTarget == nil {
+                    let range = exercise.trainingMode.repRange
+                    Text("\(range.lowerBound)-\(range.upperBound) reps")
+                        .font(RQTypography.caption)
+                        .foregroundColor(RQColors.textTertiary)
+
+                    Text("RPE \(formatRPE(exercise.trainingMode.targetRPE))")
+                        .font(RQTypography.caption)
+                        .foregroundColor(RQColors.textTertiary)
+                }
+            }
         }
+    }
+
+    // MARK: - Decision Helpers
+
+    private func decisionIcon(_ decision: ProgressionDecision) -> String {
+        switch decision {
+        case .increaseWeight: return "arrow.up.circle.fill"
+        case .increaseReps: return "arrow.up.right.circle.fill"
+        case .maintain: return "arrow.right.circle.fill"
+        case .deload: return "arrow.down.circle.fill"
+        case .deloadVolume: return "arrow.down.circle.fill"
+        }
+    }
+
+    private func decisionColor(_ decision: ProgressionDecision) -> Color {
+        switch decision {
+        case .increaseWeight: return RQColors.success
+        case .increaseReps: return RQColors.accent
+        case .maintain: return RQColors.warning
+        case .deload: return RQColors.error
+        case .deloadVolume: return RQColors.error
+        }
+    }
+
+    private func formatWeight(_ weight: Double) -> String {
+        weight.truncatingRemainder(dividingBy: 1) == 0
+            ? String(format: "%.0f", weight)
+            : String(format: "%.1f", weight)
     }
 
     // MARK: - Section Header

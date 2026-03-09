@@ -46,6 +46,7 @@ struct ExerciseLogEntry: Identifiable {
     var sets: [SetEntry]
     var previousSets: [[WorkoutSet]] // last session's sets for reference
     var isExpanded: Bool // whether previous sets are shown
+    var progressionTarget: ProgressionTarget? // progression target for this exercise
 
     var completedSetCount: Int {
         sets.filter(\.isCompleted).count
@@ -66,6 +67,24 @@ struct WorkoutSummaryData {
     let totalSets: Int
     let totalVolume: Double
     let exerciseSummaries: [ExerciseSummary]
+    let newPRs: [PRSummary]
+    let progressionDecisions: [ProgressionSummary]
+
+    init(
+        duration: Int,
+        totalSets: Int,
+        totalVolume: Double,
+        exerciseSummaries: [ExerciseSummary],
+        newPRs: [PRSummary] = [],
+        progressionDecisions: [ProgressionSummary] = []
+    ) {
+        self.duration = duration
+        self.totalSets = totalSets
+        self.totalVolume = totalVolume
+        self.exerciseSummaries = exerciseSummaries
+        self.newPRs = newPRs
+        self.progressionDecisions = progressionDecisions
+    }
 
     struct ExerciseSummary: Identifiable {
         let id: UUID // exerciseId
@@ -77,4 +96,23 @@ struct WorkoutSummaryData {
         let topWeight: Double
         let topReps: Int
     }
+}
+
+/// A PR achieved during a workout session.
+struct PRSummary: Identifiable {
+    let id = UUID()
+    let exerciseName: String
+    let recordType: RecordType
+    let value: Double
+    let previousValue: Double?
+}
+
+/// A progression decision for the next session.
+struct ProgressionSummary: Identifiable {
+    let id = UUID()
+    let exerciseName: String
+    let decision: ProgressionDecision
+    let targetWeight: Double
+    let targetReps: String // "10-12"
+    let reasoning: String
 }

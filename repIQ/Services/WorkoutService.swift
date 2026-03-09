@@ -32,6 +32,36 @@ struct WorkoutService: Sendable {
         return sets.count
     }
 
+    /// Fetches all completed workout sessions for the user, ordered by completion date.
+    func fetchAllSessions(userId: UUID) async throws -> [WorkoutSession] {
+        try await supabase.from("workout_sessions")
+            .select()
+            .eq("user_id", value: userId.uuidString)
+            .eq("status", value: "completed")
+            .order("completed_at", ascending: false)
+            .execute()
+            .value
+    }
+
+    /// Fetches a single session with all its sets for the detail view.
+    func fetchSessionDetail(sessionId: UUID) async throws -> (session: WorkoutSession, sets: [WorkoutSet]) {
+        let session: WorkoutSession = try await supabase.from("workout_sessions")
+            .select()
+            .eq("id", value: sessionId.uuidString)
+            .single()
+            .execute()
+            .value
+
+        let sets: [WorkoutSet] = try await supabase.from("workout_sets")
+            .select()
+            .eq("session_id", value: sessionId.uuidString)
+            .order("set_number")
+            .execute()
+            .value
+
+        return (session: session, sets: sets)
+    }
+
     // MARK: - Previous Session Data
 
     func fetchPreviousSetsForExercise(exerciseId: UUID, userId: UUID, limit: Int = 3) async throws -> [[WorkoutSet]] {

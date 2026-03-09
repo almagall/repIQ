@@ -35,6 +35,7 @@ final class ActiveWorkoutViewModel {
 
     // MARK: - Private
     private let workoutService = WorkoutService()
+    private let progressionService = ProgressionService()
     private var timerTask: Task<Void, Never>?
     private var restTimerTask: Task<Void, Never>?
 
@@ -138,27 +139,36 @@ final class ActiveWorkoutViewModel {
             let dayExercises = day.exercises ?? []
             let exerciseIds = dayExercises.map(\.exerciseId)
 
-            // 3. Fetch previous session data for all exercises
-            let previousData = try await workoutService.fetchPreviousSetsForExercises(
+            // 3. Fetch previous session data and progression targets in parallel
+            async let previousDataTask = workoutService.fetchPreviousSetsForExercises(
                 exerciseIds: exerciseIds,
                 userId: userId
             )
+            async let targetsTask = progressionService.fetchLatestTargets(
+                userId: userId,
+                exerciseIds: exerciseIds
+            )
+
+            let previousData = try await previousDataTask
+            let targets = (try? await targetsTask) ?? [:]
 
             // 4. Build ExerciseLogEntry array
             exercises = dayExercises.sorted(by: { $0.sortOrder < $1.sortOrder }).map { dayExercise in
                 let prevSets = previousData[dayExercise.exerciseId] ?? []
+                let target = targets[dayExercise.exerciseId]
                 let restSeconds = dayExercise.restSecondsOverride
                     ?? dayExercise.exercise?.defaultRestSeconds
                     ?? AppConstants.Defaults.restTimerSeconds
 
-                // Pre-fill sets from template target count
+                // Pre-fill sets: use progression target weight if available, else previous session
                 var sets: [SetEntry] = []
                 for i in 1...dayExercise.targetSets {
                     let previousSet = prevSets[safe: i - 1]
+                    let prefillWeight = target?.targetWeight ?? previousSet?.weight ?? 0
                     sets.append(SetEntry(
                         setNumber: i,
                         setType: .working,
-                        weight: previousSet?.weight ?? 0,
+                        weight: prefillWeight,
                         reps: previousSet.map { _ in 0 } ?? 0
                     ))
                 }
@@ -175,7 +185,8 @@ final class ActiveWorkoutViewModel {
                     sortOrder: dayExercise.sortOrder,
                     sets: sets,
                     previousSets: prevSets.isEmpty ? [] : [prevSets],
-                    isExpanded: false
+                    isExpanded: false,
+                    progressionTarget: target
                 )
             }
 
@@ -193,32 +204,114 @@ final class ActiveWorkoutViewModel {
         isLoading = true
 
         do {
+            guard let userId = try? await supabase.auth.session.user.id else {
+                errorMessage = "Not authenticated."
+                isLoading = false
+                return
+            }
+
             let duration = Int(Date().timeIntervalSince(startTime))
             try await workoutService.completeSession(
                 sessionId: sessionId,
                 durationSeconds: duration
             )
 
-            // Build summary
+            // Build exercise summaries
+            let exerciseSummaries: [WorkoutSummaryData.ExerciseSummary] = exercises.compactMap { exercise in
+                let completed = exercise.sets.filter(\.isCompleted)
+                guard !completed.isEmpty else { return nil }
+                let topSet = completed.max(by: { $0.weight < $1.weight })
+                return WorkoutSummaryData.ExerciseSummary(
+                    id: exercise.exerciseId,
+                    name: exercise.exerciseName,
+                    muscleGroup: exercise.muscleGroup,
+                    trainingMode: exercise.trainingMode,
+                    setsCompleted: completed.count,
+                    totalVolume: exercise.totalVolume,
+                    topWeight: topSet?.weight ?? 0,
+                    topReps: topSet?.reps ?? 0
+                )
+            }
+
+            // Run PR detection and progression calculations
+            var allNewPRs: [PRSummary] = []
+            var allDecisions: [ProgressionSummary] = []
+
+            for exercise in exercises {
+                let completedWorking = exercise.sets.filter { $0.isCompleted && $0.setType == .working }
+                guard !completedWorking.isEmpty else { continue }
+
+                // Convert SetEntry to WorkoutSet for the service
+                let workoutSets = completedWorking.map { set in
+                    WorkoutSet(
+                        id: set.savedSetId ?? UUID(),
+                        sessionId: sessionId,
+                        exerciseId: exercise.exerciseId,
+                        setNumber: set.setNumber,
+                        setType: set.setType,
+                        weight: set.weight,
+                        reps: set.reps,
+                        rpe: set.rpe,
+                        isPR: false,
+                        notes: nil,
+                        completedAt: Date(),
+                        createdAt: Date()
+                    )
+                }
+
+                // Detect PRs
+                if let newPRs = try? await progressionService.detectPRs(
+                    exerciseId: exercise.exerciseId,
+                    userId: userId,
+                    sessionId: sessionId,
+                    completedSets: workoutSets
+                ) {
+                    for pr in newPRs {
+                        allNewPRs.append(PRSummary(
+                            exerciseName: exercise.exerciseName,
+                            recordType: pr.recordType,
+                            value: pr.value,
+                            previousValue: nil
+                        ))
+                    }
+                }
+
+                // Calculate next targets
+                let recentSessions = (try? await workoutService.fetchPreviousSetsForExercise(
+                    exerciseId: exercise.exerciseId,
+                    userId: userId,
+                    limit: 3
+                )) ?? []
+
+                // Include this session's sets as the most recent data
+                let sessionsWithCurrent = [workoutSets] + recentSessions
+
+                if let target = progressionService.calculateTarget(
+                    exerciseId: exercise.exerciseId,
+                    trainingMode: exercise.trainingMode,
+                    equipment: exercise.equipment,
+                    recentSessions: sessionsWithCurrent
+                ) {
+                    try? await progressionService.saveTarget(target, userId: userId)
+
+                    allDecisions.append(ProgressionSummary(
+                        exerciseName: exercise.exerciseName,
+                        decision: target.decision,
+                        targetWeight: target.targetWeight,
+                        targetReps: target.targetRepRangeDisplay,
+                        reasoning: target.reasoning
+                    ))
+                }
+            }
+
+            // Build summary with PR and progression data
             workoutSummary = WorkoutSummaryData(
                 duration: duration,
                 totalSets: totalCompletedSets,
                 totalVolume: totalVolume,
-                exerciseSummaries: exercises.compactMap { exercise in
-                    let completed = exercise.sets.filter(\.isCompleted)
-                    guard !completed.isEmpty else { return nil }
-                    let topSet = completed.max(by: { $0.weight < $1.weight })
-                    return WorkoutSummaryData.ExerciseSummary(
-                        id: exercise.exerciseId,
-                        name: exercise.exerciseName,
-                        muscleGroup: exercise.muscleGroup,
-                        trainingMode: exercise.trainingMode,
-                        setsCompleted: completed.count,
-                        totalVolume: exercise.totalVolume,
-                        topWeight: topSet?.weight ?? 0,
-                        topReps: topSet?.reps ?? 0
-                    )
-                }
+                exerciseSummaries: exerciseSummaries,
+                newPRs: allNewPRs,
+                progressionDecisions: allDecisions
             )
 
             timerTask?.cancel()

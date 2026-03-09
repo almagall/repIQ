@@ -34,6 +34,17 @@ struct ExerciseLibraryService: Sendable {
             .value
     }
 
+    /// Fetches exercise names by their IDs. Returns a dictionary mapping exercise ID → name.
+    func fetchExercisesByIds(_ ids: [UUID]) async throws -> [UUID: String] {
+        guard !ids.isEmpty else { return [:] }
+        let exercises: [Exercise] = try await supabase.from("exercises")
+            .select()
+            .in("id", values: ids.map(\.uuidString))
+            .execute()
+            .value
+        return Dictionary(uniqueKeysWithValues: exercises.map { ($0.id, $0.name) })
+    }
+
     func createCustomExercise(
         userId: UUID,
         name: String,
