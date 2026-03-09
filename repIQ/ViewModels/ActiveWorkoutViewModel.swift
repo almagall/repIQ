@@ -277,20 +277,19 @@ final class ActiveWorkoutViewModel {
                 }
 
                 // Calculate next targets
+                // The current session is already marked completed, so
+                // fetchPreviousSetsForExercise includes it automatically.
                 let recentSessions = (try? await workoutService.fetchPreviousSetsForExercise(
                     exerciseId: exercise.exerciseId,
                     userId: userId,
                     limit: 3
                 )) ?? []
 
-                // Include this session's sets as the most recent data
-                let sessionsWithCurrent = [workoutSets] + recentSessions
-
                 if let target = progressionService.calculateTarget(
                     exerciseId: exercise.exerciseId,
                     trainingMode: exercise.trainingMode,
                     equipment: exercise.equipment,
-                    recentSessions: sessionsWithCurrent
+                    recentSessions: recentSessions
                 ) {
                     try? await progressionService.saveTarget(target, userId: userId)
 
