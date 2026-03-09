@@ -56,7 +56,8 @@ struct ExerciseLogView: View {
                                     viewModel: viewModel,
                                     exerciseIndex: exerciseIndex,
                                     setIndex: item.index,
-                                    previousSet: previousSet(for: group.type, groupIndex: groupIndex)
+                                    previousSet: previousSet(for: group.type, groupIndex: groupIndex),
+                                    progressionTarget: group.type == .working ? exercise.progressionTarget : nil
                                 )
                             } onDelete: {
                                 setToDelete = item.index

@@ -160,16 +160,16 @@ final class ActiveWorkoutViewModel {
                     ?? dayExercise.exercise?.defaultRestSeconds
                     ?? AppConstants.Defaults.restTimerSeconds
 
-                // Pre-fill sets: use progression target weight if available, else previous session
+                // Pre-fill sets: use progression target weight/reps if available, else previous session
+                let prefillWeight = target?.targetWeight ?? prevSets.first?.weight ?? 0
+                let prefillReps = target?.targetRepsLow ?? 0
                 var sets: [SetEntry] = []
                 for i in 1...dayExercise.targetSets {
-                    let previousSet = prevSets[safe: i - 1]
-                    let prefillWeight = target?.targetWeight ?? previousSet?.weight ?? 0
                     sets.append(SetEntry(
                         setNumber: i,
                         setType: .working,
                         weight: prefillWeight,
-                        reps: previousSet.map { _ in 0 } ?? 0
+                        reps: prefillReps
                     ))
                 }
 

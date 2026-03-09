@@ -5,6 +5,7 @@ struct SetRowView: View {
     let exerciseIndex: Int
     let setIndex: Int
     var previousSet: WorkoutSet? = nil
+    var progressionTarget: ProgressionTarget? = nil
     @FocusState private var focusedField: Field?
 
     private enum Field {
@@ -27,12 +28,35 @@ struct SetRowView: View {
 
         return AnyView(
             VStack(alignment: .leading, spacing: 0) {
-                // Ghost row — previous session data
-                if let prev = previousSet {
+                // Ghost row — target (preferred) or previous session fallback
+                if let target = progressionTarget {
+                    // Show target: what to aim for
                     HStack(spacing: RQSpacing.sm) {
-                        // Offset to align under weight/reps columns (past the set badge + spacing)
+                        Spacer().frame(width: 32)
+
+                        Text("Target:")
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.accent.opacity(0.5))
+
+                        Text("\(formatWeight(target.targetWeight)) × \(target.targetRepRangeDisplay)")
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.accent.opacity(0.5))
+
+                        Text("@\(formatRPE(target.targetRPE))")
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.accent.opacity(0.35))
+
                         Spacer()
-                            .frame(width: 32) // set badge width + spacing
+                    }
+                    .padding(.bottom, 2)
+                } else if let prev = previousSet {
+                    // Fallback: show previous session data
+                    HStack(spacing: RQSpacing.sm) {
+                        Spacer().frame(width: 32)
+
+                        Text("Prev:")
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.textTertiary)
 
                         Text("\(formatWeight(prev.weight)) × \(prev.reps)")
                             .font(RQTypography.caption)
@@ -120,7 +144,7 @@ struct SetRowView: View {
                         } else {
                             Image(systemName: set.isCompleted ? "checkmark.circle.fill" : "circle")
                                 .font(.system(size: 22))
-                                .foregroundColor(set.isCompleted ? RQColors.success : RQColors.textTertiary)
+                                .foregroundColor(set.isCompleted ? completionColor(for: set) : RQColors.textTertiary)
                         }
                     }
                     .disabled(set.isSaving)
@@ -160,6 +184,15 @@ struct SetRowView: View {
                 .cornerRadius(RQRadius.small)
         }
         .disabled(set.isCompleted)
+    }
+
+    /// Returns green if the completed set meets the target, yellow/warning if it missed.
+    /// Falls back to green when no target exists.
+    private func completionColor(for set: SetEntry) -> Color {
+        guard let target = progressionTarget else { return RQColors.success }
+        let hitWeight = set.weight >= target.targetWeight
+        let hitReps = set.reps >= target.targetRepsLow
+        return (hitWeight && hitReps) ? RQColors.success : RQColors.warning
     }
 
     private var setTypeColor: Color {
