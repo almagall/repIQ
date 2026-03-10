@@ -315,7 +315,3 @@ struct ActiveWorkoutView: View {
     }
 }
 
-// Make WorkoutSummaryData identifiable for .fullScreenCover(item:)
-extension WorkoutSummaryData: @retroactive Identifiable {
-    var id: Int { duration.hashValue ^ totalSets.hashValue }
-}

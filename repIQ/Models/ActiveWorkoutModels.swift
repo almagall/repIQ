@@ -61,7 +61,8 @@ struct ExerciseLogEntry: Identifiable {
 }
 
 /// Post-workout summary data.
-struct WorkoutSummaryData {
+struct WorkoutSummaryData: Identifiable {
+    var id: Int { duration.hashValue ^ totalSets.hashValue }
     let duration: Int // seconds
     let totalSets: Int
     let totalVolume: Double
