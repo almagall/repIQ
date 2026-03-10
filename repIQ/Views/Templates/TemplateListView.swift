@@ -3,6 +3,8 @@ import SwiftUI
 struct TemplateListView: View {
     @State private var viewModel = TemplateListViewModel()
     @State private var showCreateTemplate = false
+    @State private var showProgramBrowser = false
+    @State private var showNewTemplateOptions = false
 
     var body: some View {
         NavigationStack {
@@ -16,10 +18,10 @@ struct TemplateListView: View {
                         EmptyStateView(
                             icon: "rectangle.stack.badge.plus",
                             title: "No Templates Yet",
-                            message: "Create a workout template to get started with structured training.",
-                            buttonTitle: "Create Template"
+                            message: "Create your own custom template or browse proven workout programs to get started.",
+                            buttonTitle: "Get Started"
                         ) {
-                            showCreateTemplate = true
+                            showNewTemplateOptions = true
                         }
                     }
                 } else {
@@ -47,15 +49,29 @@ struct TemplateListView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
-                        showCreateTemplate = true
+                        showNewTemplateOptions = true
                     } label: {
                         Image(systemName: "plus")
                             .foregroundColor(RQColors.accent)
                     }
                 }
             }
+            .confirmationDialog("New Template", isPresented: $showNewTemplateOptions, titleVisibility: .visible) {
+                Button("Custom Template") {
+                    showCreateTemplate = true
+                }
+                Button("Browse Programs") {
+                    showProgramBrowser = true
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Create your own template or choose from proven workout programs.")
+            }
             .navigationDestination(isPresented: $showCreateTemplate) {
                 TemplateEditorView(viewModel: TemplateEditorViewModel())
+            }
+            .navigationDestination(isPresented: $showProgramBrowser) {
+                ProgramBrowserView()
             }
             .task {
                 await viewModel.loadTemplates()
@@ -85,7 +101,7 @@ struct TemplateListView: View {
                         Text("\(dayCount) day\(dayCount == 1 ? "" : "s")")
                             .font(RQTypography.footnote)
                             .foregroundColor(RQColors.textSecondary)
-                        Text("·")
+                        Text("\u{00B7}")
                             .foregroundColor(RQColors.textTertiary)
                         Text("\(totalExercises) exercise\(totalExercises == 1 ? "" : "s")")
                             .font(RQTypography.footnote)

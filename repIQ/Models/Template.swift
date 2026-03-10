@@ -10,6 +10,7 @@ struct Template: Codable, Identifiable, Sendable {
     var createdAt: Date
     var updatedAt: Date
     var workoutDays: [WorkoutDay]?
+    var sourceProgram: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -20,5 +21,6 @@ struct Template: Codable, Identifiable, Sendable {
         case createdAt = "created_at"
         case updatedAt = "updated_at"
         case workoutDays = "workout_days"
+        case sourceProgram = "source_program"
     }
 }

@@ -23,13 +23,17 @@ struct TemplateService: Sendable {
             .value
     }
 
-    func createTemplate(userId: UUID, name: String, description: String?) async throws -> Template {
-        try await supabase.from("templates")
-            .insert([
-                "user_id": userId.uuidString,
-                "name": name,
-                "description": description ?? ""
-            ])
+    func createTemplate(userId: UUID, name: String, description: String?, sourceProgram: String? = nil) async throws -> Template {
+        var fields: [String: String] = [
+            "user_id": userId.uuidString,
+            "name": name,
+            "description": description ?? ""
+        ]
+        if let sourceProgram {
+            fields["source_program"] = sourceProgram
+        }
+        return try await supabase.from("templates")
+            .insert(fields)
             .select()
             .single()
             .execute()
