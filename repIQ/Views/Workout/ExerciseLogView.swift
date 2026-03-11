@@ -99,38 +99,95 @@ struct ExerciseLogView: View {
     // MARK: - Exercise Header
 
     private func exerciseHeader(_ exercise: ExerciseLogEntry) -> some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: RQSpacing.xxs) {
-                Text(exercise.exerciseName)
-                    .font(RQTypography.headline)
-                    .foregroundColor(RQColors.textPrimary)
-
-                HStack(spacing: RQSpacing.sm) {
-                    Text(exercise.equipment.capitalized)
+        VStack(alignment: .leading, spacing: RQSpacing.sm) {
+            // Superset badge (if part of a superset)
+            if let group = exercise.supersetGroup {
+                let members = viewModel.supersetExercises(for: exerciseIndex)
+                let position = members.firstIndex(where: { $0.index == exerciseIndex }).map { $0 + 1 } ?? 1
+                HStack(spacing: RQSpacing.xs) {
+                    Image(systemName: "link")
+                        .font(.system(size: 10, weight: .bold))
+                    Text("SUPERSET \(supersetLabel(group))")
+                        .font(RQTypography.label)
+                        .textCase(.uppercase)
+                        .tracking(1)
+                    Text("(\(position)/\(members.count))")
                         .font(RQTypography.caption)
-                        .foregroundColor(RQColors.textTertiary)
-
-                    Text("·")
-                        .foregroundColor(RQColors.textTertiary)
-
-                    Text(exercise.muscleGroup.capitalized)
-                        .font(RQTypography.caption)
-                        .foregroundColor(RQColors.textTertiary)
                 }
+                .foregroundColor(RQColors.warning)
+                .padding(.horizontal, RQSpacing.sm)
+                .padding(.vertical, RQSpacing.xxs)
+                .background(RQColors.warning.opacity(0.15))
+                .cornerRadius(RQRadius.small)
             }
 
-            Spacer()
-
-            // Training mode badge
-            Text(exercise.trainingMode.displayName)
-                .font(RQTypography.caption)
-                .fontWeight(.semibold)
-                .foregroundColor(modeColor)
+            // Substitution badge
+            if exercise.isSubstituted {
+                HStack(spacing: RQSpacing.xs) {
+                    Image(systemName: "arrow.triangle.swap")
+                        .font(.system(size: 10, weight: .bold))
+                    Text("SUBSTITUTED")
+                        .font(RQTypography.label)
+                        .textCase(.uppercase)
+                        .tracking(1)
+                }
+                .foregroundColor(RQColors.accent)
                 .padding(.horizontal, RQSpacing.sm)
-                .padding(.vertical, RQSpacing.xs)
-                .background(modeColor.opacity(0.15))
+                .padding(.vertical, RQSpacing.xxs)
+                .background(RQColors.accent.opacity(0.15))
                 .cornerRadius(RQRadius.small)
+            }
+
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: RQSpacing.xxs) {
+                    Text(exercise.exerciseName)
+                        .font(RQTypography.headline)
+                        .foregroundColor(RQColors.textPrimary)
+
+                    HStack(spacing: RQSpacing.sm) {
+                        Text(exercise.equipment.capitalized)
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.textTertiary)
+
+                        Text("·")
+                            .foregroundColor(RQColors.textTertiary)
+
+                        Text(exercise.muscleGroup.capitalized)
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.textTertiary)
+                    }
+                }
+
+                Spacer()
+
+                // Swap exercise button
+                Button {
+                    viewModel.showExerciseSubstitution = true
+                } label: {
+                    Image(systemName: "arrow.triangle.swap")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(RQColors.textSecondary)
+                        .frame(width: 32, height: 32)
+                        .background(RQColors.surfaceTertiary)
+                        .clipShape(Circle())
+                }
+
+                // Training mode badge
+                Text(exercise.trainingMode.displayName)
+                    .font(RQTypography.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(modeColor)
+                    .padding(.horizontal, RQSpacing.sm)
+                    .padding(.vertical, RQSpacing.xs)
+                    .background(modeColor.opacity(0.15))
+                    .cornerRadius(RQRadius.small)
+            }
         }
+    }
+
+    private func supersetLabel(_ group: Int) -> String {
+        let labels = ["A", "B", "C", "D", "E"]
+        return labels[safe: group] ?? "\(group + 1)"
     }
 
     // MARK: - Progress Row

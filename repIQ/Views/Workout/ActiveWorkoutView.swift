@@ -29,10 +29,30 @@ struct ActiveWorkoutView: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    // Elapsed timer — passive display, no icon
-                    Text(viewModel.elapsedDisplay)
-                        .font(RQTypography.numbersSmall)
-                        .foregroundColor(RQColors.textSecondary)
+                    HStack(spacing: RQSpacing.sm) {
+                        // Elapsed timer — passive display, no icon
+                        Text(viewModel.elapsedDisplay)
+                            .font(RQTypography.numbersSmall)
+                            .foregroundColor(RQColors.textSecondary)
+
+                        // Offline indicator
+                        if viewModel.isOffline {
+                            Image(systemName: "wifi.slash")
+                                .font(.system(size: 11))
+                                .foregroundColor(RQColors.warning)
+                        }
+
+                        // Pending sync indicator
+                        if viewModel.hasPendingSets {
+                            HStack(spacing: 2) {
+                                Image(systemName: "arrow.triangle.2.circlepath")
+                                    .font(.system(size: 10))
+                                Text("\(viewModel.pendingSetCount)")
+                                    .font(RQTypography.caption)
+                            }
+                            .foregroundColor(RQColors.warning)
+                        }
+                    }
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
@@ -77,6 +97,18 @@ struct ActiveWorkoutView: View {
                 Button("Keep Going", role: .cancel) {}
             } message: {
                 Text("Your logged sets will be saved, but the session will be marked as abandoned.")
+            }
+            .sheet(isPresented: $viewModel.showExerciseSubstitution) {
+                if let exercise = viewModel.currentExercise {
+                    ExerciseSubstitutionView(currentExercise: exercise) { newExercise in
+                        Task {
+                            await viewModel.substituteExercise(
+                                at: viewModel.currentExerciseIndex,
+                                with: newExercise
+                            )
+                        }
+                    }
+                }
             }
             .fullScreenCover(item: summaryBinding) { summary in
                 WorkoutSummaryView(summary: summary) {
@@ -158,7 +190,13 @@ struct ActiveWorkoutView: View {
                         viewModel.goToExercise(at: index)
                     } label: {
                         HStack {
+                            if exercise.supersetGroup != nil {
+                                Image(systemName: "link")
+                            }
                             Text(exercise.exerciseName)
+                            if exercise.isSubstituted {
+                                Image(systemName: "arrow.triangle.swap")
+                            }
                             if exercise.isAllSetsCompleted {
                                 Image(systemName: "checkmark.circle.fill")
                             }

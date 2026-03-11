@@ -35,6 +35,7 @@ struct WorkoutDayExercise: Codable, Identifiable, Sendable {
     var sortOrder: Int
     var restSecondsOverride: Int?
     var notes: String?
+    var supersetGroup: Int?
     var createdAt: Date
     var exercise: Exercise?
 
@@ -47,6 +48,7 @@ struct WorkoutDayExercise: Codable, Identifiable, Sendable {
         case sortOrder = "sort_order"
         case restSecondsOverride = "rest_seconds_override"
         case notes
+        case supersetGroup = "superset_group"
         case createdAt = "created_at"
         case exercise = "exercises"
     }

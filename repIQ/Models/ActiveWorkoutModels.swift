@@ -35,10 +35,10 @@ struct SetEntry: Identifiable {
 /// Represents one exercise in the active workout with its mutable sets.
 struct ExerciseLogEntry: Identifiable {
     let id: UUID // matches WorkoutDayExercise.id
-    let exerciseId: UUID
-    let exerciseName: String
-    let muscleGroup: String
-    let equipment: String
+    var exerciseId: UUID
+    var exerciseName: String
+    var muscleGroup: String
+    var equipment: String
     let trainingMode: TrainingMode
     let targetSets: Int
     let restSeconds: Int
@@ -46,6 +46,11 @@ struct ExerciseLogEntry: Identifiable {
     var sets: [SetEntry]
     var previousSets: [[WorkoutSet]] // last session's sets for reference
     var progressionTarget: ProgressionTarget? // progression target for this exercise
+    var originalExerciseId: UUID? // non-nil if this exercise was substituted
+    var isSubstituted: Bool { originalExerciseId != nil }
+
+    /// The superset group index, if this exercise is part of a superset.
+    var supersetGroup: Int?
 
     var completedSetCount: Int {
         sets.filter(\.isCompleted).count

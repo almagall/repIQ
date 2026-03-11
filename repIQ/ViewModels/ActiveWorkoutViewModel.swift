@@ -18,6 +18,9 @@ final class ActiveWorkoutViewModel {
     var showAbandonConfirmation = false
     var workoutSummary: WorkoutSummaryData?
 
+    // MARK: - Exercise Substitution
+    var showExerciseSubstitution = false
+
     // MARK: - Rest Timer
     var restTimerRemaining: Int = 0
     var restTimerTarget: Int = 0
@@ -33,15 +36,23 @@ final class ActiveWorkoutViewModel {
     private(set) var dayName: String = ""
     private(set) var timerStarted = false
 
+    // MARK: - Offline Support
+    var isOffline: Bool { !NetworkMonitor.shared.isConnected }
+    var hasPendingSets: Bool { OfflineSetQueue.shared.hasPendingSets }
+    var pendingSetCount: Int { OfflineSetQueue.shared.pendingCount }
+
     // MARK: - Private
     private let workoutService = WorkoutService()
     private let progressionService = ProgressionService()
+    private let exerciseLibraryService = ExerciseLibraryService()
     private var timerTask: Task<Void, Never>?
     private var restTimerTask: Task<Void, Never>?
+    private var autoSaveTask: Task<Void, Never>?
 
     deinit {
         timerTask?.cancel()
         restTimerTask?.cancel()
+        autoSaveTask?.cancel()
         UIApplication.shared.isIdleTimerDisabled = false
     }
 
@@ -284,12 +295,16 @@ final class ActiveWorkoutViewModel {
                     sortOrder: dayExercise.sortOrder,
                     sets: sets,
                     previousSets: prevSets.isEmpty ? [] : [prevSets],
-                    progressionTarget: target
+                    progressionTarget: target,
+                    supersetGroup: dayExercise.supersetGroup
                 )
             }
 
             // 5. Keep screen awake during workout
             UIApplication.shared.isIdleTimerDisabled = true
+
+            // 6. Start periodic auto-save for crash recovery
+            startAutoSave()
 
         } catch {
             errorMessage = "Failed to start workout: \(error.localizedDescription)"
@@ -412,8 +427,13 @@ final class ActiveWorkoutViewModel {
             )
 
             timerTask?.cancel()
+            autoSaveTask?.cancel()
             cancelRestTimer()
+            WorkoutAutoSave.clear()
             UIApplication.shared.isIdleTimerDisabled = false
+
+            // Sync any offline sets that were queued
+            await syncOfflineSets()
 
         } catch {
             errorMessage = "Failed to complete workout: \(error.localizedDescription)"
@@ -431,7 +451,9 @@ final class ActiveWorkoutViewModel {
         }
 
         timerTask?.cancel()
+        autoSaveTask?.cancel()
         cancelRestTimer()
+        WorkoutAutoSave.clear()
         UIApplication.shared.isIdleTimerDisabled = false
     }
 
@@ -466,27 +488,48 @@ final class ActiveWorkoutViewModel {
             exercises[exerciseIndex].sets[setIndex].savedSetId = savedSet.id
             exercises[exerciseIndex].sets[setIndex].isCompleted = true
             exercises[exerciseIndex].sets[setIndex].isSaving = false
-
-            // Start elapsed timer on first confirmed set
-            if !timerStarted {
-                startTime = Date()
-                startElapsedTimer()
-                timerStarted = true
-            }
-
-            // Start rest timer if enabled
-            if restTimerEnabled {
-                startRestTimer(seconds: restTimerDuration)
-            }
-
-            // Haptic feedback
-            let generator = UIImpactFeedbackGenerator(style: .medium)
-            generator.impactOccurred()
-
         } catch {
+            // Offline fallback: queue the set for later sync
+            let pending = PendingSet(
+                sessionId: sessionId,
+                exerciseId: exercises[exerciseIndex].exerciseId,
+                setNumber: set.setNumber,
+                setType: set.setType,
+                weight: set.weight,
+                reps: set.reps,
+                rpe: set.rpe
+            )
+            OfflineSetQueue.shared.enqueue(pending)
+
+            // Still mark as completed locally so the user can continue
+            exercises[exerciseIndex].sets[setIndex].isCompleted = true
             exercises[exerciseIndex].sets[setIndex].isSaving = false
-            errorMessage = "Failed to save set."
         }
+
+        // Start elapsed timer on first confirmed set
+        if !timerStarted {
+            startTime = Date()
+            startElapsedTimer()
+            timerStarted = true
+        }
+
+        // Superset auto-advance: if in a superset and not the last exercise,
+        // skip rest timer and move to next exercise in the group.
+        if isInSuperset(exerciseIndex),
+           let nextIndex = nextSupersetExercise(after: exerciseIndex) {
+            // Auto-advance to next superset exercise (no rest between)
+            currentExerciseIndex = nextIndex
+        } else if restTimerEnabled {
+            // Normal flow or last exercise in superset: start rest timer
+            startRestTimer(seconds: restTimerDuration)
+        }
+
+        // Haptic feedback
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.impactOccurred()
+
+        // Auto-save workout state
+        saveWorkoutState()
     }
 
     func uncompleteSet(exerciseIndex: Int, setIndex: Int) async {
@@ -614,6 +657,196 @@ final class ActiveWorkoutViewModel {
               exercises[exerciseIndex].sets.indices.contains(setIndex),
               !exercises[exerciseIndex].sets[setIndex].isCompleted else { return }
         exercises[exerciseIndex].sets[setIndex].setType = setType
+    }
+
+    // MARK: - Auto-Save & Recovery
+
+    /// Saves current workout state to disk for crash recovery.
+    func saveWorkoutState() {
+        guard let sessionId else { return }
+
+        let savedExercises = exercises.map { exercise in
+            SavedExerciseState(
+                exerciseId: exercise.exerciseId,
+                exerciseName: exercise.exerciseName,
+                muscleGroup: exercise.muscleGroup,
+                equipment: exercise.equipment,
+                trainingMode: exercise.trainingMode,
+                targetSets: exercise.targetSets,
+                sortOrder: exercise.sortOrder,
+                sets: exercise.sets.map { set in
+                    SavedSetState(
+                        setNumber: set.setNumber,
+                        setType: set.setType,
+                        weight: set.weight,
+                        reps: set.reps,
+                        rpe: set.rpe,
+                        isCompleted: set.isCompleted,
+                        savedSetId: set.savedSetId
+                    )
+                },
+                originalExerciseId: exercise.originalExerciseId,
+                supersetGroup: exercise.supersetGroup
+            )
+        }
+
+        let state = SavedWorkoutState(
+            sessionId: sessionId,
+            templateName: templateName,
+            dayName: dayName,
+            startTime: startTime,
+            exercises: savedExercises
+        )
+        WorkoutAutoSave.save(state)
+    }
+
+    /// Restores workout state from a saved snapshot (crash recovery).
+    func restoreFromSavedState(_ state: SavedWorkoutState) {
+        sessionId = state.sessionId
+        templateName = state.templateName
+        dayName = state.dayName
+        startTime = state.startTime
+        elapsedSeconds = Int(Date().timeIntervalSince(state.startTime))
+
+        exercises = state.exercises.map { saved in
+            ExerciseLogEntry(
+                id: UUID(),
+                exerciseId: saved.exerciseId,
+                exerciseName: saved.exerciseName,
+                muscleGroup: saved.muscleGroup,
+                equipment: saved.equipment,
+                trainingMode: saved.trainingMode,
+                targetSets: saved.targetSets,
+                restSeconds: AppConstants.Defaults.restTimerSeconds,
+                sortOrder: saved.sortOrder,
+                sets: saved.sets.map { savedSet in
+                    var entry = SetEntry(
+                        setNumber: savedSet.setNumber,
+                        setType: savedSet.setType,
+                        weight: savedSet.weight,
+                        reps: savedSet.reps,
+                        rpe: savedSet.rpe
+                    )
+                    entry.isCompleted = savedSet.isCompleted
+                    entry.savedSetId = savedSet.savedSetId
+                    return entry
+                },
+                previousSets: [],
+                originalExerciseId: saved.originalExerciseId,
+                supersetGroup: saved.supersetGroup
+            )
+        }
+
+        // Start timers
+        startElapsedTimer()
+        timerStarted = true
+        UIApplication.shared.isIdleTimerDisabled = true
+    }
+
+    /// Starts periodic auto-save (every 30 seconds).
+    private func startAutoSave() {
+        autoSaveTask?.cancel()
+        autoSaveTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                guard let self, !Task.isCancelled else { break }
+                self.saveWorkoutState()
+            }
+        }
+    }
+
+    /// Syncs any pending offline sets.
+    func syncOfflineSets() async {
+        await OfflineSetQueue.shared.syncPendingSets()
+    }
+
+    // MARK: - Exercise Substitution
+
+    /// Substitutes the exercise at the given index with a new exercise.
+    /// Per user requirement: no target carryover from original exercise.
+    /// If the user has logged the substitute exercise before, pre-fill from that data.
+    func substituteExercise(at exerciseIndex: Int, with newExercise: Exercise) async {
+        guard exercises.indices.contains(exerciseIndex) else { return }
+
+        let original = exercises[exerciseIndex]
+
+        // Fetch previous session data for the NEW exercise (if user has logged it before)
+        var previousSets: [WorkoutSet] = []
+        if let userId = try? await supabase.auth.session.user.id {
+            let history = (try? await workoutService.fetchPreviousSetsForExercise(
+                exerciseId: newExercise.id,
+                userId: userId,
+                limit: 1
+            )) ?? []
+            previousSets = history.first ?? []
+        }
+
+        // Build new sets: pre-fill from substitute's history or leave blank
+        var newSets: [SetEntry] = []
+        for i in 1...original.targetSets {
+            let prev = previousSets[safe: i - 1]
+            newSets.append(SetEntry(
+                setNumber: i,
+                setType: .working,
+                weight: prev?.weight ?? 0,
+                reps: prev?.reps ?? 0
+            ))
+        }
+
+        // Replace exercise data — NO progression target carryover
+        exercises[exerciseIndex].originalExerciseId = original.exerciseId
+        exercises[exerciseIndex].exerciseId = newExercise.id
+        exercises[exerciseIndex].exerciseName = newExercise.name
+        exercises[exerciseIndex].muscleGroup = newExercise.muscleGroup
+        exercises[exerciseIndex].equipment = newExercise.equipment
+        exercises[exerciseIndex].previousSets = previousSets.isEmpty ? [] : [previousSets]
+        exercises[exerciseIndex].progressionTarget = nil // No carryover
+
+        // Remove uncompleted sets and add new ones
+        let completedSets = original.sets.filter(\.isCompleted)
+        exercises[exerciseIndex].sets = completedSets + newSets
+
+        // Renumber
+        renumberSets(exerciseIndex: exerciseIndex)
+
+        // Haptic
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.success)
+    }
+
+    // MARK: - Superset Support
+
+    /// Returns the exercises in the same superset group as the given exercise index.
+    /// Returns an empty array if the exercise is not in a superset.
+    func supersetExercises(for exerciseIndex: Int) -> [(index: Int, entry: ExerciseLogEntry)] {
+        guard let group = exercises[safe: exerciseIndex]?.supersetGroup else { return [] }
+        return exercises.enumerated()
+            .filter { $0.element.supersetGroup == group }
+            .map { (index: $0.offset, entry: $0.element) }
+    }
+
+    /// Returns true if the exercise at the given index is part of a superset.
+    func isInSuperset(_ exerciseIndex: Int) -> Bool {
+        exercises[safe: exerciseIndex]?.supersetGroup != nil
+    }
+
+    /// Returns the next exercise in the superset after the given index, or nil.
+    func nextSupersetExercise(after exerciseIndex: Int) -> Int? {
+        guard let group = exercises[safe: exerciseIndex]?.supersetGroup else { return nil }
+        let supersetMembers = exercises.enumerated()
+            .filter { $0.element.supersetGroup == group }
+            .map(\.offset)
+        guard let currentPos = supersetMembers.firstIndex(of: exerciseIndex) else { return nil }
+        let nextPos = currentPos + 1
+        if nextPos < supersetMembers.count {
+            return supersetMembers[nextPos]
+        }
+        return nil // End of superset round
+    }
+
+    /// Returns true if this exercise is the last in its superset group.
+    func isLastInSuperset(_ exerciseIndex: Int) -> Bool {
+        return nextSupersetExercise(after: exerciseIndex) == nil
     }
 
     // MARK: - Timers

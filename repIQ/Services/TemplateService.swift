@@ -124,6 +124,24 @@ struct TemplateService: Sendable {
             .execute()
     }
 
+    func updateSupersetGroup(id: UUID, supersetGroup: Int?) async throws {
+        if let group = supersetGroup {
+            try await supabase.from("workout_day_exercises")
+                .update(["superset_group": "\(group)"])
+                .eq("id", value: id.uuidString)
+                .execute()
+        } else {
+            // Clear superset group — set to null
+            struct NullUpdate: Encodable {
+                let superset_group: String? = nil
+            }
+            try await supabase.from("workout_day_exercises")
+                .update(NullUpdate())
+                .eq("id", value: id.uuidString)
+                .execute()
+        }
+    }
+
     func updateDayExerciseSortOrder(id: UUID, sortOrder: Int) async throws {
         try await supabase.from("workout_day_exercises")
             .update(["sort_order": "\(sortOrder)"])

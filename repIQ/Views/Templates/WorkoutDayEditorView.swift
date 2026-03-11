@@ -92,137 +92,188 @@ struct WorkoutDayEditorView: View {
     }
 
     private func exerciseCard(_ dayExercise: WorkoutDayExercise, index: Int, total: Int) -> some View {
-        RQCard {
-            VStack(alignment: .leading, spacing: RQSpacing.md) {
-                // Exercise name, reorder, and remove
-                HStack(spacing: RQSpacing.sm) {
-                    // Reorder buttons
-                    VStack(spacing: 2) {
-                        Button {
-                            Task {
-                                await viewModel.moveExercise(in: currentDay, from: index, to: index - 1)
-                            }
-                        } label: {
-                            Image(systemName: "chevron.up")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(index > 0 ? RQColors.textSecondary : RQColors.surfaceTertiary)
-                        }
-                        .disabled(index == 0)
+        let allExercises = currentDay.exercises?.sorted(by: { $0.sortOrder < $1.sortOrder }) ?? []
 
-                        Button {
-                            Task {
-                                await viewModel.moveExercise(in: currentDay, from: index, to: index + 1)
-                            }
-                        } label: {
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(index < total - 1 ? RQColors.textSecondary : RQColors.surfaceTertiary)
-                        }
-                        .disabled(index == total - 1)
+        return VStack(spacing: 0) {
+            // Superset bracket indicator (if part of a superset)
+            if let group = dayExercise.supersetGroup {
+                let isFirstInGroup = index == 0 || allExercises[safe: index - 1]?.supersetGroup != group
+                if isFirstInGroup {
+                    HStack(spacing: RQSpacing.xs) {
+                        Image(systemName: "link")
+                            .font(.system(size: 11, weight: .bold))
+                        Text("SUPERSET \(supersetLabel(group))")
+                            .font(RQTypography.label)
+                            .textCase(.uppercase)
+                            .tracking(1)
                     }
-                    .frame(width: 24)
-
-                    Text(dayExercise.exercise?.name ?? "Unknown Exercise")
-                        .font(RQTypography.headline)
-                        .foregroundColor(RQColors.textPrimary)
-
-                    Spacer()
-
-                    Button {
-                        Task {
-                            await viewModel.removeExercise(dayExercise, from: currentDay)
-                        }
-                    } label: {
-                        Image(systemName: "trash")
-                            .font(.system(size: 14))
-                            .foregroundColor(RQColors.error)
-                    }
-                }
-
-                // Equipment + Muscle info
-                if let exercise = dayExercise.exercise {
-                    HStack(spacing: RQSpacing.sm) {
-                        Text(exercise.muscleGroup.capitalized)
-                            .font(RQTypography.caption)
-                            .foregroundColor(RQColors.textTertiary)
-                        Text("·")
-                            .foregroundColor(RQColors.textTertiary)
-                        Text(exercise.equipment.capitalized)
-                            .font(RQTypography.caption)
-                            .foregroundColor(RQColors.textTertiary)
-                    }
-                }
-
-                Divider().background(RQColors.surfaceTertiary)
-
-                // Training mode toggle
-                HStack {
-                    Text("Mode")
-                        .font(RQTypography.label)
-                        .textCase(.uppercase)
-                        .tracking(1.5)
-                        .foregroundColor(RQColors.textSecondary)
-                    Spacer()
-                    trainingModeToggle(dayExercise)
-                }
-
-                // Target sets
-                HStack {
-                    Text("Target Sets")
-                        .font(RQTypography.label)
-                        .textCase(.uppercase)
-                        .tracking(1.5)
-                        .foregroundColor(RQColors.textSecondary)
-                    Spacer()
-                    HStack(spacing: RQSpacing.md) {
-                        Button {
-                            let newSets = max(1, dayExercise.targetSets - 1)
-                            Task {
-                                await viewModel.updateExerciseMode(
-                                    dayExercise,
-                                    trainingMode: dayExercise.trainingMode,
-                                    targetSets: newSets
-                                )
-                            }
-                        } label: {
-                            Image(systemName: "minus.circle")
-                                .foregroundColor(RQColors.textSecondary)
-                        }
-                        Text("\(dayExercise.targetSets)")
-                            .font(RQTypography.numbersSmall)
-                            .foregroundColor(RQColors.textPrimary)
-                            .frame(width: 24, alignment: .center)
-                        Button {
-                            let newSets = min(10, dayExercise.targetSets + 1)
-                            Task {
-                                await viewModel.updateExerciseMode(
-                                    dayExercise,
-                                    trainingMode: dayExercise.trainingMode,
-                                    targetSets: newSets
-                                )
-                            }
-                        } label: {
-                            Image(systemName: "plus.circle")
-                                .foregroundColor(RQColors.textSecondary)
-                        }
-                    }
-                }
-
-                // Rep range indicator
-                HStack {
-                    Text("Rep Range")
-                        .font(RQTypography.label)
-                        .textCase(.uppercase)
-                        .tracking(1.5)
-                        .foregroundColor(RQColors.textSecondary)
-                    Spacer()
-                    let range = dayExercise.trainingMode.repRange
-                    Text("\(range.lowerBound)-\(range.upperBound) reps")
-                        .font(RQTypography.numbersSmall)
-                        .foregroundColor(modeColor(dayExercise.trainingMode))
+                    .foregroundColor(RQColors.warning)
+                    .padding(.horizontal, RQSpacing.md)
+                    .padding(.vertical, RQSpacing.xs)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
+
+            RQCard {
+                VStack(alignment: .leading, spacing: RQSpacing.md) {
+                    // Exercise name, reorder, and remove
+                    HStack(spacing: RQSpacing.sm) {
+                        // Reorder buttons
+                        VStack(spacing: 2) {
+                            Button {
+                                Task {
+                                    await viewModel.moveExercise(in: currentDay, from: index, to: index - 1)
+                                }
+                            } label: {
+                                Image(systemName: "chevron.up")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(index > 0 ? RQColors.textSecondary : RQColors.surfaceTertiary)
+                            }
+                            .disabled(index == 0)
+
+                            Button {
+                                Task {
+                                    await viewModel.moveExercise(in: currentDay, from: index, to: index + 1)
+                                }
+                            } label: {
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(index < total - 1 ? RQColors.textSecondary : RQColors.surfaceTertiary)
+                            }
+                            .disabled(index == total - 1)
+                        }
+                        .frame(width: 24)
+
+                        Text(dayExercise.exercise?.name ?? "Unknown Exercise")
+                            .font(RQTypography.headline)
+                            .foregroundColor(RQColors.textPrimary)
+
+                        Spacer()
+
+                        // Superset toggle button (only show if not last exercise)
+                        if index < total - 1 {
+                            Button {
+                                Task {
+                                    await viewModel.toggleSuperset(for: dayExercise, in: currentDay)
+                                }
+                            } label: {
+                                Image(systemName: dayExercise.supersetGroup != nil ? "link.circle.fill" : "link.circle")
+                                    .font(.system(size: 18))
+                                    .foregroundColor(dayExercise.supersetGroup != nil ? RQColors.warning : RQColors.textTertiary)
+                            }
+                        }
+
+                        Button {
+                            Task {
+                                await viewModel.removeExercise(dayExercise, from: currentDay)
+                            }
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.system(size: 14))
+                                .foregroundColor(RQColors.error)
+                        }
+                    }
+
+                    // Equipment + Muscle info
+                    if let exercise = dayExercise.exercise {
+                        HStack(spacing: RQSpacing.sm) {
+                            Text(exercise.muscleGroup.capitalized)
+                                .font(RQTypography.caption)
+                                .foregroundColor(RQColors.textTertiary)
+                            Text("·")
+                                .foregroundColor(RQColors.textTertiary)
+                            Text(exercise.equipment.capitalized)
+                                .font(RQTypography.caption)
+                                .foregroundColor(RQColors.textTertiary)
+                        }
+                    }
+
+                    Divider().background(RQColors.surfaceTertiary)
+
+                    // Training mode toggle
+                    HStack {
+                        Text("Mode")
+                            .font(RQTypography.label)
+                            .textCase(.uppercase)
+                            .tracking(1.5)
+                            .foregroundColor(RQColors.textSecondary)
+                        Spacer()
+                        trainingModeToggle(dayExercise)
+                    }
+
+                    // Target sets
+                    HStack {
+                        Text("Target Sets")
+                            .font(RQTypography.label)
+                            .textCase(.uppercase)
+                            .tracking(1.5)
+                            .foregroundColor(RQColors.textSecondary)
+                        Spacer()
+                        HStack(spacing: RQSpacing.md) {
+                            Button {
+                                let newSets = max(1, dayExercise.targetSets - 1)
+                                Task {
+                                    await viewModel.updateExerciseMode(
+                                        dayExercise,
+                                        trainingMode: dayExercise.trainingMode,
+                                        targetSets: newSets
+                                    )
+                                }
+                            } label: {
+                                Image(systemName: "minus.circle")
+                                    .foregroundColor(RQColors.textSecondary)
+                            }
+                            Text("\(dayExercise.targetSets)")
+                                .font(RQTypography.numbersSmall)
+                                .foregroundColor(RQColors.textPrimary)
+                                .frame(width: 24, alignment: .center)
+                            Button {
+                                let newSets = min(10, dayExercise.targetSets + 1)
+                                Task {
+                                    await viewModel.updateExerciseMode(
+                                        dayExercise,
+                                        trainingMode: dayExercise.trainingMode,
+                                        targetSets: newSets
+                                    )
+                                }
+                            } label: {
+                                Image(systemName: "plus.circle")
+                                    .foregroundColor(RQColors.textSecondary)
+                            }
+                        }
+                    }
+
+                    // Rep range indicator
+                    HStack {
+                        Text("Rep Range")
+                            .font(RQTypography.label)
+                            .textCase(.uppercase)
+                            .tracking(1.5)
+                            .foregroundColor(RQColors.textSecondary)
+                        Spacer()
+                        let range = dayExercise.trainingMode.repRange
+                        Text("\(range.lowerBound)-\(range.upperBound) reps")
+                            .font(RQTypography.numbersSmall)
+                            .foregroundColor(modeColor(dayExercise.trainingMode))
+                    }
+                }
+            }
+            .overlay(
+                // Left accent bar for superset members
+                dayExercise.supersetGroup != nil
+                    ? RoundedRectangle(cornerRadius: 2)
+                        .fill(RQColors.warning)
+                        .frame(width: 3)
+                        .padding(.vertical, RQSpacing.sm)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    : nil
+            )
         }
+    }
+
+    private func supersetLabel(_ group: Int) -> String {
+        let labels = ["A", "B", "C", "D", "E"]
+        return labels[safe: group] ?? "\(group + 1)"
     }
 
     private func trainingModeToggle(_ dayExercise: WorkoutDayExercise) -> some View {

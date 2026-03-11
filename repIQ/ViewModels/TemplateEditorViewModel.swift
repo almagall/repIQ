@@ -254,6 +254,49 @@ final class TemplateEditorViewModel {
         }
     }
 
+    // MARK: - Superset Management
+
+    /// Toggles a superset link between two exercises.
+    /// If the exercise is already in a superset, it removes it.
+    /// Otherwise, it groups it with the next exercise in the list.
+    func toggleSuperset(for dayExercise: WorkoutDayExercise, in day: WorkoutDay) async {
+        guard let dayIndex = workoutDays.firstIndex(where: { $0.id == day.id }),
+              let exercises = workoutDays[dayIndex].exercises?.sorted(by: { $0.sortOrder < $1.sortOrder }),
+              let exIndex = exercises.firstIndex(where: { $0.id == dayExercise.id }) else { return }
+
+        if dayExercise.supersetGroup != nil {
+            // Remove from superset
+            await updateSupersetGroup(for: dayExercise, group: nil, dayIndex: dayIndex)
+        } else {
+            // Find or create a superset group with the next exercise
+            let nextIndex = exIndex + 1
+            guard nextIndex < exercises.count else { return }
+            let nextExercise = exercises[nextIndex]
+
+            // If next exercise is already in a superset, join that group
+            if let existingGroup = nextExercise.supersetGroup {
+                await updateSupersetGroup(for: dayExercise, group: existingGroup, dayIndex: dayIndex)
+            } else {
+                // Create a new superset group
+                let maxGroup = exercises.compactMap(\.supersetGroup).max() ?? -1
+                let newGroup = maxGroup + 1
+                await updateSupersetGroup(for: dayExercise, group: newGroup, dayIndex: dayIndex)
+                await updateSupersetGroup(for: nextExercise, group: newGroup, dayIndex: dayIndex)
+            }
+        }
+    }
+
+    private func updateSupersetGroup(for dayExercise: WorkoutDayExercise, group: Int?, dayIndex: Int) async {
+        do {
+            try await templateService.updateSupersetGroup(id: dayExercise.id, supersetGroup: group)
+            if let exIndex = workoutDays[dayIndex].exercises?.firstIndex(where: { $0.id == dayExercise.id }) {
+                workoutDays[dayIndex].exercises?[exIndex].supersetGroup = group
+            }
+        } catch {
+            errorMessage = "Failed to update superset."
+        }
+    }
+
     // MARK: - Reload
 
     func reload() async {
