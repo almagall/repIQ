@@ -20,6 +20,11 @@ final class ProgressDashboardViewModel {
     var effectiveRepsSummary: [EffectiveRepsSummary] = []
     var averageRPE: Double?
 
+    // Phase Then: new analytics
+    var pushPullBalance: PushPullBalance?
+    var volumeLandmarks: [VolumeLandmarkData] = []
+    var consistencyScore: ConsistencyScore?
+
     // UI toggle for fractional volume
     var showFractionalVolume: Bool = false
 
@@ -113,6 +118,9 @@ final class ProgressDashboardViewModel {
             async let sessionsTask = workoutService.fetchAllSessions(userId: userId)
             async let effectiveRepsTask = analyticsService.fetchEffectiveRepsSummary(userId: userId, days: 30)
             async let rpeTask = analyticsService.fetchAverageRPE(userId: userId, days: 14)
+            async let pushPullTask = analyticsService.fetchPushPullBalance(userId: userId, days: 30)
+            async let consistencyTask = analyticsService.fetchConsistencyScore(userId: userId, weeks: 8)
+            async let landmarkTask = analyticsService.fetchVolumeLandmarkData(userId: userId)
 
             // Await all
             let fetchedStreak = try await streakTask
@@ -125,6 +133,9 @@ final class ProgressDashboardViewModel {
             let fetchedSessions = try await sessionsTask
             let fetchedEffectiveReps = try await effectiveRepsTask
             let fetchedRPE = try await rpeTask
+            let fetchedPushPull = try await pushPullTask
+            let fetchedConsistency = try await consistencyTask
+            let fetchedLandmarks = try await landmarkTask
 
             // Update state
             streakData = fetchedStreak
@@ -137,6 +148,9 @@ final class ProgressDashboardViewModel {
             milestones = MilestoneCatalog.evaluate(with: fetchedMilestoneData)
             effectiveRepsSummary = fetchedEffectiveReps
             averageRPE = fetchedRPE
+            pushPullBalance = fetchedPushPull
+            consistencyScore = fetchedConsistency
+            volumeLandmarks = fetchedLandmarks
 
             // Compute overview stats
             totalVolume = fetchedMilestoneData.totalVolume

@@ -211,6 +211,206 @@ struct EffectiveRepsSummary: Identifiable {
     }
 }
 
+// MARK: - Push/Pull Balance
+
+struct PushPullBalance {
+    let pushVolume: Double
+    let pullVolume: Double
+    let pushSets: Int
+    let pullSets: Int
+
+    /// Push:Pull ratio (e.g., 1.3 means 30% more push than pull).
+    var ratio: Double {
+        guard pullVolume > 0 else { return pushVolume > 0 ? .infinity : 1.0 }
+        return pushVolume / pullVolume
+    }
+
+    /// Formatted ratio string like "1.3 : 1".
+    var ratioString: String {
+        guard pullVolume > 0 else { return pushVolume > 0 ? "All Push" : "N/A" }
+        return String(format: "%.1f : 1", ratio)
+    }
+
+    var status: PushPullStatus {
+        PushPullStatus.from(ratio: ratio)
+    }
+
+    /// Push muscle groups: chest, shoulders, triceps.
+    static let pushGroups: Set<String> = ["chest", "shoulders", "triceps"]
+    /// Pull muscle groups: back, biceps.
+    static let pullGroups: Set<String> = ["back", "biceps"]
+}
+
+enum PushPullStatus: String, Sendable {
+    case balanced       // 0.8 – 1.3
+    case pushDominant   // > 1.3
+    case pullDominant   // < 0.8
+
+    var displayName: String {
+        switch self {
+        case .balanced: return "Balanced"
+        case .pushDominant: return "Push Heavy"
+        case .pullDominant: return "Pull Heavy"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .balanced: return RQColors.success
+        case .pushDominant: return RQColors.warning
+        case .pullDominant: return RQColors.info
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .balanced: return "checkmark.circle"
+        case .pushDominant: return "arrow.right.circle"
+        case .pullDominant: return "arrow.left.circle"
+        }
+    }
+
+    static func from(ratio: Double) -> PushPullStatus {
+        if ratio > 1.3 { return .pushDominant }
+        if ratio < 0.8 { return .pullDominant }
+        return .balanced
+    }
+}
+
+// MARK: - Volume Landmarks
+
+struct VolumeLandmarkData: Identifiable {
+    var id: String { muscleGroup }
+    let muscleGroup: String
+    let displayName: String
+    let currentWeeklySets: Int
+    let mev: Int // Minimum Effective Volume
+    let mav: ClosedRange<Int> // Maximum Adaptive Volume range
+    let mrv: Int // Maximum Recoverable Volume
+
+    var status: VolumeLandmarkStatus {
+        if currentWeeklySets < mev { return .belowMEV }
+        if currentWeeklySets <= mav.upperBound { return .withinMAV }
+        if currentWeeklySets <= mrv { return .approachingMRV }
+        return .aboveMRV
+    }
+
+    /// Progress within the MEV → MRV range (0.0 – 1.0+).
+    var progressInRange: Double {
+        guard mrv > mev else { return 0 }
+        return Double(currentWeeklySets - mev) / Double(mrv - mev)
+    }
+
+    var color: Color {
+        RQColors.muscleGroupColors[muscleGroup] ?? RQColors.textTertiary
+    }
+}
+
+enum VolumeLandmarkStatus: String, Sendable {
+    case belowMEV       // Under-training
+    case withinMAV      // Sweet spot
+    case approachingMRV // High but recoverable
+    case aboveMRV       // Over-training risk
+
+    var displayName: String {
+        switch self {
+        case .belowMEV: return "Below MEV"
+        case .withinMAV: return "Sweet Spot"
+        case .approachingMRV: return "High Volume"
+        case .aboveMRV: return "Over MRV"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .belowMEV: return RQColors.warning
+        case .withinMAV: return RQColors.success
+        case .approachingMRV: return RQColors.info
+        case .aboveMRV: return RQColors.error
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .belowMEV: return "arrow.down.circle"
+        case .withinMAV: return "checkmark.circle"
+        case .approachingMRV: return "exclamationmark.circle"
+        case .aboveMRV: return "xmark.circle"
+        }
+    }
+}
+
+// MARK: - Consistency Score
+
+struct ConsistencyScore {
+    let overall: Int // 0–100
+    let frequencyScore: Double // 0–1
+    let volumeStabilityScore: Double // 0–1
+    let streakScore: Double // 0–1
+    let recencyScore: Double // 0–1
+
+    var grade: ConsistencyGrade {
+        ConsistencyGrade.from(score: overall)
+    }
+}
+
+enum ConsistencyGrade: String, Sendable {
+    case elite      // 90–100
+    case strong     // 75–89
+    case good       // 60–74
+    case developing // 40–59
+    case beginning  // 0–39
+
+    var displayName: String {
+        switch self {
+        case .elite: return "Elite"
+        case .strong: return "Strong"
+        case .good: return "Good"
+        case .developing: return "Developing"
+        case .beginning: return "Beginning"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .elite: return RQColors.accent
+        case .strong: return RQColors.success
+        case .good: return RQColors.chartPositive
+        case .developing: return RQColors.warning
+        case .beginning: return RQColors.textTertiary
+        }
+    }
+
+    static func from(score: Int) -> ConsistencyGrade {
+        if score >= 90 { return .elite }
+        if score >= 75 { return .strong }
+        if score >= 60 { return .good }
+        if score >= 40 { return .developing }
+        return .beginning
+    }
+}
+
+// MARK: - Strength Prediction
+
+struct StrengthPrediction {
+    let currentE1RM: Double
+    let projectedE1RM: Double // 4 weeks out
+    let weeklyGainRate: Double // lbs per week (from linear regression slope)
+    let confidence: Double // R² value (0–1)
+
+    /// Projected change in lbs over 4 weeks.
+    var projectedGain: Double { projectedE1RM - currentE1RM }
+
+    /// Projected change as a percentage.
+    var projectedGainPercent: Double {
+        guard currentE1RM > 0 else { return 0 }
+        return (projectedGain / currentE1RM) * 100
+    }
+
+    /// True if we have enough data and a reasonable fit.
+    var isReliable: Bool { confidence >= 0.3 }
+}
+
 // MARK: - Compound Synergist Map
 
 enum CompoundSynergistMap {

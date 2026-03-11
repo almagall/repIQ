@@ -507,6 +507,243 @@ struct AnalyticsService: Sendable {
         return rpeValues.reduce(0, +) / Double(rpeValues.count)
     }
 
+    // MARK: - Push/Pull Balance
+
+    /// Returns push vs pull volume balance for the past N days.
+    func fetchPushPullBalance(userId: UUID, days: Int = 30) async throws -> PushPullBalance {
+        let calendar = Calendar.current
+        guard let startDate = calendar.date(byAdding: .day, value: -days, to: Date()) else {
+            return PushPullBalance(pushVolume: 0, pullVolume: 0, pushSets: 0, pullSets: 0)
+        }
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        let sessions: [WorkoutSession] = try await supabase.from("workout_sessions")
+            .select()
+            .eq("user_id", value: userId.uuidString)
+            .eq("status", value: "completed")
+            .gte("completed_at", value: formatter.string(from: startDate))
+            .execute()
+            .value
+
+        guard !sessions.isEmpty else {
+            return PushPullBalance(pushVolume: 0, pullVolume: 0, pushSets: 0, pullSets: 0)
+        }
+
+        let sessionIds = sessions.map(\.id)
+        let allSets = try await fetchSetsForSessions(sessionIds)
+        let workingSets = allSets.filter { $0.setType == .working }
+
+        let exerciseIds = Array(Set(workingSets.map(\.exerciseId)))
+        let exercises = try await fetchExercisesFull(ids: exerciseIds)
+        let exerciseMap = Dictionary(uniqueKeysWithValues: exercises.map { ($0.id, $0) })
+
+        var pushVolume: Double = 0
+        var pullVolume: Double = 0
+        var pushSets = 0
+        var pullSets = 0
+
+        for set in workingSets {
+            let group = exerciseMap[set.exerciseId]?.muscleGroup ?? ""
+            if PushPullBalance.pushGroups.contains(group) {
+                pushVolume += set.volume
+                pushSets += 1
+            } else if PushPullBalance.pullGroups.contains(group) {
+                pullVolume += set.volume
+                pullSets += 1
+            }
+        }
+
+        return PushPullBalance(
+            pushVolume: pushVolume,
+            pullVolume: pullVolume,
+            pushSets: pushSets,
+            pullSets: pullSets
+        )
+    }
+
+    // MARK: - Consistency Score
+
+    /// Computes a 0–100 consistency score from multiple training factors.
+    func fetchConsistencyScore(userId: UUID, weeks: Int = 8) async throws -> ConsistencyScore {
+        let calendar = Calendar.current
+        guard let startDate = calendar.date(byAdding: .weekOfYear, value: -weeks, to: Date()) else {
+            return ConsistencyScore(overall: 0, frequencyScore: 0, volumeStabilityScore: 0, streakScore: 0, recencyScore: 0)
+        }
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        let sessions: [WorkoutSession] = try await supabase.from("workout_sessions")
+            .select()
+            .eq("user_id", value: userId.uuidString)
+            .eq("status", value: "completed")
+            .gte("completed_at", value: formatter.string(from: startDate))
+            .order("completed_at", ascending: true)
+            .execute()
+            .value
+
+        // 1. Frequency Score (40%) — sessions per week vs target of 4
+        let targetSessionsPerWeek = 4.0
+        let totalWeeks = max(1.0, Double(weeks))
+        let sessionsPerWeek = Double(sessions.count) / totalWeeks
+        let frequencyScore = min(1.0, sessionsPerWeek / targetSessionsPerWeek)
+
+        // 2. Volume Stability (25%) — coefficient of variation of weekly volumes
+        var volumeStabilityScore: Double = 0
+        if sessions.count >= 2 {
+            let allSets = try await fetchSetsForSessions(sessions.map(\.id))
+            var weeklyVolumes: [Date: Double] = [:]
+            for session in sessions {
+                let date = session.completedAt ?? session.startedAt
+                guard let weekStart = calendar.dateInterval(of: .weekOfYear, for: date)?.start else { continue }
+                let sessionVolume = allSets
+                    .filter { $0.sessionId == session.id && $0.setType == .working }
+                    .reduce(0.0) { $0 + $1.volume }
+                weeklyVolumes[weekStart, default: 0] += sessionVolume
+            }
+
+            let volumes = Array(weeklyVolumes.values).filter { $0 > 0 }
+            if volumes.count >= 2 {
+                let mean = volumes.reduce(0, +) / Double(volumes.count)
+                let variance = volumes.reduce(0) { $0 + pow($1 - mean, 2) } / Double(volumes.count)
+                let cv = mean > 0 ? sqrt(variance) / mean : 1.0
+                // Lower CV = more stable. CV of 0 = perfect, CV > 0.5 = very unstable
+                volumeStabilityScore = max(0, 1.0 - (cv * 2.0))
+            }
+        }
+
+        // 3. Streak Score (20%) — current streak normalized
+        let streak = try await fetchCurrentStreak(userId: userId)
+        let streakScore = min(1.0, Double(streak.currentStreak) / 14.0) // 14-day streak = full score
+
+        // 4. Recency Score (15%) — days since last workout
+        var recencyScore: Double = 0
+        if let lastWorkout = streak.lastWorkoutDate {
+            let daysSince = calendar.dateComponents([.day], from: lastWorkout, to: Date()).day ?? 30
+            // 0 days = 1.0, 7+ days = 0.0
+            recencyScore = max(0, 1.0 - (Double(daysSince) / 7.0))
+        }
+
+        // Weighted composite
+        let overall = Int(round(
+            (frequencyScore * 40.0) +
+            (volumeStabilityScore * 25.0) +
+            (streakScore * 20.0) +
+            (recencyScore * 15.0)
+        ))
+
+        return ConsistencyScore(
+            overall: min(100, max(0, overall)),
+            frequencyScore: frequencyScore,
+            volumeStabilityScore: volumeStabilityScore,
+            streakScore: streakScore,
+            recencyScore: recencyScore
+        )
+    }
+
+    // MARK: - Volume Landmark Data
+
+    /// Returns volume landmark comparison for each muscle group over the past 7 days (1 week).
+    func fetchVolumeLandmarkData(userId: UUID) async throws -> [VolumeLandmarkData] {
+        let calendar = Calendar.current
+        guard let startDate = calendar.date(byAdding: .day, value: -7, to: Date()) else {
+            return []
+        }
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        let sessions: [WorkoutSession] = try await supabase.from("workout_sessions")
+            .select()
+            .eq("user_id", value: userId.uuidString)
+            .eq("status", value: "completed")
+            .gte("completed_at", value: formatter.string(from: startDate))
+            .execute()
+            .value
+
+        guard !sessions.isEmpty else { return [] }
+
+        let sessionIds = sessions.map(\.id)
+        let allSets = try await fetchSetsForSessions(sessionIds)
+        let workingSets = allSets.filter { $0.setType == .working }
+        guard !workingSets.isEmpty else { return [] }
+
+        let exerciseIds = Array(Set(workingSets.map(\.exerciseId)))
+        let exercises = try await fetchExercisesFull(ids: exerciseIds)
+        let exerciseMap = Dictionary(uniqueKeysWithValues: exercises.map { ($0.id, $0) })
+
+        // Count sets per muscle group
+        var setsByGroup: [String: Int] = [:]
+        for set in workingSets {
+            let group = exerciseMap[set.exerciseId]?.muscleGroup ?? "other"
+            setsByGroup[group, default: 0] += 1
+        }
+
+        return setsByGroup.compactMap { group, setCount in
+            guard group != "other" else { return nil }
+            let landmark = VolumeLandmarkReference.landmark(for: group)
+            let muscleGroup = MuscleGroup(rawValue: group)
+            return VolumeLandmarkData(
+                muscleGroup: group,
+                displayName: muscleGroup?.displayName ?? group.capitalized,
+                currentWeeklySets: setCount,
+                mev: landmark.mev,
+                mav: landmark.mavRange,
+                mrv: landmark.mrv
+            )
+        }
+        .sorted { $0.currentWeeklySets > $1.currentWeeklySets }
+    }
+
+    // MARK: - Strength Prediction (for ExerciseProgressView)
+
+    /// Computes a 4-week E1RM projection using simple linear regression on session snapshots.
+    static func predictStrength(from snapshots: [ExerciseSessionSnapshot]) -> StrengthPrediction? {
+        guard snapshots.count >= 3 else { return nil }
+
+        let e1rmValues = snapshots.map(\.estimated1RM)
+        guard let currentE1RM = e1rmValues.last, currentE1RM > 0 else { return nil }
+
+        // X = days from first snapshot, Y = E1RM
+        let firstDate = snapshots.first!.date
+        let xs = snapshots.map { snapshot in
+            Double(Calendar.current.dateComponents([.day], from: firstDate, to: snapshot.date).day ?? 0)
+        }
+        let ys = e1rmValues
+
+        let n = Double(xs.count)
+        let sumX = xs.reduce(0, +)
+        let sumY = ys.reduce(0, +)
+        let sumXY = zip(xs, ys).reduce(0) { $0 + $1.0 * $1.1 }
+        let sumX2 = xs.reduce(0) { $0 + $1 * $1 }
+
+        let denominator = n * sumX2 - sumX * sumX
+        guard denominator != 0 else { return nil }
+
+        let slope = (n * sumXY - sumX * sumY) / denominator // lbs per day
+        let intercept = (sumY - slope * sumX) / n
+
+        // R² for confidence
+        let meanY = sumY / n
+        let ssRes = zip(xs, ys).reduce(0) { $0 + pow($1.1 - (slope * $1.0 + intercept), 2) }
+        let ssTot = ys.reduce(0) { $0 + pow($1 - meanY, 2) }
+        let rSquared = ssTot > 0 ? max(0, 1.0 - (ssRes / ssTot)) : 0
+
+        // Project 28 days (4 weeks) from last data point
+        let lastX = xs.last ?? 0
+        let projectedE1RM = slope * (lastX + 28.0) + intercept
+        let weeklyGain = slope * 7.0
+
+        return StrengthPrediction(
+            currentE1RM: currentE1RM,
+            projectedE1RM: max(0, projectedE1RM),
+            weeklyGainRate: weeklyGain,
+            confidence: rSquared
+        )
+    }
+
     // MARK: - Helpers
 
     /// Fetches sets for multiple sessions in a single query.

@@ -4,6 +4,7 @@ import Charts
 struct ProgressTabView: View {
     @State private var viewModel = ProgressDashboardViewModel()
     @State private var showExercisePicker = false
+    @State private var showShareSheet = false
 
     var body: some View {
         NavigationStack {
@@ -23,46 +24,61 @@ struct ProgressTabView: View {
                         // 1. Streak Banner — emotional hook
                         streakBanner
 
-                        // 2. Overview Stats Grid — quick health check
+                        // 2. Consistency Score — overall training health
+                        if let score = viewModel.consistencyScore, score.overall > 0 {
+                            consistencyScoreSection
+                        }
+
+                        // 3. Overview Stats Grid — quick health check
                         overviewStatsGrid
 
-                        // 3. Weekly Volume Chart — primary trend
+                        // 4. Weekly Volume Chart — primary trend
                         volumeChartSection
 
-                        // 4. Smart Insights — prescriptive advice (high value)
+                        // 5. Smart Insights — prescriptive advice (high value)
                         if !viewModel.insights.isEmpty {
                             insightsSection
                         }
 
-                        // 5. Recent PRs — reward/celebration
+                        // 6. Recent PRs — reward/celebration
                         if !viewModel.recentPRs.isEmpty {
                             recentPRsSection
                         }
 
-                        // 6. Milestones — gamification, next goals
+                        // 7. Milestones — gamification, next goals
                         if !viewModel.milestones.isEmpty {
                             milestonesSection
                         }
 
-                        // 7. Muscle Balance — with fractional volume toggle
+                        // 8. Push/Pull Balance
+                        if let balance = viewModel.pushPullBalance, balance.pushVolume > 0 || balance.pullVolume > 0 {
+                            pushPullSection
+                        }
+
+                        // 9. Muscle Balance — with fractional volume toggle
                         if !viewModel.activeMuscleDistribution.isEmpty {
                             muscleBalanceSection
                         }
 
-                        // 8. Training Quality — effective reps breakdown
+                        // 10. Volume Landmarks
+                        if !viewModel.volumeLandmarks.isEmpty {
+                            volumeLandmarksSection
+                        }
+
+                        // 11. Training Quality — effective reps breakdown
                         if !viewModel.effectiveRepsSummary.isEmpty {
                             trainingQualitySection
                         }
 
-                        // 9. Training Frequency Heatmap
+                        // 12. Training Frequency Heatmap
                         if !viewModel.frequencyData.isEmpty {
                             frequencyHeatmapSection
                         }
 
-                        // 10. Exercise Progress — drill-down entry
+                        // 13. Exercise Progress — drill-down entry
                         exerciseProgressButton
 
-                        // 11. Workout History — reference
+                        // 14. Workout History — reference
                         workoutHistorySection
                     }
                     .padding(.horizontal, RQSpacing.screenHorizontal)
@@ -73,6 +89,15 @@ struct ProgressTabView: View {
             .background(RQColors.background)
             .navigationTitle("Progress")
             .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    ShareLink(item: shareText) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 14))
+                            .foregroundColor(RQColors.accent)
+                    }
+                }
+            }
             .navigationDestination(for: UUID.self) { sessionId in
                 SessionDetailView(viewModel: viewModel, sessionId: sessionId)
             }
@@ -86,6 +111,38 @@ struct ProgressTabView: View {
                 await viewModel.loadDashboard()
             }
         }
+    }
+
+    // MARK: - Share Text
+
+    private var shareText: String {
+        var lines: [String] = ["repIQ — Training Summary"]
+        lines.append("")
+
+        if let streak = viewModel.streakData, streak.currentStreak > 0 {
+            lines.append("\u{1F525} \(streak.currentStreak)-day streak (best: \(streak.bestStreak))")
+        }
+
+        if let score = viewModel.consistencyScore {
+            lines.append("\u{1F3AF} Consistency: \(score.overall)/100 (\(score.grade.displayName))")
+        }
+
+        lines.append("\u{1F4AA} Weekly Volume: \(formatVolumeCompact(viewModel.weeklyVolume))")
+        lines.append("\u{1F3CB} Sessions This Week: \(viewModel.weeklySessionCount)")
+        lines.append("\u{1F3C6} Total PRs: \(viewModel.totalPRCount)")
+        lines.append("\u{2696} Total Volume: \(formatVolumeCompact(viewModel.totalVolume))")
+
+        if let balance = viewModel.pushPullBalance {
+            lines.append("\u{2194} Push/Pull: \(balance.ratioString)")
+        }
+
+        if let delta = viewModel.volumeDeltaPercent {
+            lines.append(String(format: "%@ Volume trend: %+.0f%% vs last week", delta >= 0 ? "\u{1F4C8}" : "\u{1F4C9}", delta))
+        }
+
+        lines.append("")
+        lines.append("Tracked with repIQ")
+        return lines.joined(separator: "\n")
     }
 
     // MARK: - 1. Streak Banner
@@ -137,7 +194,96 @@ struct ProgressTabView: View {
         return RQColors.textTertiary
     }
 
-    // MARK: - 2. Overview Stats Grid
+    // MARK: - 2. Consistency Score
+
+    private var consistencyScoreSection: some View {
+        VStack(alignment: .leading, spacing: RQSpacing.md) {
+            sectionHeaderWithInfo("CONSISTENCY", topic: ProgressExplainer.consistencyScore)
+
+            if let score = viewModel.consistencyScore {
+                RQCard {
+                    VStack(spacing: RQSpacing.lg) {
+                        HStack(spacing: RQSpacing.lg) {
+                            // Score ring
+                            ZStack {
+                                Circle()
+                                    .stroke(RQColors.surfaceTertiary, lineWidth: 5)
+                                    .frame(width: 68, height: 68)
+                                Circle()
+                                    .trim(from: 0, to: Double(score.overall) / 100.0)
+                                    .stroke(
+                                        score.grade.color,
+                                        style: StrokeStyle(lineWidth: 5, lineCap: .round)
+                                    )
+                                    .frame(width: 68, height: 68)
+                                    .rotationEffect(.degrees(-90))
+                                VStack(spacing: 0) {
+                                    Text("\(score.overall)")
+                                        .font(RQTypography.numbers)
+                                        .foregroundColor(RQColors.textPrimary)
+                                }
+                            }
+
+                            VStack(alignment: .leading, spacing: RQSpacing.xs) {
+                                Text(score.grade.displayName.uppercased())
+                                    .font(RQTypography.label)
+                                    .tracking(1)
+                                    .foregroundColor(score.grade.color)
+                                Text("Training consistency over the past 8 weeks")
+                                    .font(RQTypography.caption)
+                                    .foregroundColor(RQColors.textTertiary)
+                            }
+
+                            Spacer()
+                        }
+
+                        // Factor breakdown
+                        VStack(spacing: RQSpacing.sm) {
+                            consistencyFactor(label: "Frequency", value: score.frequencyScore, weight: "40%")
+                            consistencyFactor(label: "Volume Stability", value: score.volumeStabilityScore, weight: "25%")
+                            consistencyFactor(label: "Streak", value: score.streakScore, weight: "20%")
+                            consistencyFactor(label: "Recency", value: score.recencyScore, weight: "15%")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func consistencyFactor(label: String, value: Double, weight: String) -> some View {
+        HStack(spacing: RQSpacing.sm) {
+            Text(label)
+                .font(RQTypography.caption)
+                .foregroundColor(RQColors.textSecondary)
+                .frame(width: 100, alignment: .leading)
+
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(RQColors.surfaceTertiary)
+                        .frame(height: 4)
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(factorColor(value))
+                        .frame(width: max(0, geo.size.width * value), height: 4)
+                }
+            }
+            .frame(height: 4)
+
+            Text(weight)
+                .font(RQTypography.label)
+                .foregroundColor(RQColors.textTertiary)
+                .frame(width: 28, alignment: .trailing)
+        }
+    }
+
+    private func factorColor(_ value: Double) -> Color {
+        if value >= 0.75 { return RQColors.success }
+        if value >= 0.5 { return RQColors.accent }
+        if value >= 0.25 { return RQColors.warning }
+        return RQColors.error
+    }
+
+    // MARK: - 3. Overview Stats Grid
 
     private var overviewStatsGrid: some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: RQSpacing.md) {
@@ -190,11 +336,11 @@ struct ProgressTabView: View {
         }
     }
 
-    // MARK: - 3. Weekly Volume Chart
+    // MARK: - 4. Weekly Volume Chart
 
     private var volumeChartSection: some View {
         VStack(alignment: .leading, spacing: RQSpacing.md) {
-            sectionHeader("VOLUME TREND")
+            sectionHeaderWithInfo("VOLUME TREND", topic: ProgressExplainer.volumeTrend)
 
             RQCard {
                 VStack(alignment: .leading, spacing: RQSpacing.md) {
@@ -257,7 +403,7 @@ struct ProgressTabView: View {
         }
     }
 
-    // MARK: - 4. Smart Insights
+    // MARK: - 5. Smart Insights
 
     private var insightsSection: some View {
         VStack(alignment: .leading, spacing: RQSpacing.md) {
@@ -302,7 +448,7 @@ struct ProgressTabView: View {
         )
     }
 
-    // MARK: - 5. Recent PRs
+    // MARK: - 6. Recent PRs
 
     private var recentPRsSection: some View {
         VStack(alignment: .leading, spacing: RQSpacing.md) {
@@ -348,12 +494,12 @@ struct ProgressTabView: View {
         .frame(width: 130)
     }
 
-    // MARK: - 6. Milestones
+    // MARK: - 7. Milestones
 
     private var milestonesSection: some View {
         VStack(alignment: .leading, spacing: RQSpacing.md) {
             HStack {
-                sectionHeader("MILESTONES")
+                sectionHeaderWithInfo("MILESTONES", topic: ProgressExplainer.milestones)
                 Spacer()
                 let achieved = viewModel.achievedMilestones.count
                 let total = viewModel.milestones.count
@@ -428,12 +574,89 @@ struct ProgressTabView: View {
         )
     }
 
-    // MARK: - 7. Muscle Group Balance
+    // MARK: - 8. Push/Pull Balance
+
+    private var pushPullSection: some View {
+        VStack(alignment: .leading, spacing: RQSpacing.md) {
+            sectionHeaderWithInfo("PUSH / PULL BALANCE", topic: ProgressExplainer.pushPullBalance)
+
+            if let balance = viewModel.pushPullBalance {
+                RQCard {
+                    VStack(spacing: RQSpacing.lg) {
+                        // Ratio display
+                        HStack(spacing: RQSpacing.md) {
+                            Image(systemName: balance.status.icon)
+                                .font(.system(size: 22))
+                                .foregroundColor(balance.status.color)
+
+                            VStack(alignment: .leading, spacing: RQSpacing.xxs) {
+                                HStack(spacing: RQSpacing.sm) {
+                                    Text(balance.ratioString)
+                                        .font(RQTypography.numbers)
+                                        .foregroundColor(RQColors.textPrimary)
+                                    Text(balance.status.displayName.uppercased())
+                                        .font(RQTypography.label)
+                                        .tracking(0.5)
+                                        .foregroundColor(balance.status.color)
+                                }
+                                Text("Push : Pull ratio (past 30 days)")
+                                    .font(RQTypography.caption)
+                                    .foregroundColor(RQColors.textTertiary)
+                            }
+
+                            Spacer()
+                        }
+
+                        // Visual bar
+                        let total = balance.pushVolume + balance.pullVolume
+                        if total > 0 {
+                            VStack(spacing: RQSpacing.sm) {
+                                GeometryReader { geo in
+                                    HStack(spacing: 2) {
+                                        RoundedRectangle(cornerRadius: 2)
+                                            .fill(RQColors.strength)
+                                            .frame(width: max(4, geo.size.width * (balance.pushVolume / total)))
+
+                                        RoundedRectangle(cornerRadius: 2)
+                                            .fill(RQColors.accent)
+                                            .frame(width: max(4, geo.size.width * (balance.pullVolume / total)))
+                                    }
+                                }
+                                .frame(height: 10)
+
+                                HStack {
+                                    HStack(spacing: RQSpacing.xs) {
+                                        RoundedRectangle(cornerRadius: 2)
+                                            .fill(RQColors.strength)
+                                            .frame(width: 10, height: 10)
+                                        Text("Push \(balance.pushSets) sets")
+                                            .font(RQTypography.caption)
+                                            .foregroundColor(RQColors.textSecondary)
+                                    }
+                                    Spacer()
+                                    HStack(spacing: RQSpacing.xs) {
+                                        Text("Pull \(balance.pullSets) sets")
+                                            .font(RQTypography.caption)
+                                            .foregroundColor(RQColors.textSecondary)
+                                        RoundedRectangle(cornerRadius: 2)
+                                            .fill(RQColors.accent)
+                                            .frame(width: 10, height: 10)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - 9. Muscle Group Balance
 
     private var muscleBalanceSection: some View {
         VStack(alignment: .leading, spacing: RQSpacing.md) {
             HStack {
-                sectionHeader("MUSCLE BALANCE")
+                sectionHeaderWithInfo("MUSCLE BALANCE", topic: ProgressExplainer.muscleBalance)
                 Spacer()
                 // Fractional volume toggle
                 Button {
@@ -512,12 +735,115 @@ struct ProgressTabView: View {
         }
     }
 
-    // MARK: - 8. Training Quality (Effective Reps)
+    // MARK: - 10. Volume Landmarks
+
+    private var volumeLandmarksSection: some View {
+        VStack(alignment: .leading, spacing: RQSpacing.md) {
+            sectionHeaderWithInfo("VOLUME LANDMARKS", topic: ProgressExplainer.volumeLandmarks)
+
+            RQCard {
+                VStack(spacing: RQSpacing.md) {
+                    // Legend
+                    HStack(spacing: RQSpacing.lg) {
+                        landmarkLegendItem(label: "MEV", color: RQColors.warning)
+                        landmarkLegendItem(label: "MAV", color: RQColors.success)
+                        landmarkLegendItem(label: "MRV", color: RQColors.error)
+                    }
+
+                    ForEach(viewModel.volumeLandmarks) { data in
+                        volumeLandmarkRow(data)
+                    }
+                }
+            }
+        }
+    }
+
+    private func landmarkLegendItem(label: String, color: Color) -> some View {
+        HStack(spacing: RQSpacing.xs) {
+            Circle()
+                .fill(color)
+                .frame(width: 6, height: 6)
+            Text(label)
+                .font(RQTypography.label)
+                .foregroundColor(RQColors.textTertiary)
+        }
+    }
+
+    private func volumeLandmarkRow(_ data: VolumeLandmarkData) -> some View {
+        VStack(spacing: RQSpacing.xs) {
+            HStack {
+                HStack(spacing: RQSpacing.sm) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(data.color)
+                        .frame(width: 10, height: 10)
+                    Text(data.displayName)
+                        .font(RQTypography.caption)
+                        .foregroundColor(RQColors.textSecondary)
+                }
+
+                Spacer()
+
+                HStack(spacing: RQSpacing.xs) {
+                    Text("\(data.currentWeeklySets) sets")
+                        .font(RQTypography.numbersSmall)
+                        .foregroundColor(RQColors.textPrimary)
+                    Image(systemName: data.status.icon)
+                        .font(.system(size: 10))
+                        .foregroundColor(data.status.color)
+                }
+            }
+
+            // Range bar visualization
+            GeometryReader { geo in
+                let totalRange = Double(data.mrv + 4) // Give visual breathing room
+                let barWidth = geo.size.width
+
+                ZStack(alignment: .leading) {
+                    // Background
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(RQColors.surfaceTertiary)
+                        .frame(height: 6)
+
+                    // MEV marker
+                    let mevX = barWidth * (Double(data.mev) / totalRange)
+                    Rectangle()
+                        .fill(RQColors.warning)
+                        .frame(width: 1.5, height: 10)
+                        .offset(x: mevX)
+
+                    // MAV zone (green)
+                    let mavStartX = barWidth * (Double(data.mav.lowerBound) / totalRange)
+                    let mavEndX = barWidth * (Double(data.mav.upperBound) / totalRange)
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(RQColors.success.opacity(0.2))
+                        .frame(width: max(0, mavEndX - mavStartX), height: 6)
+                        .offset(x: mavStartX)
+
+                    // MRV marker
+                    let mrvX = barWidth * (Double(data.mrv) / totalRange)
+                    Rectangle()
+                        .fill(RQColors.error)
+                        .frame(width: 1.5, height: 10)
+                        .offset(x: mrvX)
+
+                    // Current position dot
+                    let currentX = barWidth * (min(Double(data.currentWeeklySets), totalRange) / totalRange)
+                    Circle()
+                        .fill(data.status.color)
+                        .frame(width: 8, height: 8)
+                        .offset(x: currentX - 4)
+                }
+            }
+            .frame(height: 10)
+        }
+    }
+
+    // MARK: - 11. Training Quality (Effective Reps)
 
     private var trainingQualitySection: some View {
         VStack(alignment: .leading, spacing: RQSpacing.md) {
             HStack {
-                sectionHeader("TRAINING QUALITY")
+                sectionHeaderWithInfo("TRAINING QUALITY", topic: ProgressExplainer.effectiveReps)
                 Spacer()
                 if let ratio = viewModel.overallEffectiveRatio {
                     Text("\(Int(ratio * 100))% EFFECTIVE")
@@ -605,11 +931,11 @@ struct ProgressTabView: View {
         return RQColors.error
     }
 
-    // MARK: - 9. Training Frequency Heatmap
+    // MARK: - 12. Training Frequency Heatmap
 
     private var frequencyHeatmapSection: some View {
         VStack(alignment: .leading, spacing: RQSpacing.md) {
-            sectionHeader("TRAINING FREQUENCY")
+            sectionHeaderWithInfo("TRAINING FREQUENCY", topic: ProgressExplainer.trainingFrequency)
 
             RQCard {
                 VStack(alignment: .leading, spacing: RQSpacing.sm) {
@@ -677,7 +1003,7 @@ struct ProgressTabView: View {
         }
     }
 
-    // MARK: - 10. Exercise Progress Entry
+    // MARK: - 13. Exercise Progress Entry
 
     private var exerciseProgressButton: some View {
         Button {
@@ -705,7 +1031,7 @@ struct ProgressTabView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - 11. Workout History
+    // MARK: - 14. Workout History
 
     private var workoutHistorySection: some View {
         VStack(alignment: .leading, spacing: RQSpacing.md) {
@@ -781,7 +1107,7 @@ struct ProgressTabView: View {
         }
     }
 
-    // MARK: - Shared Helpers
+    // MARK: - Section Header Helpers
 
     private func sectionHeader(_ title: String) -> some View {
         HStack {
@@ -793,6 +1119,19 @@ struct ProgressTabView: View {
             Spacer()
         }
     }
+
+    private func sectionHeaderWithInfo(_ title: String, topic: ProgressExplainer.Topic) -> some View {
+        HStack(spacing: RQSpacing.xs) {
+            Text(title)
+                .font(RQTypography.label)
+                .textCase(.uppercase)
+                .tracking(1.5)
+                .foregroundColor(RQColors.textSecondary)
+            InfoButton(topic: topic)
+        }
+    }
+
+    // MARK: - Shared Helpers
 
     private func isCurrentWeek(_ weekStart: Date) -> Bool {
         let calendar = Calendar.current

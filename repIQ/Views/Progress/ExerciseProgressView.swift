@@ -106,6 +106,12 @@ struct ExerciseProgressView: View {
         )
     }
 
+    // MARK: - Computed: Strength Prediction
+
+    private var strengthPrediction: StrengthPrediction? {
+        AnalyticsService.predictStrength(from: snapshots)
+    }
+
     var body: some View {
         ScrollView {
             if isLoading {
@@ -122,6 +128,11 @@ struct ExerciseProgressView: View {
                         velocityBadge(vel)
                     }
 
+                    // Strength Prediction
+                    if let prediction = strengthPrediction, prediction.isReliable {
+                        strengthPredictionCard(prediction)
+                    }
+
                     // Plateau alert
                     if let plateau = plateauAnalysis {
                         plateauAlert(plateau)
@@ -130,7 +141,7 @@ struct ExerciseProgressView: View {
                     // Metric selector
                     metricPicker
 
-                    // Trend chart
+                    // Trend chart (with prediction line if E1RM selected)
                     trendChart
 
                     // PR cards
@@ -138,7 +149,7 @@ struct ExerciseProgressView: View {
                         prSection
                     }
 
-                    // Recent sessions
+                    // Recent sessions (with deltas)
                     if !snapshots.isEmpty {
                         recentSessionsSection
                     }
@@ -209,6 +220,8 @@ struct ExerciseProgressView: View {
                 }
 
                 Spacer()
+
+                InfoButton(topic: ProgressExplainer.velocity)
             }
         }
     }
@@ -221,6 +234,59 @@ struct ExerciseProgressView: View {
         case .stalling: return "Progress has slowed. Check volume and recovery."
         case .regressing: return "E1RM is declining. Prioritize recovery or deload."
         }
+    }
+
+    // MARK: - Strength Prediction Card
+
+    private func strengthPredictionCard(_ prediction: StrengthPrediction) -> some View {
+        RQCard {
+            HStack(spacing: RQSpacing.md) {
+                Image(systemName: "chart.line.uptrend.xyaxis")
+                    .font(.system(size: 22))
+                    .foregroundColor(prediction.projectedGain >= 0 ? RQColors.accent : RQColors.textTertiary)
+
+                VStack(alignment: .leading, spacing: RQSpacing.xxs) {
+                    HStack(spacing: RQSpacing.sm) {
+                        Text("4-WEEK PROJECTION")
+                            .font(RQTypography.label)
+                            .tracking(1)
+                            .foregroundColor(RQColors.textSecondary)
+                    }
+
+                    HStack(spacing: RQSpacing.sm) {
+                        Text("\(formatWeight(prediction.projectedE1RM)) lbs")
+                            .font(RQTypography.numbers)
+                            .foregroundColor(RQColors.textPrimary)
+
+                        Text(String(format: "(%+.1f lbs)", prediction.projectedGain))
+                            .font(RQTypography.numbersSmall)
+                            .foregroundColor(prediction.projectedGain >= 0 ? RQColors.chartPositive : RQColors.chartNegative)
+                    }
+
+                    HStack(spacing: RQSpacing.sm) {
+                        Text(String(format: "%+.1f lbs/wk", prediction.weeklyGainRate))
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.textTertiary)
+                        Text("\u{00B7}")
+                            .foregroundColor(RQColors.textTertiary)
+                        Text(String(format: "R² = %.2f", prediction.confidence))
+                            .font(RQTypography.caption)
+                            .foregroundColor(confidenceColor(prediction.confidence))
+                    }
+                }
+
+                Spacer()
+
+                InfoButton(topic: ProgressExplainer.strengthPrediction)
+            }
+        }
+    }
+
+    private func confidenceColor(_ confidence: Double) -> Color {
+        if confidence >= 0.7 { return RQColors.success }
+        if confidence >= 0.5 { return RQColors.accent }
+        if confidence >= 0.3 { return RQColors.warning }
+        return RQColors.textTertiary
     }
 
     // MARK: - Plateau Alert
@@ -248,6 +314,8 @@ struct ExerciseProgressView: View {
                 }
 
                 Spacer()
+
+                InfoButton(topic: ProgressExplainer.plateauDetection)
             }
 
             // Root causes and recommendations
@@ -298,20 +366,51 @@ struct ExerciseProgressView: View {
         RQCard {
             VStack(alignment: .leading, spacing: RQSpacing.md) {
                 if snapshots.count >= 2 {
-                    Chart(snapshots) { snapshot in
-                        LineMark(
-                            x: .value("Date", snapshot.date),
-                            y: .value(selectedMetric.rawValue, metricValue(for: snapshot))
-                        )
-                        .foregroundStyle(RQColors.accent)
-                        .interpolationMethod(.catmullRom)
+                    Chart {
+                        // Actual data
+                        ForEach(snapshots) { snapshot in
+                            LineMark(
+                                x: .value("Date", snapshot.date),
+                                y: .value(selectedMetric.rawValue, metricValue(for: snapshot))
+                            )
+                            .foregroundStyle(RQColors.accent)
+                            .interpolationMethod(.catmullRom)
 
-                        PointMark(
-                            x: .value("Date", snapshot.date),
-                            y: .value(selectedMetric.rawValue, metricValue(for: snapshot))
-                        )
-                        .foregroundStyle(RQColors.accent)
-                        .symbolSize(24)
+                            PointMark(
+                                x: .value("Date", snapshot.date),
+                                y: .value(selectedMetric.rawValue, metricValue(for: snapshot))
+                            )
+                            .foregroundStyle(RQColors.accent)
+                            .symbolSize(24)
+                        }
+
+                        // Prediction line (only for E1RM metric)
+                        if selectedMetric == .estimated1rm, let prediction = strengthPrediction, prediction.isReliable {
+                            let lastDate = snapshots.last!.date
+                            let futureDate = Calendar.current.date(byAdding: .day, value: 28, to: lastDate)!
+
+                            LineMark(
+                                x: .value("Date", lastDate),
+                                y: .value(selectedMetric.rawValue, prediction.currentE1RM)
+                            )
+                            .foregroundStyle(RQColors.accent.opacity(0.3))
+                            .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+
+                            LineMark(
+                                x: .value("Date", futureDate),
+                                y: .value(selectedMetric.rawValue, prediction.projectedE1RM)
+                            )
+                            .foregroundStyle(RQColors.accent.opacity(0.3))
+                            .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+
+                            PointMark(
+                                x: .value("Date", futureDate),
+                                y: .value(selectedMetric.rawValue, prediction.projectedE1RM)
+                            )
+                            .foregroundStyle(RQColors.accent.opacity(0.4))
+                            .symbolSize(32)
+                            .symbol(.diamond)
+                        }
                     }
                     .chartXAxis {
                         AxisMarks { value in
@@ -409,7 +508,7 @@ struct ExerciseProgressView: View {
         }
     }
 
-    // MARK: - Recent Sessions
+    // MARK: - Recent Sessions (with Deltas)
 
     private var recentSessionsSection: some View {
         VStack(alignment: .leading, spacing: RQSpacing.md) {
@@ -422,37 +521,110 @@ struct ExerciseProgressView: View {
                 Spacer()
             }
 
-            ForEach(snapshots.suffix(5).reversed()) { snapshot in
+            let recentSnapshots = Array(snapshots.suffix(5).reversed())
+            ForEach(Array(recentSnapshots.enumerated()), id: \.element.id) { index, snapshot in
+                // Find previous session for delta calculation
+                let previousSnapshot = findPreviousSnapshot(for: snapshot)
+
                 RQCard {
-                    HStack {
-                        VStack(alignment: .leading, spacing: RQSpacing.xxs) {
-                            Text(sessionDateFormatted(snapshot.date))
-                                .font(RQTypography.headline)
-                                .foregroundColor(RQColors.textPrimary)
-                            HStack(spacing: RQSpacing.sm) {
-                                Text("\(snapshot.setCount) sets")
-                                    .font(RQTypography.caption)
-                                    .foregroundColor(RQColors.textTertiary)
-                                Text("\u{00B7}")
-                                    .foregroundColor(RQColors.textTertiary)
-                                Text("\(formatWeight(snapshot.bestWeight)) lbs x \(snapshot.bestReps)")
+                    VStack(spacing: RQSpacing.sm) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: RQSpacing.xxs) {
+                                Text(sessionDateFormatted(snapshot.date))
+                                    .font(RQTypography.headline)
+                                    .foregroundColor(RQColors.textPrimary)
+                                HStack(spacing: RQSpacing.sm) {
+                                    Text("\(snapshot.setCount) sets")
+                                        .font(RQTypography.caption)
+                                        .foregroundColor(RQColors.textTertiary)
+                                    Text("\u{00B7}")
+                                        .foregroundColor(RQColors.textTertiary)
+                                    Text("\(formatWeight(snapshot.bestWeight)) lbs x \(snapshot.bestReps)")
+                                        .font(RQTypography.caption)
+                                        .foregroundColor(RQColors.textTertiary)
+                                }
+                            }
+                            Spacer()
+                            VStack(alignment: .trailing, spacing: RQSpacing.xxs) {
+                                Text(formatVolumeCompact(snapshot.totalVolume))
+                                    .font(RQTypography.numbersSmall)
+                                    .foregroundColor(RQColors.accent)
+                                Text("volume")
                                     .font(RQTypography.caption)
                                     .foregroundColor(RQColors.textTertiary)
                             }
                         }
-                        Spacer()
-                        VStack(alignment: .trailing, spacing: RQSpacing.xxs) {
-                            Text(formatVolumeCompact(snapshot.totalVolume))
-                                .font(RQTypography.numbersSmall)
-                                .foregroundColor(RQColors.accent)
-                            Text("volume")
-                                .font(RQTypography.caption)
-                                .foregroundColor(RQColors.textTertiary)
+
+                        // Session deltas vs previous
+                        if let prev = previousSnapshot {
+                            sessionDeltaRow(current: snapshot, previous: prev)
                         }
                     }
                 }
             }
         }
+    }
+
+    /// Finds the session immediately before the given one in chronological order.
+    private func findPreviousSnapshot(for snapshot: ExerciseSessionSnapshot) -> ExerciseSessionSnapshot? {
+        guard let currentIndex = snapshots.firstIndex(where: { $0.id == snapshot.id }),
+              currentIndex > 0 else { return nil }
+        return snapshots[currentIndex - 1]
+    }
+
+    private func sessionDeltaRow(current: ExerciseSessionSnapshot, previous: ExerciseSessionSnapshot) -> some View {
+        HStack(spacing: RQSpacing.lg) {
+            // Weight delta
+            let weightDelta = current.bestWeight - previous.bestWeight
+            if weightDelta != 0 {
+                deltaChip(
+                    label: "Weight",
+                    value: String(format: "%+.1f", weightDelta),
+                    isPositive: weightDelta > 0
+                )
+            }
+
+            // Volume delta
+            let volumeDelta = current.totalVolume - previous.totalVolume
+            if volumeDelta != 0 {
+                deltaChip(
+                    label: "Volume",
+                    value: String(format: "%+.0f", volumeDelta),
+                    isPositive: volumeDelta > 0
+                )
+            }
+
+            // E1RM delta
+            let e1rmDelta = current.estimated1RM - previous.estimated1RM
+            if e1rmDelta != 0 {
+                deltaChip(
+                    label: "E1RM",
+                    value: String(format: "%+.1f", e1rmDelta),
+                    isPositive: e1rmDelta > 0
+                )
+            }
+
+            Spacer()
+        }
+    }
+
+    private func deltaChip(label: String, value: String, isPositive: Bool) -> some View {
+        HStack(spacing: RQSpacing.xxs) {
+            Image(systemName: isPositive ? "arrow.up" : "arrow.down")
+                .font(.system(size: 8, weight: .bold))
+            Text("\(label) \(value)")
+                .font(RQTypography.label)
+        }
+        .foregroundColor(isPositive ? RQColors.chartPositive : RQColors.chartNegative)
+        .padding(.horizontal, RQSpacing.sm)
+        .padding(.vertical, RQSpacing.xxs)
+        .overlay(
+            RoundedRectangle(cornerRadius: RQRadius.small)
+                .stroke(
+                    (isPositive ? RQColors.chartPositive : RQColors.chartNegative).opacity(0.3),
+                    lineWidth: 0.5
+                )
+        )
     }
 
     // MARK: - Helpers
