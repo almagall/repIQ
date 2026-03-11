@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SessionDetailView: View {
-    @Bindable var viewModel: ProgressViewModel
+    @Bindable var viewModel: ProgressDashboardViewModel
     let sessionId: UUID
 
     var body: some View {

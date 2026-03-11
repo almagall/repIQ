@@ -33,6 +33,26 @@ enum RQColors {
     static let cooldown = Color(hex: "5AC8FA")
     static let dropSet = Color(hex: "9B59B6")
     static let failure = Color(hex: "FF3B30")
+
+    // Chart Colors
+    static let chartPositive = Color(hex: "00CC66")
+    static let chartNegative = Color(hex: "FF3B30")
+    static let chartGrid = Color(hex: "1C1C1C")
+
+    // Muscle Group Colors (for balance chart)
+    static let muscleGroupColors: [String: Color] = [
+        "chest": Color(hex: "FF6B6B"),
+        "back": Color(hex: "4ECDC4"),
+        "shoulders": Color(hex: "45B7D1"),
+        "biceps": Color(hex: "96CEB4"),
+        "triceps": Color(hex: "FFEAA7"),
+        "quads": Color(hex: "DDA0DD"),
+        "hamstrings": Color(hex: "98D8C8"),
+        "glutes": Color(hex: "F7DC6F"),
+        "calves": Color(hex: "BB8FCE"),
+        "abs": Color(hex: "85C1E9"),
+        "forearms": Color(hex: "F0B27A"),
+    ]
 }
 
 enum RQSpacing {
