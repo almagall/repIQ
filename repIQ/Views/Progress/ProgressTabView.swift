@@ -20,39 +20,49 @@ struct ProgressTabView: View {
                     )
                 } else {
                     VStack(spacing: RQSpacing.xl) {
-                        // A. Streak Banner
+                        // 1. Streak Banner — emotional hook
                         streakBanner
 
-                        // B. Overview Stats Grid
+                        // 2. Overview Stats Grid — quick health check
                         overviewStatsGrid
 
-                        // C. Weekly Volume Chart
+                        // 3. Weekly Volume Chart — primary trend
                         volumeChartSection
 
-                        // D. Recent PRs
-                        if !viewModel.recentPRs.isEmpty {
-                            recentPRsSection
-                        }
-
-                        // E. Muscle Group Balance
-                        if !viewModel.muscleDistribution.isEmpty {
-                            muscleBalanceSection
-                        }
-
-                        // F. Training Frequency Heatmap
-                        if !viewModel.frequencyData.isEmpty {
-                            frequencyHeatmapSection
-                        }
-
-                        // G. Insight Cards
+                        // 4. Smart Insights — prescriptive advice (high value)
                         if !viewModel.insights.isEmpty {
                             insightsSection
                         }
 
-                        // Exercise Progress entry point
+                        // 5. Recent PRs — reward/celebration
+                        if !viewModel.recentPRs.isEmpty {
+                            recentPRsSection
+                        }
+
+                        // 6. Milestones — gamification, next goals
+                        if !viewModel.milestones.isEmpty {
+                            milestonesSection
+                        }
+
+                        // 7. Muscle Balance — with fractional volume toggle
+                        if !viewModel.activeMuscleDistribution.isEmpty {
+                            muscleBalanceSection
+                        }
+
+                        // 8. Training Quality — effective reps breakdown
+                        if !viewModel.effectiveRepsSummary.isEmpty {
+                            trainingQualitySection
+                        }
+
+                        // 9. Training Frequency Heatmap
+                        if !viewModel.frequencyData.isEmpty {
+                            frequencyHeatmapSection
+                        }
+
+                        // 10. Exercise Progress — drill-down entry
                         exerciseProgressButton
 
-                        // H. Workout History
+                        // 11. Workout History — reference
                         workoutHistorySection
                     }
                     .padding(.horizontal, RQSpacing.screenHorizontal)
@@ -78,7 +88,7 @@ struct ProgressTabView: View {
         }
     }
 
-    // MARK: - A. Streak Banner
+    // MARK: - 1. Streak Banner
 
     private var streakBanner: some View {
         RQCard {
@@ -127,7 +137,7 @@ struct ProgressTabView: View {
         return RQColors.textTertiary
     }
 
-    // MARK: - B. Overview Stats Grid
+    // MARK: - 2. Overview Stats Grid
 
     private var overviewStatsGrid: some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: RQSpacing.md) {
@@ -180,7 +190,7 @@ struct ProgressTabView: View {
         }
     }
 
-    // MARK: - C. Weekly Volume Chart
+    // MARK: - 3. Weekly Volume Chart
 
     private var volumeChartSection: some View {
         VStack(alignment: .leading, spacing: RQSpacing.md) {
@@ -247,7 +257,52 @@ struct ProgressTabView: View {
         }
     }
 
-    // MARK: - D. Recent PRs
+    // MARK: - 4. Smart Insights
+
+    private var insightsSection: some View {
+        VStack(alignment: .leading, spacing: RQSpacing.md) {
+            sectionHeader("INSIGHTS")
+
+            ForEach(viewModel.insights) { insight in
+                insightCard(insight)
+            }
+        }
+    }
+
+    private func insightCard(_ insight: InsightCard) -> some View {
+        HStack(spacing: RQSpacing.md) {
+            // Colored left bar
+            RoundedRectangle(cornerRadius: 1)
+                .fill(insight.accentColor)
+                .frame(width: 3)
+
+            Image(systemName: insight.icon)
+                .font(.system(size: 16))
+                .foregroundColor(insight.accentColor)
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: RQSpacing.xxs) {
+                Text(insight.title)
+                    .font(RQTypography.headline)
+                    .foregroundColor(RQColors.textPrimary)
+                Text(insight.message)
+                    .font(RQTypography.caption)
+                    .foregroundColor(RQColors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer()
+        }
+        .padding(RQSpacing.cardPadding)
+        .background(Color.clear)
+        .cornerRadius(RQSpacing.cardCornerRadius)
+        .overlay(
+            RoundedRectangle(cornerRadius: RQSpacing.cardCornerRadius)
+                .stroke(RQColors.textTertiary, lineWidth: 1)
+        )
+    }
+
+    // MARK: - 5. Recent PRs
 
     private var recentPRsSection: some View {
         VStack(alignment: .leading, spacing: RQSpacing.md) {
@@ -293,16 +348,124 @@ struct ProgressTabView: View {
         .frame(width: 130)
     }
 
-    // MARK: - E. Muscle Group Balance
+    // MARK: - 6. Milestones
+
+    private var milestonesSection: some View {
+        VStack(alignment: .leading, spacing: RQSpacing.md) {
+            HStack {
+                sectionHeader("MILESTONES")
+                Spacer()
+                let achieved = viewModel.achievedMilestones.count
+                let total = viewModel.milestones.count
+                Text("\(achieved)/\(total)")
+                    .font(RQTypography.label)
+                    .foregroundColor(RQColors.textTertiary)
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: RQSpacing.md) {
+                    // Show next milestones first (most motivating), then achieved
+                    ForEach(viewModel.nextMilestones) { milestone in
+                        milestoneCard(milestone)
+                    }
+                    ForEach(viewModel.achievedMilestones.prefix(5)) { milestone in
+                        milestoneCard(milestone)
+                    }
+                }
+            }
+        }
+    }
+
+    private func milestoneCard(_ milestone: MilestoneDefinition) -> some View {
+        VStack(spacing: RQSpacing.sm) {
+            // Progress ring with icon
+            ZStack {
+                Circle()
+                    .stroke(RQColors.surfaceTertiary, lineWidth: 3)
+                    .frame(width: 48, height: 48)
+
+                Circle()
+                    .trim(from: 0, to: milestone.progress)
+                    .stroke(
+                        milestone.isAchieved ? RQColors.accent : RQColors.textTertiary,
+                        style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                    )
+                    .frame(width: 48, height: 48)
+                    .rotationEffect(.degrees(-90))
+
+                Image(systemName: milestone.isAchieved ? "checkmark" : milestone.icon)
+                    .font(.system(size: 16, weight: milestone.isAchieved ? .bold : .regular))
+                    .foregroundColor(milestone.isAchieved ? RQColors.accent : RQColors.textTertiary)
+            }
+
+            Text(milestone.title)
+                .font(RQTypography.caption)
+                .foregroundColor(milestone.isAchieved ? RQColors.textPrimary : RQColors.textSecondary)
+                .lineLimit(1)
+
+            if milestone.isAchieved {
+                Text("ACHIEVED")
+                    .font(RQTypography.label)
+                    .tracking(0.5)
+                    .foregroundColor(RQColors.accent)
+            } else {
+                Text("\(Int(milestone.progress * 100))%")
+                    .font(RQTypography.label)
+                    .foregroundColor(RQColors.textTertiary)
+            }
+        }
+        .frame(width: 90)
+        .padding(.vertical, RQSpacing.sm)
+        .padding(.horizontal, RQSpacing.xs)
+        .background(Color.clear)
+        .cornerRadius(RQSpacing.cardCornerRadius)
+        .overlay(
+            RoundedRectangle(cornerRadius: RQSpacing.cardCornerRadius)
+                .stroke(
+                    milestone.isAchieved ? RQColors.accent.opacity(0.5) : RQColors.textTertiary,
+                    lineWidth: milestone.isAchieved ? 1 : 0.5
+                )
+        )
+    }
+
+    // MARK: - 7. Muscle Group Balance
 
     private var muscleBalanceSection: some View {
         VStack(alignment: .leading, spacing: RQSpacing.md) {
-            sectionHeader("MUSCLE BALANCE")
+            HStack {
+                sectionHeader("MUSCLE BALANCE")
+                Spacer()
+                // Fractional volume toggle
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        viewModel.showFractionalVolume.toggle()
+                    }
+                } label: {
+                    HStack(spacing: RQSpacing.xs) {
+                        Image(systemName: viewModel.showFractionalVolume ? "arrow.triangle.branch" : "scope")
+                            .font(.system(size: 10))
+                        Text(viewModel.showFractionalVolume ? "ADJUSTED" : "DIRECT")
+                            .font(RQTypography.label)
+                            .tracking(0.5)
+                    }
+                    .foregroundColor(viewModel.showFractionalVolume ? RQColors.accent : RQColors.textTertiary)
+                    .padding(.horizontal, RQSpacing.sm)
+                    .padding(.vertical, RQSpacing.xxs)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: RQRadius.small)
+                            .stroke(
+                                viewModel.showFractionalVolume ? RQColors.accent.opacity(0.5) : RQColors.textTertiary,
+                                lineWidth: 0.5
+                            )
+                    )
+                }
+                .buttonStyle(.plain)
+            }
 
             RQCard {
                 VStack(spacing: RQSpacing.lg) {
                     // Donut chart
-                    Chart(viewModel.muscleDistribution) { group in
+                    Chart(viewModel.activeMuscleDistribution) { group in
                         SectorMark(
                             angle: .value("Volume", group.volume),
                             innerRadius: .ratio(0.6),
@@ -313,9 +476,19 @@ struct ProgressTabView: View {
                     }
                     .frame(height: 180)
 
+                    if viewModel.showFractionalVolume {
+                        HStack(spacing: RQSpacing.xs) {
+                            Image(systemName: "info.circle")
+                                .font(.system(size: 10))
+                            Text("Includes 0.5x synergist credit for compound lifts")
+                                .font(RQTypography.caption)
+                        }
+                        .foregroundColor(RQColors.textTertiary)
+                    }
+
                     // Legend
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: RQSpacing.sm) {
-                        ForEach(viewModel.muscleDistribution) { group in
+                        ForEach(viewModel.activeMuscleDistribution) { group in
                             HStack(spacing: RQSpacing.sm) {
                                 RoundedRectangle(cornerRadius: 2)
                                     .fill(group.color)
@@ -339,7 +512,100 @@ struct ProgressTabView: View {
         }
     }
 
-    // MARK: - F. Training Frequency Heatmap
+    // MARK: - 8. Training Quality (Effective Reps)
+
+    private var trainingQualitySection: some View {
+        VStack(alignment: .leading, spacing: RQSpacing.md) {
+            HStack {
+                sectionHeader("TRAINING QUALITY")
+                Spacer()
+                if let ratio = viewModel.overallEffectiveRatio {
+                    Text("\(Int(ratio * 100))% EFFECTIVE")
+                        .font(RQTypography.label)
+                        .tracking(0.5)
+                        .foregroundColor(effectiveRatioColor(ratio))
+                }
+            }
+
+            RQCard {
+                VStack(spacing: RQSpacing.md) {
+                    // Overall effective reps gauge
+                    if let ratio = viewModel.overallEffectiveRatio {
+                        HStack(spacing: RQSpacing.lg) {
+                            // Circular gauge
+                            ZStack {
+                                Circle()
+                                    .stroke(RQColors.surfaceTertiary, lineWidth: 4)
+                                    .frame(width: 56, height: 56)
+                                Circle()
+                                    .trim(from: 0, to: ratio)
+                                    .stroke(
+                                        effectiveRatioColor(ratio),
+                                        style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                                    )
+                                    .frame(width: 56, height: 56)
+                                    .rotationEffect(.degrees(-90))
+                                Text("\(Int(ratio * 100))")
+                                    .font(RQTypography.numbersSmall)
+                                    .foregroundColor(RQColors.textPrimary)
+                            }
+
+                            VStack(alignment: .leading, spacing: RQSpacing.xxs) {
+                                Text("Effective Rep Ratio")
+                                    .font(RQTypography.headline)
+                                    .foregroundColor(RQColors.textPrimary)
+                                Text("% of reps near failure (RPE 7+) that drive growth")
+                                    .font(RQTypography.caption)
+                                    .foregroundColor(RQColors.textTertiary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+
+                    // Per muscle group breakdown
+                    ForEach(viewModel.effectiveRepsSummary.prefix(6)) { data in
+                        HStack(spacing: RQSpacing.sm) {
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(data.color)
+                                .frame(width: 10, height: 10)
+
+                            Text(data.displayName)
+                                .font(RQTypography.caption)
+                                .foregroundColor(RQColors.textSecondary)
+                                .frame(width: 80, alignment: .leading)
+
+                            // Progress bar
+                            GeometryReader { geo in
+                                ZStack(alignment: .leading) {
+                                    RoundedRectangle(cornerRadius: 2)
+                                        .fill(RQColors.surfaceTertiary)
+                                        .frame(height: 6)
+                                    RoundedRectangle(cornerRadius: 2)
+                                        .fill(effectiveRatioColor(data.effectiveRatio))
+                                        .frame(width: max(0, geo.size.width * data.effectiveRatio), height: 6)
+                                }
+                            }
+                            .frame(height: 6)
+
+                            Text("\(data.effectiveReps)/\(data.totalReps)")
+                                .font(RQTypography.label)
+                                .foregroundColor(RQColors.textTertiary)
+                                .frame(width: 50, alignment: .trailing)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func effectiveRatioColor(_ ratio: Double) -> Color {
+        if ratio >= 0.4 { return RQColors.success }
+        if ratio >= 0.25 { return RQColors.accent }
+        if ratio >= 0.15 { return RQColors.warning }
+        return RQColors.error
+    }
+
+    // MARK: - 9. Training Frequency Heatmap
 
     private var frequencyHeatmapSection: some View {
         VStack(alignment: .leading, spacing: RQSpacing.md) {
@@ -383,22 +649,18 @@ struct ProgressTabView: View {
 
         for entry in viewModel.frequencyData {
             let weekday = calendar.component(.weekday, from: entry.date)
-            // Convert to Monday=0 format
             let mondayIndex = (weekday + 5) % 7
 
             if mondayIndex == 0 && !currentWeek.isEmpty {
-                // Pad incomplete week
                 while currentWeek.count < 7 { currentWeek.append(0) }
                 weeks.append(currentWeek)
                 currentWeek = []
             }
 
-            // Pad if starting mid-week
             while currentWeek.count < mondayIndex { currentWeek.append(0) }
             currentWeek.append(entry.count)
         }
 
-        // Add final incomplete week
         if !currentWeek.isEmpty {
             while currentWeek.count < 7 { currentWeek.append(0) }
             weeks.append(currentWeek)
@@ -415,52 +677,7 @@ struct ProgressTabView: View {
         }
     }
 
-    // MARK: - G. Insight Cards
-
-    private var insightsSection: some View {
-        VStack(alignment: .leading, spacing: RQSpacing.md) {
-            sectionHeader("INSIGHTS")
-
-            ForEach(viewModel.insights) { insight in
-                insightCard(insight)
-            }
-        }
-    }
-
-    private func insightCard(_ insight: InsightCard) -> some View {
-        HStack(spacing: RQSpacing.md) {
-            // Colored left bar
-            RoundedRectangle(cornerRadius: 1)
-                .fill(insight.accentColor)
-                .frame(width: 3)
-
-            Image(systemName: insight.icon)
-                .font(.system(size: 16))
-                .foregroundColor(insight.accentColor)
-                .frame(width: 24)
-
-            VStack(alignment: .leading, spacing: RQSpacing.xxs) {
-                Text(insight.title)
-                    .font(RQTypography.headline)
-                    .foregroundColor(RQColors.textPrimary)
-                Text(insight.message)
-                    .font(RQTypography.caption)
-                    .foregroundColor(RQColors.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Spacer()
-        }
-        .padding(RQSpacing.cardPadding)
-        .background(Color.clear)
-        .cornerRadius(RQSpacing.cardCornerRadius)
-        .overlay(
-            RoundedRectangle(cornerRadius: RQSpacing.cardCornerRadius)
-                .stroke(RQColors.textTertiary, lineWidth: 1)
-        )
-    }
-
-    // MARK: - Exercise Progress Entry
+    // MARK: - 10. Exercise Progress Entry
 
     private var exerciseProgressButton: some View {
         Button {
@@ -474,7 +691,7 @@ struct ProgressTabView: View {
                             .textCase(.uppercase)
                             .tracking(1.5)
                             .foregroundColor(RQColors.textSecondary)
-                        Text("View per-exercise trends and PRs")
+                        Text("View per-exercise trends, velocity, and plateau detection")
                             .font(RQTypography.caption)
                             .foregroundColor(RQColors.textTertiary)
                     }
@@ -488,7 +705,7 @@ struct ProgressTabView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - H. Workout History
+    // MARK: - 11. Workout History
 
     private var workoutHistorySection: some View {
         VStack(alignment: .leading, spacing: RQSpacing.md) {
@@ -512,7 +729,6 @@ struct ProgressTabView: View {
 
         return RQCard {
             HStack(spacing: RQSpacing.md) {
-                // Date badge
                 VStack(spacing: 2) {
                     Text(dayOfMonth(date))
                         .font(RQTypography.title3)
@@ -524,12 +740,10 @@ struct ProgressTabView: View {
                 }
                 .frame(width: 44)
 
-                // Divider
                 RoundedRectangle(cornerRadius: 1)
                     .fill(RQColors.surfaceTertiary)
                     .frame(width: 1, height: 44)
 
-                // Session info
                 VStack(alignment: .leading, spacing: RQSpacing.xxs) {
                     Text(workout ?? dayOfWeek(date))
                         .font(RQTypography.headline)

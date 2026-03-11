@@ -3,18 +3,21 @@ import SwiftUI
 
 struct InsightEngine {
 
-    /// Generates up to 3 actionable insight cards based on the user's data.
-    /// Rules are evaluated in priority order; the first 3 that match are returned.
+    /// Generates up to 4 actionable, prescriptive insight cards based on the user's data.
+    /// Rules are evaluated in priority order; the first 4 that match are returned.
     static func generateInsights(
         volumeTrend: [WeeklyVolumeSummary],
         muscleDistribution: [MuscleGroupVolume],
         streakData: StreakData?,
         recentPRs: [(record: PersonalRecord, exerciseName: String)],
         totalSessions: Int,
-        lastWorkoutDate: Date?
+        lastWorkoutDate: Date?,
+        averageRPE: Double? = nil,
+        effectiveRepsData: [EffectiveRepsSummary] = [],
+        weeklySessionCount: Int = 0
     ) -> [InsightCard] {
         var insights: [InsightCard] = []
-        let maxInsights = 3
+        let maxInsights = 4
 
         // Rule 1: Volume dropped >20% week-over-week
         if let drop = volumeDropInsight(volumeTrend: volumeTrend) {
@@ -28,33 +31,49 @@ struct InsightEngine {
         }
         guard insights.count < maxInsights else { return insights }
 
-        // Rule 3: Muscle imbalance (one group >3x another)
+        // Rule 3: RPE overreach warning (prescriptive)
+        if let rpeInsight = rpeOverreachInsight(averageRPE: averageRPE) {
+            insights.append(rpeInsight)
+        }
+        guard insights.count < maxInsights else { return insights }
+
+        // Rule 4: Muscle imbalance (one group >3x another)
         if let imbalance = muscleImbalanceInsight(distribution: muscleDistribution) {
             insights.append(imbalance)
         }
         guard insights.count < maxInsights else { return insights }
 
-        // Rule 4: No workout in 3+ days
+        // Rule 5: No workout in 3+ days
         if let inactivity = inactivityInsight(lastWorkoutDate: lastWorkoutDate) {
             insights.append(inactivity)
         }
         guard insights.count < maxInsights else { return insights }
 
-        // Rule 5: New PR in last 7 days
+        // Rule 6: Training efficiency — low effective reps ratio (prescriptive)
+        if let efficiencyInsight = trainingEfficiencyInsight(effectiveRepsData: effectiveRepsData) {
+            insights.append(efficiencyInsight)
+        }
+        guard insights.count < maxInsights else { return insights }
+
+        // Rule 7: New PR in last 7 days
         if let prInsight = recentPRInsight(recentPRs: recentPRs) {
             insights.append(prInsight)
         }
         guard insights.count < maxInsights else { return insights }
 
-        // Rule 6: Streak is 7+ days
+        // Rule 8: Frequency optimization (prescriptive)
+        if let freqInsight = frequencyInsight(weeklySessionCount: weeklySessionCount, totalSessions: totalSessions) {
+            insights.append(freqInsight)
+        }
+        guard insights.count < maxInsights else { return insights }
+
+        // Rule 9: Streak is 7+ days
         if let streakInsight = streakInsight(streakData: streakData) {
             insights.append(streakInsight)
         }
         guard insights.count < maxInsights else { return insights }
 
-        // Rule 7: High average RPE (not evaluable without per-set RPE data, skip for now)
-
-        // Rule 8: Session milestone
+        // Rule 10: Session milestone
         if let sessionInsight = sessionMilestoneInsight(totalSessions: totalSessions) {
             insights.append(sessionInsight)
         }
@@ -76,7 +95,7 @@ struct InsightEngine {
         return InsightCard(
             icon: "arrow.down.right",
             title: "Volume Dip",
-            message: "Your training volume dropped \(Int(abs(changePercent)))% this week. Life happens, but try to get back on track next week.",
+            message: "Training volume dropped \(Int(abs(changePercent)))% this week. If intentional (deload), great. Otherwise, aim to return to your baseline next week.",
             accentColor: RQColors.warning,
             priority: 1
         )
@@ -94,9 +113,22 @@ struct InsightEngine {
         return InsightCard(
             icon: "arrow.up.right",
             title: "Volume Climbing",
-            message: "Volume is up \(Int(changePercent))% this week. Great progress! Watch your recovery if you keep increasing.",
+            message: "Volume is up \(Int(changePercent))% this week. Keep the increase under 10% per week to avoid overreaching.",
             accentColor: RQColors.success,
             priority: 2
+        )
+    }
+
+    /// Prescriptive: warns when average RPE is too high, recommends deload.
+    private static func rpeOverreachInsight(averageRPE: Double?) -> InsightCard? {
+        guard let rpe = averageRPE, rpe > 9.0 else { return nil }
+
+        return InsightCard(
+            icon: "bolt.trianglebadge.exclamationmark",
+            title: "High Fatigue",
+            message: "Your average effort (RPE \(String(format: "%.1f", rpe))) has been very high. Schedule a deload week — reduce volume by 40–50% to recover and come back stronger.",
+            accentColor: RQColors.error,
+            priority: 3
         )
     }
 
@@ -109,9 +141,9 @@ struct InsightEngine {
         return InsightCard(
             icon: "chart.bar.xaxis",
             title: "Muscle Imbalance",
-            message: "Your \(highest.displayName.lowercased()) volume is significantly higher than \(lowest.displayName.lowercased()). Consider adding more \(lowest.displayName.lowercased()) work for balanced development.",
+            message: "Your \(highest.displayName.lowercased()) volume is 3x+ your \(lowest.displayName.lowercased()). Add 2–3 direct \(lowest.displayName.lowercased()) sets per week for balanced development.",
             accentColor: RQColors.info,
-            priority: 3
+            priority: 4
         )
     }
 
@@ -123,9 +155,29 @@ struct InsightEngine {
         return InsightCard(
             icon: "clock.badge.exclamationmark",
             title: "Time to Train",
-            message: "It's been \(daysSince) days since your last session. A quick workout today can keep your momentum going.",
+            message: "It's been \(daysSince) days since your last session. Even a short workout keeps your momentum going.",
             accentColor: RQColors.warning,
-            priority: 4
+            priority: 5
+        )
+    }
+
+    /// Prescriptive: warns when most training is at low RPE (low effective reps ratio).
+    private static func trainingEfficiencyInsight(effectiveRepsData: [EffectiveRepsSummary]) -> InsightCard? {
+        guard !effectiveRepsData.isEmpty else { return nil }
+        let totalEffective = effectiveRepsData.reduce(0) { $0 + $1.effectiveReps }
+        let totalReps = effectiveRepsData.reduce(0) { $0 + $1.totalReps }
+        guard totalReps > 0 else { return nil }
+
+        let overallRatio = Double(totalEffective) / Double(totalReps)
+        guard overallRatio < 0.25 else { return nil }
+
+        let percent = Int(overallRatio * 100)
+        return InsightCard(
+            icon: "gauge.with.dots.needle.33percent",
+            title: "Training Intensity",
+            message: "Only \(percent)% of your reps are near failure (effective reps). Training at RPE 7–9 maximizes growth stimulus per set.",
+            accentColor: RQColors.info,
+            priority: 6
         )
     }
 
@@ -141,7 +193,21 @@ struct InsightEngine {
             title: "New PR!",
             message: "You hit a new \(typeName) PR on \(recentPR.exerciseName)! Your training is paying off.",
             accentColor: RQColors.warning,
-            priority: 5
+            priority: 7
+        )
+    }
+
+    /// Prescriptive: recommends increasing frequency for better results.
+    private static func frequencyInsight(weeklySessionCount: Int, totalSessions: Int) -> InsightCard? {
+        // Only suggest after user has at least 4 sessions (not a brand new user)
+        guard totalSessions >= 4, weeklySessionCount > 0, weeklySessionCount < 3 else { return nil }
+
+        return InsightCard(
+            icon: "calendar.badge.plus",
+            title: "Frequency",
+            message: "You trained \(weeklySessionCount)x this week. Research shows 3–5 sessions per week optimizes muscle growth and strength gains.",
+            accentColor: RQColors.accent,
+            priority: 8
         )
     }
 
@@ -153,12 +219,11 @@ struct InsightEngine {
             title: "Streak Going Strong",
             message: "You're on a \(streak.currentStreak)-day streak! Consistency is the #1 factor in long-term progress.",
             accentColor: RQColors.accent,
-            priority: 6
+            priority: 9
         )
     }
 
     private static func sessionMilestoneInsight(totalSessions: Int) -> InsightCard? {
-        // Show for milestones: 10, 25, 50, 100, 150, 200, 250
         let milestones = [10, 25, 50, 100, 150, 200, 250]
         guard milestones.contains(totalSessions) || (totalSessions >= 50 && totalSessions % 50 == 0) else {
             return nil
@@ -169,7 +234,7 @@ struct InsightEngine {
             title: "Session Milestone",
             message: "You've completed \(totalSessions) sessions. You're building a serious training foundation.",
             accentColor: RQColors.accent,
-            priority: 8
+            priority: 10
         )
     }
 }

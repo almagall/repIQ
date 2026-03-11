@@ -355,6 +355,158 @@ struct AnalyticsService: Sendable {
         )
     }
 
+    // MARK: - Effective Reps Summary
+
+    /// Returns effective (stimulating) reps per muscle group for the past N days.
+    /// Uses RPE data to estimate how many reps per set were near failure.
+    func fetchEffectiveRepsSummary(userId: UUID, days: Int = 30) async throws -> [EffectiveRepsSummary] {
+        let calendar = Calendar.current
+        guard let startDate = calendar.date(byAdding: .day, value: -days, to: Date()) else {
+            return []
+        }
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        let sessions: [WorkoutSession] = try await supabase.from("workout_sessions")
+            .select()
+            .eq("user_id", value: userId.uuidString)
+            .eq("status", value: "completed")
+            .gte("completed_at", value: formatter.string(from: startDate))
+            .execute()
+            .value
+
+        guard !sessions.isEmpty else { return [] }
+
+        let sessionIds = sessions.map(\.id)
+        let allSets = try await fetchSetsForSessions(sessionIds)
+        let workingSets = allSets.filter { $0.setType == .working }
+        guard !workingSets.isEmpty else { return [] }
+
+        let exerciseIds = Array(Set(workingSets.map(\.exerciseId)))
+        let exercises = try await fetchExercisesFull(ids: exerciseIds)
+        let exerciseMap = Dictionary(uniqueKeysWithValues: exercises.map { ($0.id, $0) })
+
+        // Aggregate effective reps by muscle group
+        var groupData: [String: (effectiveReps: Int, totalReps: Int, sets: Int)] = [:]
+        for set in workingSets {
+            let group = exerciseMap[set.exerciseId]?.muscleGroup ?? "other"
+            let effective = CompoundSynergistMap.effectiveReps(reps: set.reps, rpe: set.rpe)
+            groupData[group, default: (0, 0, 0)].effectiveReps += effective
+            groupData[group, default: (0, 0, 0)].totalReps += set.reps
+            groupData[group, default: (0, 0, 0)].sets += 1
+        }
+
+        return groupData.map { group, data in
+            let muscleGroup = MuscleGroup(rawValue: group)
+            return EffectiveRepsSummary(
+                muscleGroup: group,
+                displayName: muscleGroup?.displayName ?? group.capitalized,
+                effectiveReps: data.effectiveReps,
+                totalReps: data.totalReps,
+                totalSets: data.sets
+            )
+        }
+        .sorted { $0.totalSets > $1.totalSets }
+    }
+
+    // MARK: - Fractional Muscle Distribution
+
+    /// Like fetchMuscleGroupDistribution but adds 0.5x synergist credit for compound exercises.
+    func fetchFractionalMuscleDistribution(userId: UUID, days: Int = 30) async throws -> [MuscleGroupVolume] {
+        let calendar = Calendar.current
+        guard let startDate = calendar.date(byAdding: .day, value: -days, to: Date()) else {
+            return []
+        }
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        let sessions: [WorkoutSession] = try await supabase.from("workout_sessions")
+            .select()
+            .eq("user_id", value: userId.uuidString)
+            .eq("status", value: "completed")
+            .gte("completed_at", value: formatter.string(from: startDate))
+            .execute()
+            .value
+
+        guard !sessions.isEmpty else { return [] }
+
+        let sessionIds = sessions.map(\.id)
+        let allSets = try await fetchSetsForSessions(sessionIds)
+        let workingSets = allSets.filter { $0.setType == .working }
+        guard !workingSets.isEmpty else { return [] }
+
+        let exerciseIds = Array(Set(workingSets.map(\.exerciseId)))
+        let exercises = try await fetchExercisesFull(ids: exerciseIds)
+        let exerciseMap = Dictionary(uniqueKeysWithValues: exercises.map { ($0.id, $0) })
+
+        // Aggregate with synergist credit
+        var groupVolume: [String: (volume: Double, sets: Int)] = [:]
+        for set in workingSets {
+            guard let exercise = exerciseMap[set.exerciseId] else { continue }
+            let primary = exercise.muscleGroup
+            let setVolume = set.volume
+
+            // Full credit to primary
+            groupVolume[primary, default: (0, 0)].volume += setVolume
+            groupVolume[primary, default: (0, 0)].sets += 1
+
+            // Synergist credit for compound exercises
+            let synergistList = CompoundSynergistMap.synergistGroups(primary: primary, isCompound: exercise.isCompound)
+            for synergist in synergistList {
+                groupVolume[synergist, default: (0, 0)].volume += setVolume * CompoundSynergistMap.synergistMultiplier
+            }
+        }
+
+        let totalVolume = groupVolume.values.reduce(0.0) { $0 + $1.volume }
+        guard totalVolume > 0 else { return [] }
+
+        return groupVolume.map { group, data in
+            let muscleGroup = MuscleGroup(rawValue: group)
+            return MuscleGroupVolume(
+                muscleGroup: group,
+                displayName: muscleGroup?.displayName ?? group.capitalized,
+                volume: data.volume,
+                percentage: (data.volume / totalVolume) * 100,
+                setCount: data.sets
+            )
+        }
+        .sorted { $0.volume > $1.volume }
+    }
+
+    // MARK: - Average RPE
+
+    /// Returns average RPE across all working sets in the past N days. Nil if no RPE data.
+    func fetchAverageRPE(userId: UUID, days: Int = 14) async throws -> Double? {
+        let calendar = Calendar.current
+        guard let startDate = calendar.date(byAdding: .day, value: -days, to: Date()) else {
+            return nil
+        }
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        let sessions: [WorkoutSession] = try await supabase.from("workout_sessions")
+            .select()
+            .eq("user_id", value: userId.uuidString)
+            .eq("status", value: "completed")
+            .gte("completed_at", value: formatter.string(from: startDate))
+            .execute()
+            .value
+
+        guard !sessions.isEmpty else { return nil }
+
+        let sessionIds = sessions.map(\.id)
+        let allSets = try await fetchSetsForSessions(sessionIds)
+        let rpeValues = allSets
+            .filter { $0.setType == .working }
+            .compactMap(\.rpe)
+
+        guard !rpeValues.isEmpty else { return nil }
+        return rpeValues.reduce(0, +) / Double(rpeValues.count)
+    }
+
     // MARK: - Helpers
 
     /// Fetches sets for multiple sessions in a single query.

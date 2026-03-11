@@ -13,9 +13,37 @@ final class ProgressDashboardViewModel {
     var volumeTrend: [WeeklyVolumeSummary] = []
     var recentPRs: [(record: PersonalRecord, exerciseName: String)] = []
     var muscleDistribution: [MuscleGroupVolume] = []
+    var fractionalDistribution: [MuscleGroupVolume] = []
     var frequencyData: [(date: Date, count: Int)] = []
     var insights: [InsightCard] = []
     var milestones: [MilestoneDefinition] = []
+    var effectiveRepsSummary: [EffectiveRepsSummary] = []
+    var averageRPE: Double?
+
+    // UI toggle for fractional volume
+    var showFractionalVolume: Bool = false
+
+    /// Returns the active muscle distribution based on the fractional toggle.
+    var activeMuscleDistribution: [MuscleGroupVolume] {
+        showFractionalVolume ? fractionalDistribution : muscleDistribution
+    }
+
+    // Computed: milestones sorted for display — achieved (most recent first), then in-progress (highest progress first)
+    var displayMilestones: [MilestoneDefinition] {
+        let achieved = milestones.filter(\.isAchieved).sorted { $0.threshold > $1.threshold }
+        let upcoming = milestones.filter { !$0.isAchieved }.sorted { $0.progress > $1.progress }
+        return achieved + upcoming
+    }
+
+    /// Next milestones the user is close to achieving (top 3 not-yet-achieved, highest progress first).
+    var nextMilestones: [MilestoneDefinition] {
+        Array(milestones.filter { !$0.isAchieved }.sorted { $0.progress > $1.progress }.prefix(3))
+    }
+
+    /// Recently achieved milestones (for celebration display).
+    var achievedMilestones: [MilestoneDefinition] {
+        milestones.filter(\.isAchieved).sorted { $0.threshold > $1.threshold }
+    }
 
     // Session history (bottom section)
     var sessions: [WorkoutSession] = []
@@ -44,6 +72,14 @@ final class ProgressDashboardViewModel {
         return ((current - previous) / previous) * 100
     }
 
+    /// Overall effective reps ratio across all muscle groups.
+    var overallEffectiveRatio: Double? {
+        let totalEffective = effectiveRepsSummary.reduce(0) { $0 + $1.effectiveReps }
+        let totalReps = effectiveRepsSummary.reduce(0) { $0 + $1.totalReps }
+        guard totalReps > 0 else { return nil }
+        return Double(totalEffective) / Double(totalReps)
+    }
+
     // MARK: - Name Helpers
 
     func templateName(for session: WorkoutSession) -> String? {
@@ -70,28 +106,37 @@ final class ProgressDashboardViewModel {
             async let streakTask = analyticsService.fetchCurrentStreak(userId: userId)
             async let volumeTrendTask = analyticsService.fetchWeeklyVolumeTrend(userId: userId, weeks: 8)
             async let muscleTask = analyticsService.fetchMuscleGroupDistribution(userId: userId, days: 30)
+            async let fractionalTask = analyticsService.fetchFractionalMuscleDistribution(userId: userId, days: 30)
             async let prTask = analyticsService.fetchRecentPRs(userId: userId, limit: 10)
             async let frequencyTask = analyticsService.fetchTrainingFrequency(userId: userId, weeks: 12)
             async let milestoneTask = analyticsService.fetchMilestoneProgress(userId: userId)
             async let sessionsTask = workoutService.fetchAllSessions(userId: userId)
+            async let effectiveRepsTask = analyticsService.fetchEffectiveRepsSummary(userId: userId, days: 30)
+            async let rpeTask = analyticsService.fetchAverageRPE(userId: userId, days: 14)
 
             // Await all
             let fetchedStreak = try await streakTask
             let fetchedTrend = try await volumeTrendTask
             let fetchedMuscle = try await muscleTask
+            let fetchedFractional = try await fractionalTask
             let fetchedPRs = try await prTask
             let fetchedFrequency = try await frequencyTask
             let fetchedMilestoneData = try await milestoneTask
             let fetchedSessions = try await sessionsTask
+            let fetchedEffectiveReps = try await effectiveRepsTask
+            let fetchedRPE = try await rpeTask
 
             // Update state
             streakData = fetchedStreak
             volumeTrend = fetchedTrend
             muscleDistribution = fetchedMuscle
+            fractionalDistribution = fetchedFractional
             recentPRs = fetchedPRs
             frequencyData = fetchedFrequency
             sessions = fetchedSessions
             milestones = MilestoneCatalog.evaluate(with: fetchedMilestoneData)
+            effectiveRepsSummary = fetchedEffectiveReps
+            averageRPE = fetchedRPE
 
             // Compute overview stats
             totalVolume = fetchedMilestoneData.totalVolume
@@ -102,14 +147,17 @@ final class ProgressDashboardViewModel {
                 weeklySessionCount = currentWeek.sessionCount
             }
 
-            // Generate insights
+            // Generate prescriptive insights with full data
             insights = InsightEngine.generateInsights(
                 volumeTrend: fetchedTrend,
                 muscleDistribution: fetchedMuscle,
                 streakData: fetchedStreak,
                 recentPRs: fetchedPRs,
                 totalSessions: fetchedSessions.count,
-                lastWorkoutDate: fetchedStreak.lastWorkoutDate
+                lastWorkoutDate: fetchedStreak.lastWorkoutDate,
+                averageRPE: fetchedRPE,
+                effectiveRepsData: fetchedEffectiveReps,
+                weeklySessionCount: weeklySessionCount
             )
 
             // Fetch template/day names for session history

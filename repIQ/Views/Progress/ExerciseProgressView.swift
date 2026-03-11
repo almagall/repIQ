@@ -19,6 +19,93 @@ struct ExerciseProgressView: View {
         case rpe = "RPE"
     }
 
+    // MARK: - Computed: Velocity
+
+    /// Calculates progress velocity from snapshots (E1RM trend over time).
+    private var velocity: (status: VelocityStatus, weeklyPercent: Double)? {
+        guard snapshots.count >= 3 else { return nil }
+        let recent = Array(snapshots.suffix(3))
+        let older = Array(snapshots.prefix(max(1, snapshots.count - 3)))
+
+        let recentAvgE1RM = recent.map(\.estimated1RM).reduce(0, +) / Double(recent.count)
+        let olderAvgE1RM = older.map(\.estimated1RM).reduce(0, +) / Double(older.count)
+
+        guard olderAvgE1RM > 0 else { return nil }
+
+        let totalChange = ((recentAvgE1RM - olderAvgE1RM) / olderAvgE1RM) * 100
+
+        // Calculate approximate weeks between oldest and newest snapshot
+        let daySpan = Calendar.current.dateComponents([.day], from: snapshots.first!.date, to: snapshots.last!.date).day ?? 1
+        let weeks = max(1.0, Double(daySpan) / 7.0)
+        let weeklyPercent = totalChange / weeks
+
+        return (status: VelocityStatus.from(weeklyPercent: weeklyPercent), weeklyPercent: weeklyPercent)
+    }
+
+    // MARK: - Computed: Plateau Detection
+
+    /// Detects plateau: E1RM flat (within 2%) for 3+ consecutive sessions.
+    private var plateauAnalysis: PlateauAnalysis? {
+        guard snapshots.count >= 3 else { return nil }
+        let recent = Array(snapshots.suffix(min(6, snapshots.count)))
+
+        // Check if E1RM has been flat for 3+ sessions
+        let e1rmValues = recent.map(\.estimated1RM)
+        guard let maxE1RM = e1rmValues.max(), maxE1RM > 0 else { return nil }
+
+        // Count consecutive flat sessions from the end
+        var flatCount = 1
+        let threshold = 0.02 // 2% change threshold
+        for i in stride(from: e1rmValues.count - 1, through: 1, by: -1) {
+            let change = abs(e1rmValues[i] - e1rmValues[i - 1]) / max(e1rmValues[i - 1], 1)
+            if change <= threshold {
+                flatCount += 1
+            } else {
+                break
+            }
+        }
+
+        guard flatCount >= 3 else { return nil }
+
+        // Determine root causes
+        var causes: [PlateauCause] = []
+
+        // Check average set count — if low, insufficient volume
+        let avgSets = Double(recent.map(\.setCount).reduce(0, +)) / Double(recent.count)
+        if avgSets < 3 {
+            causes.append(.insufficientVolume)
+        }
+
+        // Check RPE — if consistently high, fatigue
+        let rpeValues = recent.compactMap(\.avgRPE)
+        if !rpeValues.isEmpty {
+            let avgRPE = rpeValues.reduce(0, +) / Double(rpeValues.count)
+            if avgRPE > 8.5 {
+                causes.append(.highFatigue)
+            }
+        }
+
+        // Check frequency — if sessions are spread far apart
+        if recent.count >= 2 {
+            let daySpan = Calendar.current.dateComponents([.day], from: recent.first!.date, to: recent.last!.date).day ?? 0
+            let avgDaysBetween = Double(daySpan) / Double(recent.count - 1)
+            if avgDaysBetween > 10 {
+                causes.append(.lowFrequency)
+            }
+        }
+
+        // If no specific cause found, suggest variety
+        if causes.isEmpty {
+            causes.append(.needsVariety)
+        }
+
+        return PlateauAnalysis(
+            sessionsStalled: flatCount,
+            currentE1RM: e1rmValues.last ?? 0,
+            causes: causes
+        )
+    }
+
     var body: some View {
         ScrollView {
             if isLoading {
@@ -27,8 +114,18 @@ struct ExerciseProgressView: View {
                     .frame(maxWidth: .infinity, minHeight: 200)
             } else {
                 VStack(spacing: RQSpacing.xl) {
-                    // Header badges
+                    // Header badges + velocity indicator
                     headerBadges
+
+                    // Velocity badge
+                    if let vel = velocity {
+                        velocityBadge(vel)
+                    }
+
+                    // Plateau alert
+                    if let plateau = plateauAnalysis {
+                        plateauAlert(plateau)
+                    }
 
                     // Metric selector
                     metricPicker
@@ -84,6 +181,103 @@ struct ExerciseProgressView: View {
                 RoundedRectangle(cornerRadius: RQRadius.small)
                     .stroke(color.opacity(0.5), lineWidth: 1)
             )
+    }
+
+    // MARK: - Velocity Badge
+
+    private func velocityBadge(_ vel: (status: VelocityStatus, weeklyPercent: Double)) -> some View {
+        RQCard {
+            HStack(spacing: RQSpacing.md) {
+                Image(systemName: vel.status.icon)
+                    .font(.system(size: 22))
+                    .foregroundColor(vel.status.color)
+
+                VStack(alignment: .leading, spacing: RQSpacing.xxs) {
+                    HStack(spacing: RQSpacing.sm) {
+                        Text(vel.status.displayName.uppercased())
+                            .font(RQTypography.label)
+                            .tracking(1)
+                            .foregroundColor(vel.status.color)
+                        Text(String(format: "%+.1f%%/wk", vel.weeklyPercent))
+                            .font(RQTypography.numbersSmall)
+                            .foregroundColor(RQColors.textPrimary)
+                    }
+
+                    Text(velocityDescription(vel.status))
+                        .font(RQTypography.caption)
+                        .foregroundColor(RQColors.textTertiary)
+                }
+
+                Spacer()
+            }
+        }
+    }
+
+    private func velocityDescription(_ status: VelocityStatus) -> String {
+        switch status {
+        case .accelerating: return "E1RM is climbing fast. Ride the wave!"
+        case .progressing: return "Steady progress. Keep doing what you're doing."
+        case .maintaining: return "Holding steady. Consider progressive overload."
+        case .stalling: return "Progress has slowed. Check volume and recovery."
+        case .regressing: return "E1RM is declining. Prioritize recovery or deload."
+        }
+    }
+
+    // MARK: - Plateau Alert
+
+    private func plateauAlert(_ plateau: PlateauAnalysis) -> some View {
+        VStack(alignment: .leading, spacing: RQSpacing.md) {
+            // Alert header
+            HStack(spacing: RQSpacing.md) {
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(RQColors.warning)
+                    .frame(width: 3)
+
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.system(size: 16))
+                    .foregroundColor(RQColors.warning)
+
+                VStack(alignment: .leading, spacing: RQSpacing.xxs) {
+                    Text("PLATEAU DETECTED")
+                        .font(RQTypography.label)
+                        .tracking(1)
+                        .foregroundColor(RQColors.warning)
+                    Text("E1RM flat for \(plateau.sessionsStalled) sessions at \(formatWeight(plateau.currentE1RM)) lbs")
+                        .font(RQTypography.caption)
+                        .foregroundColor(RQColors.textSecondary)
+                }
+
+                Spacer()
+            }
+
+            // Root causes and recommendations
+            ForEach(Array(plateau.causes.enumerated()), id: \.offset) { _, cause in
+                HStack(spacing: RQSpacing.sm) {
+                    Image(systemName: cause.icon)
+                        .font(.system(size: 12))
+                        .foregroundColor(RQColors.textTertiary)
+                        .frame(width: 20)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(cause.displayName.uppercased())
+                            .font(RQTypography.label)
+                            .tracking(0.5)
+                            .foregroundColor(RQColors.textSecondary)
+                        Text(cause.recommendation)
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.textTertiary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(.leading, RQSpacing.xl)
+            }
+        }
+        .padding(RQSpacing.cardPadding)
+        .background(Color.clear)
+        .cornerRadius(RQSpacing.cardCornerRadius)
+        .overlay(
+            RoundedRectangle(cornerRadius: RQSpacing.cardCornerRadius)
+                .stroke(RQColors.warning.opacity(0.5), lineWidth: 1)
+        )
     }
 
     // MARK: - Metric Picker
