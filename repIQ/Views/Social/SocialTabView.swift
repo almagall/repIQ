@@ -53,6 +53,7 @@ struct SocialTabView: View {
             .navigationTitle("Social")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: RQSpacing.md) {
@@ -137,7 +138,9 @@ struct SocialTabView: View {
             HStack(spacing: 0) {
                 ForEach(SocialSection.allCases, id: \.rawValue) { section in
                     Button {
-                        selectedSection = section
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            selectedSection = section
+                        }
                     } label: {
                         VStack(spacing: RQSpacing.xs) {
                             HStack(spacing: RQSpacing.xs) {
@@ -171,9 +174,10 @@ struct SocialTabView: View {
                 }
             }
             .padding(.horizontal, RQSpacing.screenHorizontal)
-            .padding(.top, RQSpacing.sm)
+            .padding(.vertical, RQSpacing.sm)
         }
-        .background(RQColors.background)
+        .fixedSize(horizontal: false, vertical: true)
+        .background(RQColors.surfacePrimary)
     }
 
     // MARK: - Discover Section
