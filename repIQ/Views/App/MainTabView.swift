@@ -21,7 +21,11 @@ struct MainTabView: View {
                 ProgressTabView()
             }
 
-            Tab("Profile", systemImage: "person.fill", value: 3) {
+            Tab("Social", systemImage: "person.2.fill", value: 3) {
+                SocialTabView()
+            }
+
+            Tab("Profile", systemImage: "person.fill", value: 4) {
                 ProfileView()
             }
         }

@@ -75,13 +75,23 @@ struct WorkoutSummaryData: Identifiable {
     let newPRs: [PRSummary]
     let progressionDecisions: [ProgressionSummary]
 
+    // Gamification
+    var iqPointsEarned: Int = 0
+    var currentStreak: Int = 0
+    var longestStreak: Int = 0
+    var newBadges: [Badge] = []
+
     init(
         duration: Int,
         totalSets: Int,
         totalVolume: Double,
         exerciseSummaries: [ExerciseSummary],
         newPRs: [PRSummary] = [],
-        progressionDecisions: [ProgressionSummary] = []
+        progressionDecisions: [ProgressionSummary] = [],
+        iqPointsEarned: Int = 0,
+        currentStreak: Int = 0,
+        longestStreak: Int = 0,
+        newBadges: [Badge] = []
     ) {
         self.duration = duration
         self.totalSets = totalSets
@@ -89,6 +99,10 @@ struct WorkoutSummaryData: Identifiable {
         self.exerciseSummaries = exerciseSummaries
         self.newPRs = newPRs
         self.progressionDecisions = progressionDecisions
+        self.iqPointsEarned = iqPointsEarned
+        self.currentStreak = currentStreak
+        self.longestStreak = longestStreak
+        self.newBadges = newBadges
     }
 
     struct ExerciseSummary: Identifiable {

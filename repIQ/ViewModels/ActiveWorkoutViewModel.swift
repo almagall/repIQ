@@ -45,6 +45,8 @@ final class ActiveWorkoutViewModel {
     private let workoutService = WorkoutService()
     private let progressionService = ProgressionService()
     private let exerciseLibraryService = ExerciseLibraryService()
+    private let gamificationService = GamificationService()
+    private let feedService = FeedService()
     private var timerTask: Task<Void, Never>?
     private var restTimerTask: Task<Void, Never>?
     private var autoSaveTask: Task<Void, Never>?
@@ -416,14 +418,120 @@ final class ActiveWorkoutViewModel {
                 }
             }
 
-            // Build summary with PR and progression data
+            // --- Gamification ---
+            // Update streak (no freezes — streak breaks if you don't train)
+            let streakResult = (try? await gamificationService.updateStreak(userId: userId))
+                ?? (currentStreak: 0, longestStreak: 0)
+
+            // Award IQ points for actual training actions
+            let iqEarned = (try? await gamificationService.awardWorkoutRewards(
+                userId: userId,
+                sessionId: sessionId,
+                completedSets: totalCompletedSets,
+                targetsHit: 0, // TODO: track targets hit during workout
+                newPRCount: allNewPRs.count,
+                currentStreak: streakResult.currentStreak
+            )) ?? 0
+
+            // Evaluate badges
+            let newBadges = (try? await gamificationService.evaluateBadges(
+                userId: userId,
+                totalSessions: 0, // Let the service query if needed
+                totalSets: totalCompletedSets,
+                totalVolume: totalVolume,
+                currentStreak: streakResult.currentStreak,
+                longestStreak: streakResult.longestStreak,
+                totalPRs: allNewPRs.count,
+                friendsCount: 0,
+                fistBumpsGiven: 0
+            )) ?? []
+
+            // Create feed item for workout completion
+            let feedData = FeedItemData(
+                duration: duration,
+                totalSets: totalCompletedSets,
+                totalVolume: totalVolume,
+                exerciseCount: exerciseSummaries.count,
+                prCount: allNewPRs.isEmpty ? nil : allNewPRs.count,
+                exerciseNames: exerciseSummaries.map(\.name)
+            )
+            try? await feedService.createFeedItem(
+                userId: userId,
+                sessionId: sessionId,
+                itemType: .workoutCompleted,
+                data: feedData
+            )
+
+            // Create PR feed items
+            if !allNewPRs.isEmpty {
+                let prFeedData = FeedItemData(prCount: allNewPRs.count)
+                try? await feedService.createFeedItem(
+                    userId: userId,
+                    sessionId: sessionId,
+                    itemType: .prAchieved,
+                    data: prFeedData
+                )
+            }
+
+            // Create streak milestone feed items (at 7, 14, 30, 60, 90, 180, 365)
+            let streakMilestones = [7, 14, 30, 60, 90, 180, 365]
+            if streakMilestones.contains(streakResult.currentStreak) {
+                let streakData = FeedItemData(streakDays: streakResult.currentStreak)
+                try? await feedService.createFeedItem(
+                    userId: userId,
+                    sessionId: nil,
+                    itemType: .streakMilestone,
+                    data: streakData
+                )
+            }
+
+            // Create badge feed items
+            for badge in newBadges {
+                let badgeData = FeedItemData(badgeName: badge.name)
+                try? await feedService.createFeedItem(
+                    userId: userId,
+                    sessionId: nil,
+                    itemType: .badgeEarned,
+                    data: badgeData
+                )
+            }
+
+            // Evaluate milestones (Phase 4)
+            let matchmakingService = MatchmakingService()
+            let newMilestones = try? await matchmakingService.evaluateMilestones(
+                userId: userId,
+                totalSessions: 0, // Service queries actual count
+                totalVolume: totalVolume,
+                currentStreak: streakResult.currentStreak,
+                longestStreak: streakResult.longestStreak,
+                accountCreatedAt: nil
+            )
+
+            // Create feed items for new milestones (celebrations visible to friends)
+            if let milestones = newMilestones {
+                for milestone in milestones {
+                    let milestoneData = FeedItemData(badgeName: milestone.milestoneType.displayName)
+                    try? await feedService.createFeedItem(
+                        userId: userId,
+                        sessionId: nil,
+                        itemType: .badgeEarned,
+                        data: milestoneData
+                    )
+                }
+            }
+
+            // Build summary with PR, progression, and gamification data
             workoutSummary = WorkoutSummaryData(
                 duration: duration,
                 totalSets: totalCompletedSets,
                 totalVolume: totalVolume,
                 exerciseSummaries: exerciseSummaries,
                 newPRs: allNewPRs,
-                progressionDecisions: allDecisions
+                progressionDecisions: allDecisions,
+                iqPointsEarned: iqEarned,
+                currentStreak: streakResult.currentStreak,
+                longestStreak: streakResult.longestStreak,
+                newBadges: newBadges
             )
 
             timerTask?.cancel()

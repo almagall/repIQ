@@ -39,6 +39,16 @@ struct WorkoutSummaryView: View {
                         )
                     }
 
+                    // Gamification: IQ Points + Streak
+                    if summary.iqPointsEarned > 0 || summary.currentStreak > 0 {
+                        gamificationSection
+                    }
+
+                    // New badges
+                    if !summary.newBadges.isEmpty {
+                        newBadgesSection
+                    }
+
                     // PR celebrations (exclude volume — not actionable insight)
                     let displayPRs = summary.newPRs.filter { $0.recordType != .volume }
                     if !displayPRs.isEmpty {
@@ -100,6 +110,100 @@ struct WorkoutSummaryView: View {
                     .foregroundColor(RQColors.accent)
                 }
             }
+        }
+    }
+
+    // MARK: - Gamification
+
+    private var gamificationSection: some View {
+        HStack(spacing: RQSpacing.lg) {
+            // IQ Points earned
+            if summary.iqPointsEarned > 0 {
+                RQCard {
+                    VStack(spacing: RQSpacing.sm) {
+                        Image(systemName: "brain.head.profile")
+                            .font(.system(size: 20))
+                            .foregroundColor(RQColors.accent)
+                        Text("+\(summary.iqPointsEarned)")
+                            .font(RQTypography.numbers)
+                            .foregroundColor(RQColors.accent)
+                        Text("IQ Earned")
+                            .font(RQTypography.label)
+                            .textCase(.uppercase)
+                            .tracking(1.5)
+                            .foregroundColor(RQColors.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+
+            // Streak
+            if summary.currentStreak > 0 {
+                RQCard {
+                    VStack(spacing: RQSpacing.sm) {
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(RQColors.warning)
+                        Text("\(summary.currentStreak)")
+                            .font(RQTypography.numbers)
+                            .foregroundColor(RQColors.warning)
+                        Text("Day Streak")
+                            .font(RQTypography.label)
+                            .textCase(.uppercase)
+                            .tracking(1.5)
+                            .foregroundColor(RQColors.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+        }
+    }
+
+    private var newBadgesSection: some View {
+        VStack(alignment: .leading, spacing: RQSpacing.md) {
+            Text("Badges Earned!")
+                .font(RQTypography.label)
+                .textCase(.uppercase)
+                .tracking(1.5)
+                .foregroundColor(RQColors.textSecondary)
+
+            ForEach(summary.newBadges) { badge in
+                RQCard {
+                    HStack(spacing: RQSpacing.md) {
+                        Image(systemName: badge.icon)
+                            .font(.system(size: 24))
+                            .foregroundColor(badgeCategoryColor(badge.category))
+                            .frame(width: 44, height: 44)
+                            .background(badgeCategoryColor(badge.category).opacity(0.15))
+                            .clipShape(Circle())
+
+                        VStack(alignment: .leading, spacing: RQSpacing.xxs) {
+                            Text(badge.name)
+                                .font(RQTypography.headline)
+                                .foregroundColor(RQColors.textPrimary)
+                            Text(badge.description)
+                                .font(RQTypography.caption)
+                                .foregroundColor(RQColors.textSecondary)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "medal.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(RQColors.warning)
+                    }
+                }
+            }
+        }
+    }
+
+    private func badgeCategoryColor(_ category: BadgeCategory) -> Color {
+        switch category {
+        case .volume: return RQColors.hypertrophy
+        case .consistency: return RQColors.success
+        case .strength: return RQColors.warning
+        case .social: return RQColors.accent
+        case .intelligence: return RQColors.info
         }
     }
 
