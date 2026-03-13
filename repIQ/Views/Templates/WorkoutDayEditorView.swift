@@ -5,7 +5,8 @@ struct WorkoutDayEditorView: View {
     @Bindable var viewModel: TemplateEditorViewModel
     @State private var showExercisePicker = false
     @State private var selectedTrainingMode: TrainingMode = .hypertrophy
-    @State private var supersetToast: String?
+    @State private var supersetSource: WorkoutDayExercise?
+    @State private var supersetSelections: Set<UUID> = []
 
     private var currentDay: WorkoutDay {
         viewModel.workoutDays.first(where: { $0.id == day.id }) ?? day
@@ -79,21 +80,6 @@ struct WorkoutDayEditorView: View {
         .navigationTitle(currentDay.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
-        .overlay(alignment: .bottom) {
-            if let toast = supersetToast {
-                Text(toast)
-                    .font(RQTypography.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, RQSpacing.lg)
-                    .padding(.vertical, RQSpacing.md)
-                    .background(RQColors.warning.opacity(0.9))
-                    .clipShape(Capsule())
-                    .padding(.bottom, RQSpacing.xxxl)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .animation(.easeInOut(duration: 0.3), value: supersetToast)
-            }
-        }
         .sheet(isPresented: $showExercisePicker) {
             ExercisePickerView { exercise in
                 Task {
@@ -105,7 +91,156 @@ struct WorkoutDayEditorView: View {
                 }
             }
         }
+        .sheet(item: $supersetSource) { source in
+            supersetPickerSheet(source: source)
+        }
     }
+
+    // MARK: - Superset Picker Sheet
+
+    private func supersetPickerSheet(source: WorkoutDayExercise) -> some View {
+        let exercises = currentDay.exercises?.sorted(by: { $0.sortOrder < $1.sortOrder }) ?? []
+        let otherExercises = exercises.filter { $0.id != source.id }
+
+        return NavigationStack {
+            ScrollView {
+                VStack(spacing: RQSpacing.lg) {
+                    // Header explanation
+                    VStack(spacing: RQSpacing.sm) {
+                        Image(systemName: "link.circle.fill")
+                            .font(.system(size: 36))
+                            .foregroundColor(RQColors.warning)
+
+                        Text("Superset with \(source.exercise?.name ?? "Exercise")")
+                            .font(RQTypography.headline)
+                            .foregroundColor(RQColors.textPrimary)
+                            .multilineTextAlignment(.center)
+
+                        Text("Select exercises to perform back-to-back with no rest between them.")
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.textSecondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.top, RQSpacing.md)
+
+                    // Exercise selection list
+                    VStack(spacing: RQSpacing.sm) {
+                        ForEach(otherExercises) { exercise in
+                            Button {
+                                if supersetSelections.contains(exercise.id) {
+                                    supersetSelections.remove(exercise.id)
+                                } else {
+                                    supersetSelections.insert(exercise.id)
+                                }
+                            } label: {
+                                HStack(spacing: RQSpacing.md) {
+                                    Image(systemName: supersetSelections.contains(exercise.id) ? "checkmark.circle.fill" : "circle")
+                                        .font(.system(size: 22))
+                                        .foregroundColor(supersetSelections.contains(exercise.id) ? RQColors.warning : RQColors.textTertiary)
+
+                                    VStack(alignment: .leading, spacing: RQSpacing.xxs) {
+                                        Text(exercise.exercise?.name ?? "Unknown")
+                                            .font(RQTypography.body)
+                                            .foregroundColor(RQColors.textPrimary)
+
+                                        if let ex = exercise.exercise {
+                                            HStack(spacing: RQSpacing.sm) {
+                                                Text(ex.muscleGroup.capitalized)
+                                                    .font(RQTypography.caption)
+                                                    .foregroundColor(RQColors.textTertiary)
+                                                Text("\u{00B7}")
+                                                    .foregroundColor(RQColors.textTertiary)
+                                                Text(exercise.trainingMode.displayName)
+                                                    .font(RQTypography.caption)
+                                                    .foregroundColor(modeColor(exercise.trainingMode))
+                                            }
+                                        }
+                                    }
+
+                                    Spacer()
+                                }
+                                .padding(RQSpacing.md)
+                                .background(
+                                    RoundedRectangle(cornerRadius: RQRadius.medium)
+                                        .fill(supersetSelections.contains(exercise.id) ? RQColors.warning.opacity(0.1) : RQColors.surfaceSecondary)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: RQRadius.medium)
+                                        .stroke(supersetSelections.contains(exercise.id) ? RQColors.warning.opacity(0.4) : Color.clear, lineWidth: 1)
+                                )
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, RQSpacing.screenHorizontal)
+                .padding(.bottom, RQSpacing.xxxl)
+            }
+            .background(RQColors.background)
+            .navigationTitle("Superset")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        supersetSource = nil
+                    }
+                    .foregroundColor(RQColors.textSecondary)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(supersetSelections.isEmpty ? "Remove" : "Save") {
+                        Task {
+                            await viewModel.setSuperset(
+                                source: source,
+                                partners: supersetSelections,
+                                in: currentDay
+                            )
+                            supersetSource = nil
+                        }
+                    }
+                    .fontWeight(.semibold)
+                    .foregroundColor(supersetSelections.isEmpty ? RQColors.error : RQColors.accent)
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                if !supersetSelections.isEmpty {
+                    supersetPreview(source: source)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    // Preview of what the superset will look like
+    private func supersetPreview(source: WorkoutDayExercise) -> some View {
+        let exercises = currentDay.exercises?.sorted(by: { $0.sortOrder < $1.sortOrder }) ?? []
+        let selectedNames = [source.exercise?.name ?? "?"] + supersetSelections.compactMap { id in
+            exercises.first(where: { $0.id == id })?.exercise?.name
+        }
+
+        return VStack(spacing: RQSpacing.xs) {
+            Text("SUPERSET PREVIEW")
+                .font(RQTypography.label)
+                .tracking(1)
+                .foregroundColor(RQColors.warning)
+
+            Text(selectedNames.joined(separator: "  \u{2192}  "))
+                .font(RQTypography.subheadline)
+                .fontWeight(.medium)
+                .foregroundColor(RQColors.textPrimary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(RQSpacing.md)
+        .frame(maxWidth: .infinity)
+        .background(RQColors.warning.opacity(0.1))
+        .overlay(
+            Rectangle()
+                .fill(RQColors.warning)
+                .frame(height: 2),
+            alignment: .top
+        )
+    }
+
+    // MARK: - Exercise Card
 
     private func exerciseCard(_ dayExercise: WorkoutDayExercise, index: Int, total: Int) -> some View {
         let allExercises = currentDay.exercises?.sorted(by: { $0.sortOrder < $1.sortOrder }) ?? []
@@ -166,30 +301,13 @@ struct WorkoutDayEditorView: View {
 
                         Spacer()
 
-                        // Superset toggle button (only show if not last exercise)
-                        if index < total - 1 {
-                            Button {
-                                let wasInSuperset = dayExercise.supersetGroup != nil
-                                let nextName = allExercises[safe: index + 1]?.exercise?.name ?? "next exercise"
-                                let currentName = dayExercise.exercise?.name ?? "exercise"
-                                Task {
-                                    await viewModel.toggleSuperset(for: dayExercise, in: currentDay)
-                                    await MainActor.run {
-                                        if wasInSuperset {
-                                            supersetToast = "Superset removed"
-                                        } else {
-                                            supersetToast = "\(currentName) + \(nextName) linked as superset"
-                                        }
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-                                            withAnimation { supersetToast = nil }
-                                        }
-                                    }
-                                }
-                            } label: {
-                                Image(systemName: dayExercise.supersetGroup != nil ? "link.circle.fill" : "link.circle")
-                                    .font(.system(size: 18))
-                                    .foregroundColor(dayExercise.supersetGroup != nil ? RQColors.warning : RQColors.textTertiary)
-                            }
+                        // Superset button — opens picker sheet
+                        Button {
+                            openSupersetPicker(for: dayExercise)
+                        } label: {
+                            Image(systemName: dayExercise.supersetGroup != nil ? "link.circle.fill" : "link.circle")
+                                .font(.system(size: 18))
+                                .foregroundColor(dayExercise.supersetGroup != nil ? RQColors.warning : RQColors.textTertiary)
                         }
 
                         Button {
@@ -209,7 +327,7 @@ struct WorkoutDayEditorView: View {
                             Text(exercise.muscleGroup.capitalized)
                                 .font(RQTypography.caption)
                                 .foregroundColor(RQColors.textTertiary)
-                            Text("·")
+                            Text("\u{00B7}")
                                 .foregroundColor(RQColors.textTertiary)
                             Text(exercise.equipment.capitalized)
                                 .font(RQTypography.caption)
@@ -298,6 +416,23 @@ struct WorkoutDayEditorView: View {
                     : nil
             )
         }
+    }
+
+    // MARK: - Helpers
+
+    private func openSupersetPicker(for exercise: WorkoutDayExercise) {
+        let exercises = currentDay.exercises?.sorted(by: { $0.sortOrder < $1.sortOrder }) ?? []
+
+        // Pre-select exercises already in the same superset group
+        if let group = exercise.supersetGroup {
+            supersetSelections = Set(
+                exercises.filter { $0.supersetGroup == group && $0.id != exercise.id }.map(\.id)
+            )
+        } else {
+            supersetSelections = []
+        }
+
+        supersetSource = exercise
     }
 
     private func supersetLabel(_ group: Int) -> String {

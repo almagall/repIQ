@@ -256,32 +256,65 @@ final class TemplateEditorViewModel {
 
     // MARK: - Superset Management
 
-    /// Toggles a superset link between two exercises.
-    /// If the exercise is already in a superset, it removes it.
-    /// Otherwise, it groups it with the next exercise in the list.
-    func toggleSuperset(for dayExercise: WorkoutDayExercise, in day: WorkoutDay) async {
+    /// Creates a superset from the source exercise and the selected partner exercises.
+    /// Any exercises previously in the source's superset group that are no longer selected get removed.
+    func setSuperset(source: WorkoutDayExercise, partners: Set<UUID>, in day: WorkoutDay) async {
         guard let dayIndex = workoutDays.firstIndex(where: { $0.id == day.id }),
-              let exercises = workoutDays[dayIndex].exercises?.sorted(by: { $0.sortOrder < $1.sortOrder }),
-              let exIndex = exercises.firstIndex(where: { $0.id == dayExercise.id }) else { return }
+              let exercises = workoutDays[dayIndex].exercises else { return }
 
-        if dayExercise.supersetGroup != nil {
-            // Remove from superset
-            await updateSupersetGroup(for: dayExercise, group: nil, dayIndex: dayIndex)
+        // All exercises that should be in this superset (source + partners)
+        let allMemberIds = partners.union([source.id])
+
+        if partners.isEmpty {
+            // Remove source from any superset
+            await updateSupersetGroup(for: source, group: nil, dayIndex: dayIndex)
+            // Clean up orphaned superset members (if only 1 left in group, remove it too)
+            if let oldGroup = source.supersetGroup {
+                let remaining = exercises.filter { $0.supersetGroup == oldGroup && $0.id != source.id }
+                if remaining.count == 1, let orphan = remaining.first {
+                    await updateSupersetGroup(for: orphan, group: nil, dayIndex: dayIndex)
+                }
+            }
+            return
+        }
+
+        // Determine the group number to use
+        let existingGroup = source.supersetGroup
+            ?? partners.compactMap({ pid in exercises.first(where: { $0.id == pid })?.supersetGroup }).first
+        let group: Int
+        if let existing = existingGroup {
+            group = existing
         } else {
-            // Find or create a superset group with the next exercise
-            let nextIndex = exIndex + 1
-            guard nextIndex < exercises.count else { return }
-            let nextExercise = exercises[nextIndex]
+            let maxGroup = exercises.compactMap(\.supersetGroup).max() ?? -1
+            group = maxGroup + 1
+        }
 
-            // If next exercise is already in a superset, join that group
-            if let existingGroup = nextExercise.supersetGroup {
-                await updateSupersetGroup(for: dayExercise, group: existingGroup, dayIndex: dayIndex)
-            } else {
-                // Create a new superset group
-                let maxGroup = exercises.compactMap(\.supersetGroup).max() ?? -1
-                let newGroup = maxGroup + 1
-                await updateSupersetGroup(for: dayExercise, group: newGroup, dayIndex: dayIndex)
-                await updateSupersetGroup(for: nextExercise, group: newGroup, dayIndex: dayIndex)
+        // Set group for all members
+        for exercise in exercises {
+            if allMemberIds.contains(exercise.id) {
+                if exercise.supersetGroup != group {
+                    await updateSupersetGroup(for: exercise, group: group, dayIndex: dayIndex)
+                }
+            } else if exercise.supersetGroup == group {
+                // Was in this group but no longer selected — remove
+                await updateSupersetGroup(for: exercise, group: nil, dayIndex: dayIndex)
+            }
+        }
+    }
+
+    /// Removes an exercise from its superset group.
+    func removeFromSuperset(_ dayExercise: WorkoutDayExercise, in day: WorkoutDay) async {
+        guard let dayIndex = workoutDays.firstIndex(where: { $0.id == day.id }),
+              let exercises = workoutDays[dayIndex].exercises else { return }
+
+        let oldGroup = dayExercise.supersetGroup
+        await updateSupersetGroup(for: dayExercise, group: nil, dayIndex: dayIndex)
+
+        // If only 1 exercise remains in the old group, remove it too
+        if let oldGroup {
+            let remaining = exercises.filter { $0.supersetGroup == oldGroup && $0.id != dayExercise.id }
+            if remaining.count == 1, let orphan = remaining.first {
+                await updateSupersetGroup(for: orphan, group: nil, dayIndex: dayIndex)
             }
         }
     }
