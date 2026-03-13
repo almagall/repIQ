@@ -6,41 +6,54 @@ struct ProgramDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: RQSpacing.lg) {
-                // Program header
-                RQCard {
-                    VStack(alignment: .leading, spacing: RQSpacing.md) {
-                        Text(program.name)
-                            .font(RQTypography.title2)
-                            .foregroundColor(RQColors.textPrimary)
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(spacing: RQSpacing.lg) {
+                    // Program header
+                    RQCard {
+                        VStack(alignment: .leading, spacing: RQSpacing.md) {
+                            Text(program.name)
+                                .font(RQTypography.title2)
+                                .foregroundColor(RQColors.textPrimary)
 
-                        Text(program.description)
-                            .font(RQTypography.subheadline)
+                            Text(program.description)
+                                .font(RQTypography.subheadline)
+                                .foregroundColor(RQColors.textSecondary)
+
+                            HStack(spacing: RQSpacing.md) {
+                                statItem(value: "\(program.daysPerWeek)", label: "DAYS/WK")
+                                statItem(value: program.difficulty.displayName, label: "LEVEL")
+                                statItem(value: "\(totalExerciseCount)", label: "EXERCISES")
+                            }
+                        }
+                    }
+
+                    // Workout days
+                    VStack(alignment: .leading, spacing: RQSpacing.md) {
+                        Text("Workout Days")
+                            .font(RQTypography.label)
+                            .textCase(.uppercase)
+                            .tracking(1.5)
                             .foregroundColor(RQColors.textSecondary)
 
-                        HStack(spacing: RQSpacing.md) {
-                            statItem(value: "\(program.daysPerWeek)", label: "DAYS/WK")
-                            statItem(value: program.difficulty.displayName, label: "LEVEL")
-                            statItem(value: "\(totalExerciseCount)", label: "EXERCISES")
+                        ForEach(program.days) { day in
+                            dayCard(day)
                         }
                     }
                 }
+                .padding(.horizontal, RQSpacing.screenHorizontal)
+                .padding(.top, RQSpacing.lg)
+                .padding(.bottom, RQSpacing.xxxl)
+            }
 
-                // Workout days
-                VStack(alignment: .leading, spacing: RQSpacing.md) {
-                    Text("Workout Days")
-                        .font(RQTypography.label)
-                        .textCase(.uppercase)
-                        .tracking(1.5)
-                        .foregroundColor(RQColors.textSecondary)
-
-                    ForEach(program.days) { day in
-                        dayCard(day)
-                    }
+            // Floating bottom button
+            VStack(spacing: RQSpacing.xs) {
+                if let error = viewModel.errorMessage {
+                    Text(error)
+                        .font(RQTypography.caption)
+                        .foregroundColor(RQColors.error)
                 }
 
-                // Use this program button
                 RQButton(
                     title: "Use This Program",
                     isLoading: viewModel.isMaterializing
@@ -49,17 +62,11 @@ struct ProgramDetailView: View {
                         await viewModel.materializeProgram(program)
                     }
                 }
-                .padding(.top, RQSpacing.md)
-
-                if let error = viewModel.errorMessage {
-                    Text(error)
-                        .font(RQTypography.caption)
-                        .foregroundColor(RQColors.error)
-                }
             }
             .padding(.horizontal, RQSpacing.screenHorizontal)
-            .padding(.top, RQSpacing.lg)
-            .padding(.bottom, RQSpacing.xxxl)
+            .padding(.top, RQSpacing.md)
+            .padding(.bottom, RQSpacing.lg)
+            .background(RQColors.background)
         }
         .background(RQColors.background)
         .navigationTitle(program.name)
