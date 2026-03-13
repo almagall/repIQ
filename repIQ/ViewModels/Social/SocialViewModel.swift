@@ -225,9 +225,11 @@ final class SocialViewModel {
 
     // MARK: - Friend Actions
 
-    /// Sends a friend request.
+    /// Sends a friend request (guards against duplicates).
     func sendFriendRequest(to friendId: UUID) async {
         guard let userId = currentUserId else { return }
+        // Skip if already friends or already sent
+        guard !friendIds.contains(friendId), !sentRequestIds.contains(friendId) else { return }
         do {
             try await socialService.sendFriendRequest(from: userId, to: friendId)
             sentRequestIds.insert(friendId)

@@ -110,7 +110,12 @@ struct SocialService: Sendable {
             .execute()
             .value
 
-        return sent + received
+        // Deduplicate by friend's profile ID
+        var seen = Set<UUID>()
+        return (sent + received).filter { friendship in
+            let friendId = friendship.friendProfile?.id ?? friendship.id
+            return seen.insert(friendId).inserted
+        }
     }
 
     /// Fetches pending friend requests received by the user (join sender's profile).
