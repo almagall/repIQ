@@ -12,7 +12,6 @@ struct SocialTabView: View {
         case leagues = "Leagues"
         case challenges = "Challenges"
         case discover = "Discover"
-        case tips = "Tips"
 
         var icon: String {
             switch self {
@@ -21,7 +20,6 @@ struct SocialTabView: View {
             case .leagues: return "trophy.fill"
             case .challenges: return "bolt.fill"
             case .discover: return "sparkles"
-            case .tips: return "lightbulb.fill"
             }
         }
     }
@@ -51,8 +49,6 @@ struct SocialTabView: View {
                         ChallengesView(viewModel: viewModel)
                     case .discover:
                         discoverSection
-                    case .tips:
-                        ExerciseTipsView(viewModel: viewModel)
                     }
                 }
             }
