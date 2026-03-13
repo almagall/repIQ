@@ -6,47 +6,45 @@ struct ProgramDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                VStack(spacing: RQSpacing.lg) {
-                    // Program header
-                    RQCard {
-                        VStack(alignment: .leading, spacing: RQSpacing.md) {
-                            Text(program.name)
-                                .font(RQTypography.title2)
-                                .foregroundColor(RQColors.textPrimary)
-
-                            Text(program.description)
-                                .font(RQTypography.subheadline)
-                                .foregroundColor(RQColors.textSecondary)
-
-                            HStack(spacing: RQSpacing.md) {
-                                statItem(value: "\(program.daysPerWeek)", label: "DAYS/WK")
-                                statItem(value: program.difficulty.displayName, label: "LEVEL")
-                                statItem(value: "\(totalExerciseCount)", label: "EXERCISES")
-                            }
-                        }
-                    }
-
-                    // Workout days
+        ScrollView {
+            VStack(spacing: RQSpacing.lg) {
+                // Program header
+                RQCard {
                     VStack(alignment: .leading, spacing: RQSpacing.md) {
-                        Text("Workout Days")
-                            .font(RQTypography.label)
-                            .textCase(.uppercase)
-                            .tracking(1.5)
+                        Text(program.name)
+                            .font(RQTypography.title2)
+                            .foregroundColor(RQColors.textPrimary)
+
+                        Text(program.description)
+                            .font(RQTypography.subheadline)
                             .foregroundColor(RQColors.textSecondary)
 
-                        ForEach(program.days) { day in
-                            dayCard(day)
+                        HStack(spacing: RQSpacing.md) {
+                            statItem(value: "\(program.daysPerWeek)", label: "DAYS/WK")
+                            statItem(value: program.difficulty.displayName, label: "LEVEL")
+                            statItem(value: "\(totalExerciseCount)", label: "EXERCISES")
                         }
                     }
                 }
-                .padding(.horizontal, RQSpacing.screenHorizontal)
-                .padding(.top, RQSpacing.lg)
-                .padding(.bottom, RQSpacing.xxxl)
-            }
 
-            // Floating bottom button
+                // Workout days
+                VStack(alignment: .leading, spacing: RQSpacing.md) {
+                    Text("Workout Days")
+                        .font(RQTypography.label)
+                        .textCase(.uppercase)
+                        .tracking(1.5)
+                        .foregroundColor(RQColors.textSecondary)
+
+                    ForEach(program.days) { day in
+                        dayCard(day)
+                    }
+                }
+            }
+            .padding(.horizontal, RQSpacing.screenHorizontal)
+            .padding(.top, RQSpacing.lg)
+            .padding(.bottom, RQSpacing.md)
+        }
+        .safeAreaInset(edge: .bottom) {
             VStack(spacing: RQSpacing.xs) {
                 if let error = viewModel.errorMessage {
                     Text(error)
@@ -65,7 +63,7 @@ struct ProgramDetailView: View {
             }
             .padding(.horizontal, RQSpacing.screenHorizontal)
             .padding(.top, RQSpacing.md)
-            .padding(.bottom, RQSpacing.lg)
+            .padding(.bottom, RQSpacing.sm)
             .background(RQColors.background)
         }
         .background(RQColors.background)
