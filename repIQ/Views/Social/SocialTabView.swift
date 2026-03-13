@@ -186,49 +186,30 @@ struct SocialTabView: View {
     // MARK: - Section Picker
 
     private var sectionPicker: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 0) {
-                ForEach(SocialSection.allCases, id: \.rawValue) { section in
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            selectedSection = section
-                        }
-                    } label: {
-                        VStack(spacing: RQSpacing.xs) {
-                            HStack(spacing: RQSpacing.xs) {
-                                Image(systemName: section.icon)
-                                    .font(.system(size: 12))
-
-                                Text(section.rawValue)
-                                    .font(RQTypography.caption)
-                                    .fontWeight(.semibold)
-
-                                // Badge count for pending requests
-                                if section == .friends && !viewModel.pendingRequests.isEmpty {
-                                    Text("\(viewModel.pendingRequests.count)")
-                                        .font(.system(size: 9, weight: .bold))
-                                        .foregroundColor(RQColors.background)
-                                        .padding(.horizontal, 4)
-                                        .padding(.vertical, 1)
-                                        .background(RQColors.error)
-                                        .clipShape(Capsule())
-                                }
-                            }
-                            .foregroundColor(selectedSection == section ? RQColors.accent : RQColors.textTertiary)
-
-                            Rectangle()
-                                .fill(selectedSection == section ? RQColors.accent : Color.clear)
-                                .frame(height: 2)
-                        }
-                        .frame(minWidth: 60)
-                        .padding(.horizontal, RQSpacing.sm)
+        HStack(spacing: 0) {
+            ForEach(SocialSection.allCases, id: \.rawValue) { section in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selectedSection = section
                     }
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: section.icon)
+                            .font(.system(size: 14))
+
+                        Text(section.rawValue)
+                            .font(.system(size: 10, weight: .semibold))
+
+                        Rectangle()
+                            .fill(selectedSection == section ? RQColors.accent : Color.clear)
+                            .frame(height: 2)
+                    }
+                    .foregroundColor(selectedSection == section ? RQColors.accent : RQColors.textTertiary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
                 }
             }
-            .padding(.horizontal, RQSpacing.screenHorizontal)
-            .padding(.vertical, RQSpacing.sm)
         }
-        .fixedSize(horizontal: false, vertical: true)
         .background(RQColors.surfacePrimary)
     }
 
