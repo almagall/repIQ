@@ -63,22 +63,22 @@ struct SocialTabView: View {
                     Button {
                         showAddFriends = true
                     } label: {
-                        ZStack(alignment: .topTrailing) {
-                            Image(systemName: "person.badge.plus")
-                                .font(.system(size: 16))
-                                .foregroundColor(RQColors.accent)
-
-                            if !viewModel.pendingRequests.isEmpty {
-                                Text("\(viewModel.pendingRequests.count)")
-                                    .font(.system(size: 9, weight: .bold))
-                                    .foregroundColor(RQColors.background)
-                                    .padding(.horizontal, 4)
-                                    .padding(.vertical, 1)
-                                    .background(RQColors.error)
-                                    .clipShape(Capsule())
-                                    .offset(x: 8, y: -6)
+                        Image(systemName: "person.badge.plus")
+                            .font(.system(size: 16))
+                            .foregroundColor(RQColors.accent)
+                            .overlay(alignment: .topTrailing) {
+                                if !viewModel.pendingRequests.isEmpty {
+                                    Text("\(viewModel.pendingRequests.count)")
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 1)
+                                        .background(RQColors.error)
+                                        .clipShape(Capsule())
+                                        .offset(x: 6, y: -8)
+                                }
                             }
-                        }
+                            .padding(.trailing, 4)
                     }
                 }
 
