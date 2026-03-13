@@ -5,6 +5,7 @@ struct WorkoutDayEditorView: View {
     @Bindable var viewModel: TemplateEditorViewModel
     @State private var showExercisePicker = false
     @State private var selectedTrainingMode: TrainingMode = .hypertrophy
+    @State private var supersetToast: String?
 
     private var currentDay: WorkoutDay {
         viewModel.workoutDays.first(where: { $0.id == day.id }) ?? day
@@ -78,6 +79,21 @@ struct WorkoutDayEditorView: View {
         .navigationTitle(currentDay.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .overlay(alignment: .bottom) {
+            if let toast = supersetToast {
+                Text(toast)
+                    .font(RQTypography.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, RQSpacing.lg)
+                    .padding(.vertical, RQSpacing.md)
+                    .background(RQColors.warning.opacity(0.9))
+                    .clipShape(Capsule())
+                    .padding(.bottom, RQSpacing.xxxl)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .animation(.easeInOut(duration: 0.3), value: supersetToast)
+            }
+        }
         .sheet(isPresented: $showExercisePicker) {
             ExercisePickerView { exercise in
                 Task {
@@ -153,8 +169,21 @@ struct WorkoutDayEditorView: View {
                         // Superset toggle button (only show if not last exercise)
                         if index < total - 1 {
                             Button {
+                                let wasInSuperset = dayExercise.supersetGroup != nil
+                                let nextName = allExercises[safe: index + 1]?.exercise?.name ?? "next exercise"
+                                let currentName = dayExercise.exercise?.name ?? "exercise"
                                 Task {
                                     await viewModel.toggleSuperset(for: dayExercise, in: currentDay)
+                                    await MainActor.run {
+                                        if wasInSuperset {
+                                            supersetToast = "Superset removed"
+                                        } else {
+                                            supersetToast = "\(currentName) + \(nextName) linked as superset"
+                                        }
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                                            withAnimation { supersetToast = nil }
+                                        }
+                                    }
                                 }
                             } label: {
                                 Image(systemName: dayExercise.supersetGroup != nil ? "link.circle.fill" : "link.circle")
