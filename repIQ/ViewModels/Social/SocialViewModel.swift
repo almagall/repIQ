@@ -351,6 +351,11 @@ final class SocialViewModel {
     /// Searches for users.
     func searchUsers(query: String) async -> [SocialProfile] {
         guard let userId = currentUserId else { return [] }
-        return (try? await socialService.searchUsers(query: query, currentUserId: userId)) ?? []
+        do {
+            return try await socialService.searchUsers(query: query, currentUserId: userId)
+        } catch {
+            errorMessage = "Search failed. Please try again."
+            return []
+        }
     }
 }
