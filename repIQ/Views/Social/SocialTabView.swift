@@ -58,46 +58,6 @@ struct SocialTabView: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: RQSpacing.md) {
-                        // Digest badge
-                        NavigationLink {
-                            WeeklyDigestView(viewModel: viewModel)
-                        } label: {
-                            ZStack(alignment: .topTrailing) {
-                                Image(systemName: "newspaper")
-                                    .font(.system(size: 16))
-                                    .foregroundColor(RQColors.textSecondary)
-
-                                if viewModel.unreadDigestCount > 0 {
-                                    Circle()
-                                        .fill(RQColors.error)
-                                        .frame(width: 8, height: 8)
-                                        .offset(x: 2, y: -2)
-                                }
-                            }
-                        }
-
-                        // Badges button
-                        NavigationLink {
-                            BadgesView(viewModel: viewModel)
-                        } label: {
-                            Image(systemName: "medal.fill")
-                                .font(.system(size: 16))
-                                .foregroundColor(RQColors.warning)
-                        }
-
-                        // Profile button
-                        NavigationLink {
-                            SocialProfileView(viewModel: viewModel)
-                        } label: {
-                            Image(systemName: "person.crop.circle")
-                                .font(.system(size: 16))
-                                .foregroundColor(RQColors.textSecondary)
-                        }
-                    }
-                }
-
                 ToolbarItem(placement: .topBarLeading) {
                     // IQ + Streak summary
                     HStack(spacing: RQSpacing.md) {
@@ -250,6 +210,24 @@ struct SocialTabView: View {
                         color: RQColors.success
                     ) {
                         WeeklyDigestView(viewModel: viewModel)
+                    }
+
+                    discoverLink(
+                        title: "Badges",
+                        subtitle: "Your achievements",
+                        icon: "medal.fill",
+                        color: RQColors.warning
+                    ) {
+                        BadgesView(viewModel: viewModel)
+                    }
+
+                    discoverLink(
+                        title: "Social Profile",
+                        subtitle: "Your stats",
+                        icon: "person.crop.circle.fill",
+                        color: RQColors.accent
+                    ) {
+                        SocialProfileView(viewModel: viewModel)
                     }
                 }
 
