@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ProgramBrowserView: View {
+    var onProgramCreated: () -> Void = {}
     @State private var viewModel = ProgramBrowserViewModel()
 
     var body: some View {
@@ -25,7 +26,7 @@ struct ProgramBrowserView: View {
                 VStack(spacing: RQSpacing.md) {
                     ForEach(viewModel.programs) { program in
                         NavigationLink {
-                            ProgramDetailView(program: program)
+                            ProgramDetailView(program: program, onProgramCreated: onProgramCreated)
                         } label: {
                             programCard(program)
                         }

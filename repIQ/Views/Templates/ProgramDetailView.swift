@@ -2,7 +2,9 @@ import SwiftUI
 
 struct ProgramDetailView: View {
     let program: ProgramDefinition
+    var onProgramCreated: () -> Void = {}
     @State private var viewModel = ProgramBrowserViewModel()
+    @State private var showSuccess = false
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -70,9 +72,20 @@ struct ProgramDetailView: View {
         .navigationTitle(program.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .overlay {
+            if showSuccess {
+                successOverlay
+                    .transition(.opacity)
+            }
+        }
         .onChange(of: viewModel.materializedTemplate != nil) {
             if viewModel.materializedTemplate != nil {
-                dismiss()
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    showSuccess = true
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    onProgramCreated()
+                }
             }
         }
     }
@@ -92,6 +105,29 @@ struct ProgramDetailView: View {
                 .foregroundColor(RQColors.textTertiary)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    private var successOverlay: some View {
+        ZStack {
+            RQColors.background.opacity(0.95)
+                .ignoresSafeArea()
+
+            VStack(spacing: RQSpacing.lg) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 64))
+                    .foregroundColor(RQColors.success)
+
+                VStack(spacing: RQSpacing.xs) {
+                    Text("Program Added!")
+                        .font(RQTypography.title2)
+                        .foregroundColor(RQColors.textPrimary)
+
+                    Text(program.name)
+                        .font(RQTypography.subheadline)
+                        .foregroundColor(RQColors.textSecondary)
+                }
+            }
+        }
     }
 
     private func dayCard(_ day: ProgramDayDefinition) -> some View {

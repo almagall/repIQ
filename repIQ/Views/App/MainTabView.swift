@@ -15,7 +15,7 @@ struct MainTabView: View {
             }
 
             Tab("Templates", systemImage: "rectangle.stack.fill", value: 1) {
-                TemplateListView()
+                TemplateListView(selectedTab: $selectedTab)
             }
 
             Tab("Progress", systemImage: "chart.line.uptrend.xyaxis", value: 2) {

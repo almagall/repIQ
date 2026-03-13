@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct TemplateListView: View {
+    @Binding var selectedTab: Int
     @State private var viewModel = TemplateListViewModel()
     @State private var showCreateTemplate = false
     @State private var showProgramBrowser = false
@@ -71,7 +72,10 @@ struct TemplateListView: View {
                 TemplateEditorView(viewModel: TemplateEditorViewModel())
             }
             .navigationDestination(isPresented: $showProgramBrowser) {
-                ProgramBrowserView()
+                ProgramBrowserView(onProgramCreated: {
+                    showProgramBrowser = false
+                    selectedTab = 0
+                })
             }
             .task {
                 await viewModel.loadTemplates()
