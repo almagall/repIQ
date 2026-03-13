@@ -2,9 +2,10 @@ import SwiftUI
 
 /// Main Social tab — hub for feed, friends, leagues, challenges, discover, and community.
 struct SocialTabView: View {
-    @State private var viewModel = SocialViewModel()
+    @Bindable var viewModel: SocialViewModel
     @State private var selectedSection: SocialSection = .feed
     @State private var showSetupSheet = false
+    @State private var showAddFriends = false
 
     enum SocialSection: String, CaseIterable {
         case feed = "Feed"
@@ -58,6 +59,29 @@ struct SocialTabView: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showAddFriends = true
+                    } label: {
+                        ZStack(alignment: .topTrailing) {
+                            Image(systemName: "person.badge.plus")
+                                .font(.system(size: 16))
+                                .foregroundColor(RQColors.accent)
+
+                            if !viewModel.pendingRequests.isEmpty {
+                                Text("\(viewModel.pendingRequests.count)")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundColor(RQColors.background)
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 1)
+                                    .background(RQColors.error)
+                                    .clipShape(Capsule())
+                                    .offset(x: 8, y: -6)
+                            }
+                        }
+                    }
+                }
+
                 ToolbarItem(placement: .topBarLeading) {
                     // IQ + Streak summary
                     HStack(spacing: RQSpacing.md) {
@@ -93,6 +117,9 @@ struct SocialTabView: View {
             }
             .sheet(isPresented: $showSetupSheet) {
                 SocialSetupSheet(viewModel: viewModel)
+            }
+            .sheet(isPresented: $showAddFriends) {
+                AddFriendsSheet(viewModel: viewModel)
             }
         }
     }

@@ -16,6 +16,9 @@ final class SocialViewModel {
     var userClubs: [Club] = []
     var socialProfile: SocialProfile?
 
+    // Sent requests tracking (for UI state)
+    var sentRequestIds: Set<UUID> = []
+
     // Phase 4/5 state
     var coachingNudges: [CoachingNudge] = []
     var unreadDigestCount: Int = 0
@@ -68,6 +71,11 @@ final class SocialViewModel {
         return allBadges.filter { !earnedIds.contains($0.id) }
     }
 
+    /// Badge count for the Social tab (pending requests + unread digests).
+    var notificationCount: Int {
+        pendingRequests.count
+    }
+
     // MARK: - Loading
 
     /// Loads all social data in parallel.
@@ -85,6 +93,10 @@ final class SocialViewModel {
             socialProfile = try await profileTask
             friends = try await friendsTask
             pendingRequests = try await pendingTask
+
+            // Load sent request IDs so we can show "Sent" in search results
+            let sentRequests = (try? await socialService.fetchSentRequests(userId: userId)) ?? []
+            sentRequestIds = Set(sentRequests.map(\.friendId))
 
             // Now fetch remaining data in parallel
             let fIds = friendIds
@@ -218,6 +230,7 @@ final class SocialViewModel {
         guard let userId = currentUserId else { return }
         do {
             try await socialService.sendFriendRequest(from: userId, to: friendId)
+            sentRequestIds.insert(friendId)
         } catch {
             errorMessage = "Failed to send friend request."
         }

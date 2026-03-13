@@ -4,6 +4,7 @@ struct MainTabView: View {
     @State private var selectedTab = 0
     @State private var workoutCoordinator = WorkoutCoordinator()
     @State private var activeWorkoutViewModel: ActiveWorkoutViewModel?
+    @State private var socialViewModel = SocialViewModel()
 
     var body: some View {
         @Bindable var coordinator = workoutCoordinator
@@ -22,8 +23,9 @@ struct MainTabView: View {
             }
 
             Tab("Social", systemImage: "person.2.fill", value: 3) {
-                SocialTabView()
+                SocialTabView(viewModel: socialViewModel)
             }
+            .badge(socialViewModel.notificationCount)
 
             Tab("Profile", systemImage: "person.fill", value: 4) {
                 ProfileView()

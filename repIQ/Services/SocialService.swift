@@ -94,17 +94,17 @@ struct SocialService: Sendable {
 
     /// Fetches all accepted friends for a user with their profiles.
     func fetchFriends(userId: UUID) async throws -> [Friendship] {
-        // Friendships where user is the sender
+        // Friendships where user is the sender — join friend's profile
         let sent: [Friendship] = try await supabase.from("friendships")
-            .select("*, profiles!friendships_friend_id_fkey(*)")
+            .select("*, profiles!friendships_friend_id_profiles_fkey(*)")
             .eq("user_id", value: userId.uuidString)
             .eq("status", value: "accepted")
             .execute()
             .value
 
-        // Friendships where user is the receiver
+        // Friendships where user is the receiver — join sender's profile
         let received: [Friendship] = try await supabase.from("friendships")
-            .select("*, profiles!friendships_user_id_fkey(*)")
+            .select("*, profiles!friendships_user_id_profiles_fkey(*)")
             .eq("friend_id", value: userId.uuidString)
             .eq("status", value: "accepted")
             .execute()
@@ -113,20 +113,20 @@ struct SocialService: Sendable {
         return sent + received
     }
 
-    /// Fetches pending friend requests received by the user.
+    /// Fetches pending friend requests received by the user (join sender's profile).
     func fetchPendingRequests(userId: UUID) async throws -> [Friendship] {
         try await supabase.from("friendships")
-            .select("*, profiles!friendships_user_id_fkey(*)")
+            .select("*, profiles!friendships_user_id_profiles_fkey(*)")
             .eq("friend_id", value: userId.uuidString)
             .eq("status", value: "pending")
             .execute()
             .value
     }
 
-    /// Fetches pending friend requests sent by the user.
+    /// Fetches pending friend requests sent by the user (join recipient's profile).
     func fetchSentRequests(userId: UUID) async throws -> [Friendship] {
         try await supabase.from("friendships")
-            .select("*, profiles!friendships_friend_id_fkey(*)")
+            .select("*, profiles!friendships_friend_id_profiles_fkey(*)")
             .eq("user_id", value: userId.uuidString)
             .eq("status", value: "pending")
             .execute()
@@ -146,7 +146,7 @@ struct SocialService: Sendable {
     /// Fetches training partners for a user.
     func fetchTrainingPartners(userId: UUID) async throws -> [Friendship] {
         let sent: [Friendship] = try await supabase.from("friendships")
-            .select("*, profiles!friendships_friend_id_fkey(*)")
+            .select("*, profiles!friendships_friend_id_profiles_fkey(*)")
             .eq("user_id", value: userId.uuidString)
             .eq("status", value: "accepted")
             .eq("is_training_partner", value: true)
@@ -154,7 +154,7 @@ struct SocialService: Sendable {
             .value
 
         let received: [Friendship] = try await supabase.from("friendships")
-            .select("*, profiles!friendships_user_id_fkey(*)")
+            .select("*, profiles!friendships_user_id_profiles_fkey(*)")
             .eq("friend_id", value: userId.uuidString)
             .eq("status", value: "accepted")
             .eq("is_training_partner", value: true)

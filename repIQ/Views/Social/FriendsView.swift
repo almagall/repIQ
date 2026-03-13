@@ -339,7 +339,25 @@ struct FriendsView: View {
             if isFriend {
                 Text("Friends")
                     .font(RQTypography.caption)
+                    .fontWeight(.semibold)
                     .foregroundColor(RQColors.success)
+                    .padding(.horizontal, RQSpacing.md)
+                    .padding(.vertical, RQSpacing.sm)
+                    .background(RQColors.success.opacity(0.15))
+                    .cornerRadius(RQRadius.large)
+            } else if viewModel.sentRequestIds.contains(user.id) {
+                HStack(spacing: RQSpacing.xxs) {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .bold))
+                    Text("Sent")
+                        .font(RQTypography.caption)
+                        .fontWeight(.semibold)
+                }
+                .foregroundColor(RQColors.textSecondary)
+                .padding(.horizontal, RQSpacing.md)
+                .padding(.vertical, RQSpacing.sm)
+                .background(RQColors.surfaceTertiary)
+                .cornerRadius(RQRadius.large)
             } else {
                 Button {
                     Task { await viewModel.sendFriendRequest(to: user.id) }
