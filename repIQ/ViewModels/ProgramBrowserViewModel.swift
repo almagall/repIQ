@@ -92,7 +92,7 @@ final class ProgramBrowserViewModel {
             // 6. Fetch the complete template with nested data
             materializedTemplate = try await templateService.fetchTemplate(id: template.id)
         } catch {
-            errorMessage = "Failed to create template."
+            errorMessage = "Failed to create template: \(error.localizedDescription)"
         }
         isMaterializing = false
     }
