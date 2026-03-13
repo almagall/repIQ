@@ -4,6 +4,7 @@ import SwiftUI
 struct SocialTabView: View {
     @State private var viewModel = SocialViewModel()
     @State private var selectedSection: SocialSection = .feed
+    @State private var showSetupSheet = false
 
     enum SocialSection: String, CaseIterable {
         case feed = "Feed"
@@ -30,6 +31,12 @@ struct SocialTabView: View {
             VStack(spacing: 0) {
                 // Section picker
                 sectionPicker
+
+                // Setup banner
+                if let profile = viewModel.socialProfile,
+                   (profile.username ?? "").isEmpty {
+                    socialSetupBanner
+                }
 
                 // Content
                 Group {
@@ -128,7 +135,52 @@ struct SocialTabView: View {
             .refreshable {
                 await viewModel.loadSocialData()
             }
+            .sheet(isPresented: $showSetupSheet) {
+                SocialSetupSheet(viewModel: viewModel)
+            }
         }
+    }
+
+    // MARK: - Setup Banner
+
+    private var socialSetupBanner: some View {
+        Button {
+            showSetupSheet = true
+        } label: {
+            HStack(spacing: RQSpacing.md) {
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(RQColors.accent)
+                    .frame(width: 3, height: 44)
+
+                Image(systemName: "person.crop.circle.badge.plus")
+                    .font(.system(size: 22))
+                    .foregroundColor(RQColors.accent)
+
+                VStack(alignment: .leading, spacing: RQSpacing.xxs) {
+                    Text("Complete Your Profile")
+                        .font(RQTypography.headline)
+                        .foregroundColor(RQColors.textPrimary)
+                    Text("Set a username so friends can find you")
+                        .font(RQTypography.caption)
+                        .foregroundColor(RQColors.textSecondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12))
+                    .foregroundColor(RQColors.textTertiary)
+            }
+            .padding(RQSpacing.cardPadding)
+            .background(RQColors.accent.opacity(0.08))
+            .cornerRadius(RQRadius.medium)
+            .overlay(
+                RoundedRectangle(cornerRadius: RQRadius.medium)
+                    .stroke(RQColors.accent.opacity(0.3), lineWidth: 1)
+            )
+        }
+        .padding(.horizontal, RQSpacing.screenHorizontal)
+        .padding(.top, RQSpacing.sm)
     }
 
     // MARK: - Section Picker

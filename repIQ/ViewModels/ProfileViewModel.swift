@@ -41,6 +41,17 @@ final class ProfileViewModel {
         }
     }
 
+    func updateUsernameAndBio(username: String?, bio: String?) async {
+        guard let profile else { return }
+        do {
+            try await profileService.updateUsernameAndBio(userId: profile.id, username: username, bio: bio)
+            self.profile?.username = username
+            self.profile?.bio = bio
+        } catch {
+            errorMessage = "Failed to update username."
+        }
+    }
+
     func signOut() async {
         do {
             try await authService.signOut()

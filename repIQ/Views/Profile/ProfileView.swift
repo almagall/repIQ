@@ -4,6 +4,9 @@ struct ProfileView: View {
     @State private var viewModel = ProfileViewModel()
     @State private var showWeightUnitPicker = false
     @State private var showRestTimerPicker = false
+    @State private var username = ""
+    @State private var bio = ""
+    @State private var isSavingSocial = false
 
     private let restTimerOptions = [60, 90, 120, 150, 180, 210, 240]
 
@@ -32,6 +35,88 @@ struct ProfileView: View {
                                     .foregroundColor(RQColors.textSecondary)
                             }
                             Spacer()
+                        }
+                    }
+
+                    // Social Identity Section
+                    RQCard {
+                        VStack(alignment: .leading, spacing: RQSpacing.lg) {
+                            Text("Social Identity")
+                                .font(RQTypography.label)
+                                .textCase(.uppercase)
+                                .tracking(1.5)
+                                .foregroundColor(RQColors.textSecondary)
+
+                            // Username
+                            VStack(alignment: .leading, spacing: RQSpacing.sm) {
+                                Text("USERNAME")
+                                    .font(RQTypography.label)
+                                    .foregroundColor(RQColors.textTertiary)
+                                    .tracking(1.5)
+
+                                TextField("Choose a username", text: $username)
+                                    .font(RQTypography.body)
+                                    .foregroundColor(RQColors.textPrimary)
+                                    .autocapitalization(.none)
+                                    .autocorrectionDisabled()
+                                    .padding(.horizontal, RQSpacing.md)
+                                    .padding(.vertical, RQSpacing.md)
+                                    .background(RQColors.surfaceTertiary)
+                                    .cornerRadius(RQRadius.medium)
+                            }
+
+                            // Bio
+                            VStack(alignment: .leading, spacing: RQSpacing.sm) {
+                                HStack {
+                                    Text("BIO")
+                                        .font(RQTypography.label)
+                                        .foregroundColor(RQColors.textTertiary)
+                                        .tracking(1.5)
+
+                                    Spacer()
+
+                                    Text("\(bio.count)/200")
+                                        .font(RQTypography.label)
+                                        .foregroundColor(bio.count > 200 ? RQColors.error : RQColors.textTertiary)
+                                }
+
+                                TextField("Tell others about yourself", text: $bio, axis: .vertical)
+                                    .font(RQTypography.body)
+                                    .foregroundColor(RQColors.textPrimary)
+                                    .lineLimit(3...5)
+                                    .padding(.horizontal, RQSpacing.md)
+                                    .padding(.vertical, RQSpacing.md)
+                                    .background(RQColors.surfaceTertiary)
+                                    .cornerRadius(RQRadius.medium)
+                            }
+
+                            // Save
+                            Button {
+                                isSavingSocial = true
+                                Task {
+                                    await viewModel.updateUsernameAndBio(
+                                        username: username.isEmpty ? nil : username,
+                                        bio: bio.isEmpty ? nil : bio
+                                    )
+                                    isSavingSocial = false
+                                }
+                            } label: {
+                                HStack {
+                                    if isSavingSocial {
+                                        ProgressView()
+                                            .tint(RQColors.background)
+                                    } else {
+                                        Text("Save")
+                                            .font(RQTypography.headline)
+                                    }
+                                }
+                                .foregroundColor(RQColors.background)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, RQSpacing.md)
+                                .background(RQColors.accent)
+                                .cornerRadius(RQRadius.medium)
+                            }
+                            .disabled(isSavingSocial)
                         }
                     }
 
@@ -79,11 +164,14 @@ struct ProfileView: View {
                 .padding(.horizontal, RQSpacing.screenHorizontal)
                 .padding(.top, RQSpacing.lg)
             }
+            .scrollDismissesKeyboard(.interactively)
             .background(RQColors.background)
             .navigationTitle("Profile")
             .toolbarColorScheme(.dark, for: .navigationBar)
             .task {
                 await viewModel.loadProfile()
+                username = viewModel.profile?.username ?? ""
+                bio = viewModel.profile?.bio ?? ""
             }
             .confirmationDialog("Weight Unit", isPresented: $showWeightUnitPicker) {
                 Button("lbs") {

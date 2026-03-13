@@ -16,13 +16,15 @@ struct Profile: Codable, Identifiable, Sendable {
     let id: UUID
     var email: String
     var displayName: String?
+    var username: String?
+    var bio: String?
     var weightUnit: WeightUnit
     var restTimerDefault: Int
     var createdAt: Date
     var updatedAt: Date
 
     enum CodingKeys: String, CodingKey {
-        case id, email
+        case id, email, username, bio
         case displayName = "display_name"
         case weightUnit = "weight_unit"
         case restTimerDefault = "rest_timer_default"

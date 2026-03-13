@@ -35,4 +35,15 @@ struct ProfileService: Sendable {
             .eq("id", value: userId.uuidString)
             .execute()
     }
+
+    func updateUsernameAndBio(userId: UUID, username: String?, bio: String?) async throws {
+        struct Payload: Encodable {
+            let username: String?
+            let bio: String?
+        }
+        try await supabase.from("profiles")
+            .update(Payload(username: username, bio: bio))
+            .eq("id", value: userId.uuidString)
+            .execute()
+    }
 }
