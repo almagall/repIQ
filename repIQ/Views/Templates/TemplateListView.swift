@@ -30,9 +30,15 @@ struct TemplateListView: View {
                         VStack(spacing: RQSpacing.md) {
                             ForEach(viewModel.templates) { template in
                                 NavigationLink {
-                                    TemplateDetailView(template: template) {
-                                        Task { await viewModel.deleteTemplate(template) }
-                                    }
+                                    TemplateDetailView(
+                                        template: template,
+                                        onDelete: {
+                                            Task { await viewModel.deleteTemplate(template) }
+                                        },
+                                        onDuplicate: {
+                                            await viewModel.duplicateTemplate(template)
+                                        }
+                                    )
                                 } label: {
                                     templateCard(template)
                                 }

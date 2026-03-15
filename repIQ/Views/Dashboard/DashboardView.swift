@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DashboardView: View {
     @State private var viewModel = DashboardViewModel()
+    @State private var goalViewModel = GoalViewModel()
     @State private var showTemplatePicker = false
     @State private var showDayPicker = false
     @State private var selectedTemplate: Template?
@@ -75,6 +76,51 @@ struct DashboardView: View {
                         }
                     }
 
+                    // Active Goals
+                    if !goalViewModel.activeGoals.isEmpty {
+                        RQCard {
+                            VStack(alignment: .leading, spacing: RQSpacing.md) {
+                                Text("Goals")
+                                    .font(RQTypography.label)
+                                    .textCase(.uppercase)
+                                    .tracking(1.5)
+                                    .foregroundColor(RQColors.textSecondary)
+
+                                ForEach(goalViewModel.activeGoals.prefix(3)) { goal in
+                                    HStack(spacing: RQSpacing.md) {
+                                        Image(systemName: goal.goalType.icon)
+                                            .font(.system(size: 14))
+                                            .foregroundColor(RQColors.accent)
+                                            .frame(width: 20)
+
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(goal.exerciseName ?? goal.goalType.displayName)
+                                                .font(RQTypography.caption)
+                                                .foregroundColor(RQColors.textPrimary)
+                                                .lineLimit(1)
+
+                                            GeometryReader { geo in
+                                                ZStack(alignment: .leading) {
+                                                    Capsule()
+                                                        .fill(RQColors.surfaceTertiary)
+                                                        .frame(height: 4)
+                                                    Capsule()
+                                                        .fill(RQColors.accent)
+                                                        .frame(width: geo.size.width * goal.progress, height: 4)
+                                                }
+                                            }
+                                            .frame(height: 4)
+                                        }
+
+                                        Text("\(Int(goal.progress * 100))%")
+                                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                            .foregroundColor(RQColors.accent)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     // Templates count
                     RQCard {
                         HStack {
@@ -109,9 +155,11 @@ struct DashboardView: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
             .task {
                 await viewModel.loadDashboard()
+                await goalViewModel.loadGoals()
             }
             .refreshable {
                 await viewModel.loadDashboard()
+                await goalViewModel.loadGoals()
             }
             .sheet(isPresented: $showTemplatePicker) {
                 templatePickerSheet

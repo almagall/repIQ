@@ -4,7 +4,9 @@ struct TemplateDetailView: View {
     let template: Template
     @State private var editorViewModel = TemplateEditorViewModel()
     @State private var showDeleteConfirmation = false
+    @State private var isDuplicating = false
     var onDelete: (() -> Void)?
+    var onDuplicate: (() async -> Void)?
 
     var body: some View {
         ScrollView {
@@ -61,6 +63,16 @@ struct TemplateDetailView: View {
                     } label: {
                         Label("Edit Template", systemImage: "pencil")
                     }
+                    Button {
+                        isDuplicating = true
+                        Task {
+                            await onDuplicate?()
+                            isDuplicating = false
+                        }
+                    } label: {
+                        Label("Duplicate Template", systemImage: "doc.on.doc")
+                    }
+                    .disabled(isDuplicating)
                     Button(role: .destructive) {
                         showDeleteConfirmation = true
                     } label: {
@@ -91,36 +103,42 @@ struct TemplateDetailView: View {
 
                 if let exercises = day.exercises, !exercises.isEmpty {
                     ForEach(exercises) { dayExercise in
-                        HStack(spacing: RQSpacing.md) {
-                            // Mode indicator bar
-                            RoundedRectangle(cornerRadius: 1)
-                                .fill(dayExercise.trainingMode == .hypertrophy ? RQColors.hypertrophy : RQColors.strength)
-                                .frame(width: 3, height: 32)
+                        VStack(spacing: RQSpacing.xs) {
+                            HStack(spacing: RQSpacing.md) {
+                                // Mode indicator bar
+                                RoundedRectangle(cornerRadius: 1)
+                                    .fill(dayExercise.trainingMode == .hypertrophy ? RQColors.hypertrophy : RQColors.strength)
+                                    .frame(width: 3, height: 32)
 
-                            VStack(alignment: .leading, spacing: RQSpacing.xxs) {
-                                Text(dayExercise.exercise?.name ?? "Unknown")
-                                    .font(RQTypography.body)
-                                    .foregroundColor(RQColors.textPrimary)
-                                HStack(spacing: RQSpacing.sm) {
-                                    Text("\(dayExercise.targetSets) sets")
-                                        .font(RQTypography.caption)
-                                        .foregroundColor(RQColors.textTertiary)
-                                    Text("·")
-                                        .foregroundColor(RQColors.textTertiary)
-                                    Text(dayExercise.trainingMode.displayName)
-                                        .font(RQTypography.caption)
-                                        .foregroundColor(
-                                            dayExercise.trainingMode == .hypertrophy
-                                                ? RQColors.hypertrophy
-                                                : RQColors.strength
-                                        )
-                                    let range = dayExercise.trainingMode.repRange
-                                    Text("(\(range.lowerBound)-\(range.upperBound) reps)")
-                                        .font(RQTypography.caption)
-                                        .foregroundColor(RQColors.textTertiary)
+                                VStack(alignment: .leading, spacing: RQSpacing.xxs) {
+                                    Text(dayExercise.exercise?.name ?? "Unknown")
+                                        .font(RQTypography.body)
+                                        .foregroundColor(RQColors.textPrimary)
+                                    HStack(spacing: RQSpacing.sm) {
+                                        Text("\(dayExercise.targetSets) sets")
+                                            .font(RQTypography.caption)
+                                            .foregroundColor(RQColors.textTertiary)
+                                        Text("·")
+                                            .foregroundColor(RQColors.textTertiary)
+                                        Text(dayExercise.trainingMode.displayName)
+                                            .font(RQTypography.caption)
+                                            .foregroundColor(
+                                                dayExercise.trainingMode == .hypertrophy
+                                                    ? RQColors.hypertrophy
+                                                    : RQColors.strength
+                                            )
+                                        let range = dayExercise.trainingMode.repRange
+                                        Text("(\(range.lowerBound)-\(range.upperBound) reps)")
+                                            .font(RQTypography.caption)
+                                            .foregroundColor(RQColors.textTertiary)
+                                    }
                                 }
+                                Spacer()
+
+                                // Mini sparkline chart
+                                ExerciseHistoryChart(exerciseId: dayExercise.exerciseId)
+                                    .frame(width: 60, height: 28)
                             }
-                            Spacer()
                         }
                     }
                 } else {

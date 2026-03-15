@@ -20,6 +20,9 @@ struct Profile: Codable, Identifiable, Sendable {
     var bio: String?
     var weightUnit: WeightUnit
     var restTimerDefault: Int
+    var hasCompletedOnboarding: Bool
+    var experienceLevel: String?
+    var trainingGoal: String?
     var createdAt: Date
     var updatedAt: Date
 
@@ -28,6 +31,9 @@ struct Profile: Codable, Identifiable, Sendable {
         case displayName = "display_name"
         case weightUnit = "weight_unit"
         case restTimerDefault = "rest_timer_default"
+        case hasCompletedOnboarding = "has_completed_onboarding"
+        case experienceLevel = "experience_level"
+        case trainingGoal = "training_goal"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }

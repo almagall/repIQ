@@ -105,6 +105,25 @@ final class AuthViewModel {
         isLoading = false
     }
 
+    // MARK: - Google Sign-In
+
+    func signInWithGoogle() async {
+        isLoading = true
+        errorMessage = nil
+
+        // Google Sign-In requires the GoogleSignIn SDK.
+        // Once configured, this method will:
+        // 1. Present the Google Sign-In UI
+        // 2. Get the ID token and access token
+        // 3. Call authService.signInWithGoogle(idToken:accessToken:)
+        //
+        // For now, show a configuration message.
+        // To enable: Add GoogleSignIn SDK via SPM and configure your
+        // Google Cloud Console OAuth client ID.
+        errorMessage = "Google Sign-In requires SDK configuration. Use Apple Sign-In or email."
+        isLoading = false
+    }
+
     // MARK: - Helpers
 
     private func mapAuthError(_ error: Error) -> String {

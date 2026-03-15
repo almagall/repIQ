@@ -26,6 +26,13 @@ final class DashboardViewModel {
             let loadedTemplates = try await templates
             self.templates = loadedTemplates
             templateCount = loadedTemplates.count
+
+            // Sync widget data
+            WidgetService.syncFromDashboard(
+                streak: 0, // Streak is loaded by analytics; will be updated next refresh
+                weeklySetCount: weeklySetCount,
+                lastSession: recentSession?.completedAt
+            )
         } catch {
             // Silently handle - dashboard is non-critical
         }

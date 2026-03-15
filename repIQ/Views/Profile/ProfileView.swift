@@ -152,6 +152,56 @@ struct ProfileView: View {
                                     value: "\(viewModel.profile?.restTimerDefault ?? 90)s"
                                 )
                             }
+
+                            Divider().background(RQColors.surfaceTertiary)
+
+                            // Notifications
+                            NavigationLink {
+                                NotificationSettingsView()
+                            } label: {
+                                settingsRow(
+                                    icon: "bell",
+                                    title: "Notifications",
+                                    value: ""
+                                )
+                            }
+
+                            Divider().background(RQColors.surfaceTertiary)
+
+                            // Export Data
+                            NavigationLink {
+                                ExportView()
+                            } label: {
+                                settingsRow(
+                                    icon: "square.and.arrow.up",
+                                    title: "Export Data",
+                                    value: ""
+                                )
+                            }
+                        }
+                    }
+
+                    // Goals
+                    NavigationLink {
+                        GoalSettingView()
+                    } label: {
+                        RQCard {
+                            HStack {
+                                Image(systemName: "target")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(RQColors.accent)
+                                    .frame(width: 24)
+
+                                Text("My Goals")
+                                    .font(RQTypography.body)
+                                    .foregroundColor(RQColors.textPrimary)
+
+                                Spacer()
+
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(RQColors.textTertiary)
+                            }
                         }
                     }
 

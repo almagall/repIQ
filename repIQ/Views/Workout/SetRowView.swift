@@ -99,8 +99,8 @@ struct SetRowView: View {
                         .background(set.isCompleted ? setTypeColor : setTypeColor.opacity(0.2))
                         .clipShape(Circle())
 
-                    // Weight input
-                    TextField("0", text: $weightText)
+                    // Weight input (auto-filled from progression target)
+                    TextField(weightPlaceholder, text: $weightText)
                         .font(RQTypography.numbersSmall)
                         .foregroundColor(set.isCompleted ? RQColors.textSecondary : RQColors.textPrimary)
                         .keyboardType(.decimalPad)
@@ -120,8 +120,8 @@ struct SetRowView: View {
                         .font(RQTypography.caption)
                         .foregroundColor(RQColors.textTertiary)
 
-                    // Reps input
-                    TextField("0", text: $repsText)
+                    // Reps input (auto-filled from progression target)
+                    TextField(repsPlaceholder, text: $repsText)
                         .font(RQTypography.numbersSmall)
                         .foregroundColor(set.isCompleted ? RQColors.textSecondary : RQColors.textPrimary)
                         .keyboardType(.numberPad)
@@ -249,6 +249,32 @@ struct SetRowView: View {
 
     private var modeColor: Color {
         trainingMode == .hypertrophy ? RQColors.hypertrophy : RQColors.strength
+    }
+
+    /// Smart placeholder showing the target weight when the field is empty.
+    private var weightPlaceholder: String {
+        if let target = progressionTarget {
+            let (w, _, _) = ActiveWorkoutViewModel.perSetTarget(
+                decision: target, previousSet: previousSet,
+                trainingMode: trainingMode, setPosition: setPosition,
+                equipment: equipment
+            )
+            return w > 0 ? formatWeight(w) : "0"
+        }
+        return previousSet.map { formatWeight($0.weight) } ?? "0"
+    }
+
+    /// Smart placeholder showing the target reps when the field is empty.
+    private var repsPlaceholder: String {
+        if let target = progressionTarget {
+            let (_, r, _) = ActiveWorkoutViewModel.perSetTarget(
+                decision: target, previousSet: previousSet,
+                trainingMode: trainingMode, setPosition: setPosition,
+                equipment: equipment
+            )
+            return r > 0 ? "\(r)" : "0"
+        }
+        return previousSet.map { "\($0.reps)" } ?? "0"
     }
 
     private let rpeValues: [Double] = stride(from: 1.0, through: 10.0, by: 0.5).map { $0 }
