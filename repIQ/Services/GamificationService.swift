@@ -1,6 +1,14 @@
 import Foundation
 import Supabase
 
+// MARK: - Helper Structs for Progress Queries
+
+private struct ProgressCountRow: Decodable, Sendable { let count: Int }
+private struct ProgressProfileRow: Decodable, Sendable { let current_streak: Int; let longest_streak: Int }
+private struct ProgressVolumeRow: Decodable, Sendable { let total_volume: Double }
+private struct ProgressExerciseRow: Decodable, Sendable { let exercise_id: UUID }
+private struct ProgressMuscleRow: Decodable, Sendable { let muscle_group: String }
+
 /// Manages IQ points, streaks, leagues, and badges.
 /// No gems, no streak freezes — all rewards are earned through actual training.
 struct GamificationService: Sendable {
@@ -286,27 +294,20 @@ struct GamificationService: Sendable {
 
     /// Fetches user stats needed to compute achievement progress.
     func fetchMilestoneProgressData(userId: UUID) async throws -> MilestoneProgressData {
-        struct CountRow: Decodable { let count: Int }
-        struct VolumeRow: Decodable { let total_volume: Double? }
-        struct ProfileRow: Decodable {
-            let current_streak: Int
-            let longest_streak: Int
-        }
-
         // Parallel queries
-        async let sessionsTask: [CountRow] = supabase.from("workout_sessions")
+        async let sessionsTask: [ProgressCountRow] = supabase.from("workout_sessions")
             .select("count", head: false)
             .eq("user_id", value: userId.uuidString)
             .execute()
             .value
 
-        async let prsTask: [CountRow] = supabase.from("personal_records")
+        async let prsTask: [ProgressCountRow] = supabase.from("personal_records")
             .select("count", head: false)
             .eq("user_id", value: userId.uuidString)
             .execute()
             .value
 
-        async let profileTask: ProfileRow = supabase.from("profiles")
+        async let profileTask: ProgressProfileRow = supabase.from("profiles")
             .select("current_streak, longest_streak")
             .eq("id", value: userId.uuidString)
             .single()
@@ -314,15 +315,14 @@ struct GamificationService: Sendable {
             .value
 
         // Volume via RPC or aggregate
-        async let volumeTask: [VolumeRow] = supabase.from("working_sets")
+        async let volumeTask: [ProgressVolumeRow] = supabase.from("working_sets")
             .select("total_volume:weight.sum()")
             .eq("user_id", value: userId.uuidString)
             .execute()
             .value
 
         // Distinct exercises
-        struct ExerciseRow: Decodable { let exercise_id: UUID }
-        async let exercisesTask: [ExerciseRow] = supabase.from("working_sets")
+        async let exercisesTask: [ProgressExerciseRow] = supabase.from("working_sets")
             .select("exercise_id")
             .eq("user_id", value: userId.uuidString)
             .execute()
@@ -339,8 +339,7 @@ struct GamificationService: Sendable {
         // Fetch muscle groups for unique exercises
         var uniqueMuscleGroups = 0
         if !uniqueExerciseIds.isEmpty {
-            struct MuscleRow: Decodable { let muscle_group: String }
-            let muscles: [MuscleRow] = try await supabase.from("exercises")
+            let muscles: [ProgressMuscleRow] = try await supabase.from("exercises")
                 .select("muscle_group")
                 .in("id", values: uniqueExerciseIds.map(\.uuidString))
                 .execute()
