@@ -232,6 +232,63 @@ struct ProgressionService: Sendable {
         return newPRs
     }
 
+    // MARK: - Proactive Deload Suggestion
+
+    struct DeloadSuggestion {
+        let sessionCount: Int
+        let weeksSinceLastDeload: Int?
+    }
+
+    /// Checks whether the user should consider a deload week based on training volume
+    /// and time since last deload. Suggests if 12+ sessions in 5 weeks with no deload.
+    func shouldSuggestDeload(userId: UUID, templateId: UUID) async throws -> DeloadSuggestion? {
+        let fiveWeeksAgo = Calendar.current.date(byAdding: .weekOfYear, value: -5, to: Date()) ?? Date()
+
+        // Count completed sessions for this template in the last 5 weeks
+        struct SessionRow: Decodable { let id: UUID }
+        let sessions: [SessionRow] = try await supabase.from("workout_sessions")
+            .select("id")
+            .eq("user_id", value: userId.uuidString)
+            .eq("template_id", value: templateId.uuidString)
+            .eq("status", value: "completed")
+            .gte("completed_at", value: ISO8601DateFormatter().string(from: fiveWeeksAgo))
+            .execute()
+            .value
+
+        guard sessions.count >= 12 else { return nil }
+
+        // Check if any deload decision was made in the last 5 weeks
+        struct DeloadRow: Decodable { let created_at: String }
+        let deloads: [DeloadRow] = try await supabase.from("progression_log")
+            .select("created_at")
+            .eq("user_id", value: userId.uuidString)
+            .eq("decision", value: "deload")
+            .gte("created_at", value: ISO8601DateFormatter().string(from: fiveWeeksAgo))
+            .limit(1)
+            .execute()
+            .value
+
+        if !deloads.isEmpty { return nil }
+
+        // Calculate weeks since last deload (if any)
+        let lastDeloads: [DeloadRow] = try await supabase.from("progression_log")
+            .select("created_at")
+            .eq("user_id", value: userId.uuidString)
+            .eq("decision", value: "deload")
+            .order("created_at", ascending: false)
+            .limit(1)
+            .execute()
+            .value
+
+        var weeksSince: Int? = nil
+        if let lastDeload = lastDeloads.first,
+           let date = ISO8601DateFormatter().date(from: lastDeload.created_at) {
+            weeksSince = Calendar.current.dateComponents([.weekOfYear], from: date, to: Date()).weekOfYear
+        }
+
+        return DeloadSuggestion(sessionCount: sessions.count, weeksSinceLastDeload: weeksSince)
+    }
+
     // MARK: - Persistence
 
     /// Saves a progression target to the progression_log table.

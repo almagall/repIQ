@@ -131,6 +131,11 @@ struct ActiveWorkoutView: View {
     @ViewBuilder
     private var workoutContent: some View {
         VStack(spacing: 0) {
+            // Proactive deload suggestion banner
+            if let suggestion = viewModel.deloadSuggestion {
+                deloadSuggestionBanner(suggestion)
+            }
+
             // Exercise selector with integrated navigation
             if !viewModel.exercises.isEmpty {
                 exerciseSelector
@@ -163,6 +168,71 @@ struct ActiveWorkoutView: View {
             }
             .scrollDismissesKeyboard(.interactively)
         }
+    }
+
+    // MARK: - Deload Suggestion Banner
+
+    private func deloadSuggestionBanner(_ suggestion: ProgressionService.DeloadSuggestion) -> some View {
+        VStack(alignment: .leading, spacing: RQSpacing.sm) {
+            HStack(spacing: RQSpacing.sm) {
+                Image(systemName: "lightbulb.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(RQColors.accent)
+
+                Text("Consider a Deload Week")
+                    .font(RQTypography.headline)
+                    .foregroundColor(RQColors.textPrimary)
+
+                Spacer()
+
+                Button {
+                    withAnimation { viewModel.dismissDeloadSuggestion() }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(RQColors.textTertiary)
+                        .frame(width: 24, height: 24)
+                }
+            }
+
+            Text("You've completed \(suggestion.sessionCount) sessions in the last 5 weeks\(suggestion.weeksSinceLastDeload.map { " (\($0)+ weeks since last deload)" } ?? "") without a deload. A lighter week can help recovery and long-term strength gains.")
+                .font(RQTypography.caption)
+                .foregroundColor(RQColors.textSecondary)
+
+            HStack(spacing: RQSpacing.md) {
+                Button {
+                    withAnimation { viewModel.dismissDeloadSuggestion() }
+                } label: {
+                    Text("Dismiss")
+                        .font(RQTypography.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(RQColors.textSecondary)
+                        .padding(.horizontal, RQSpacing.lg)
+                        .padding(.vertical, RQSpacing.sm)
+                        .background(RQColors.surfaceTertiary)
+                        .cornerRadius(RQRadius.medium)
+                }
+
+                Button {
+                    withAnimation { viewModel.applyDeloadToAllExercises() }
+                } label: {
+                    Text("Apply Deload")
+                        .font(RQTypography.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(RQColors.background)
+                        .padding(.horizontal, RQSpacing.lg)
+                        .padding(.vertical, RQSpacing.sm)
+                        .background(RQColors.accent)
+                        .cornerRadius(RQRadius.medium)
+                }
+            }
+        }
+        .padding(RQSpacing.md)
+        .background(RQColors.accent.opacity(0.08))
+        .cornerRadius(RQRadius.large)
+        .padding(.horizontal, RQSpacing.screenHorizontal)
+        .padding(.top, RQSpacing.sm)
+        .transition(.move(edge: .top).combined(with: .opacity))
     }
 
     // MARK: - Exercise Selector with Navigation

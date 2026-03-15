@@ -40,6 +40,12 @@ struct ExerciseLogView: View {
                     // Progress indicator
                     progressRow(exercise)
 
+                    // Deload explanation banner
+                    if let target = exercise.progressionTarget,
+                       target.decision == .deload || target.decision == .deloadVolume {
+                        deloadBanner(reasoning: target.reasoning)
+                    }
+
                     Divider().background(RQColors.surfaceTertiary)
 
                     // Grouped set sections
@@ -356,6 +362,35 @@ struct ExerciseLogView: View {
             .cornerRadius(RQRadius.medium)
             .frame(maxWidth: .infinity)
         }
+    }
+
+    // MARK: - Deload Banner
+
+    private func deloadBanner(reasoning: String) -> some View {
+        HStack(alignment: .top, spacing: RQSpacing.sm) {
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.system(size: 18))
+                .foregroundColor(RQColors.error)
+
+            VStack(alignment: .leading, spacing: RQSpacing.xs) {
+                Text("Deload Active")
+                    .font(RQTypography.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(RQColors.error)
+
+                Text(reasoning)
+                    .font(RQTypography.caption)
+                    .foregroundColor(RQColors.textSecondary)
+
+                Text("Deloads help you recover and break through plateaus. Trust the process.")
+                    .font(RQTypography.caption)
+                    .foregroundColor(RQColors.textTertiary)
+                    .italic()
+            }
+        }
+        .padding(RQSpacing.md)
+        .background(RQColors.error.opacity(0.08))
+        .cornerRadius(RQRadius.medium)
     }
 
     // MARK: - Helpers

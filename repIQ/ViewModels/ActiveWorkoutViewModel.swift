@@ -21,6 +21,9 @@ final class ActiveWorkoutViewModel {
     // MARK: - Exercise Substitution
     var showExerciseSubstitution = false
 
+    // MARK: - Deload Suggestion
+    var deloadSuggestion: ProgressionService.DeloadSuggestion?
+
     // MARK: - Rest Timer
     var restTimerRemaining: Int = 0
     var restTimerTarget: Int = 0
@@ -320,10 +323,64 @@ final class ActiveWorkoutViewModel {
             // 6. Start periodic auto-save for crash recovery
             startAutoSave()
 
+            // 7. Check if proactive deload should be suggested
+            if let templateId = template.id as UUID? {
+                deloadSuggestion = try? await progressionService.shouldSuggestDeload(
+                    userId: userId,
+                    templateId: templateId
+                )
+            }
+
         } catch {
             errorMessage = "Failed to start workout: \(error.localizedDescription)"
         }
         isLoading = false
+    }
+
+    // MARK: - Deload Suggestion Actions
+
+    func dismissDeloadSuggestion() {
+        deloadSuggestion = nil
+    }
+
+    func applyDeloadToAllExercises() {
+        for i in exercises.indices {
+            guard let target = exercises[i].progressionTarget else { continue }
+            let deloadWeight = (target.targetWeight * 0.9).rounded()
+            let increment = ProgressionService.weightIncrement(for: exercises[i].equipment)
+            let roundedWeight = increment > 0
+                ? (deloadWeight / increment).rounded(.down) * increment
+                : deloadWeight
+
+            exercises[i].progressionTarget = ProgressionTarget(
+                exerciseId: target.exerciseId,
+                trainingMode: target.trainingMode,
+                targetWeight: roundedWeight,
+                targetRepsLow: target.targetRepsLow,
+                targetRepsHigh: target.targetRepsHigh,
+                targetRPE: target.targetRPE,
+                decision: .deload,
+                reasoning: "Proactive deload — reducing weight 10% for recovery.",
+                previousWeight: target.previousWeight,
+                previousReps: target.previousReps,
+                previousRPE: target.previousRPE
+            )
+
+            // Update pre-filled set values to match deload targets
+            for j in exercises[i].sets.indices where !exercises[i].sets[j].isCompleted {
+                let prev = exercises[i].previousSets.first?[safe: j]
+                let (w, r, _) = Self.perSetTarget(
+                    decision: exercises[i].progressionTarget,
+                    previousSet: prev,
+                    trainingMode: exercises[i].trainingMode,
+                    setPosition: j,
+                    equipment: exercises[i].equipment
+                )
+                exercises[i].sets[j].weight = w
+                exercises[i].sets[j].reps = r
+            }
+        }
+        deloadSuggestion = nil
     }
 
     func completeWorkout() async {
