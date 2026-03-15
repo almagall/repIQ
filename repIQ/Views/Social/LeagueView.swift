@@ -102,39 +102,37 @@ struct LeagueView: View {
         let tiers = LeagueTier.allCases
         let currentIndex = tiers.firstIndex(of: viewModel.currentTier) ?? 0
 
-        return VStack(spacing: RQSpacing.sm) {
-            // Progress dots
-            HStack(spacing: 0) {
-                ForEach(tiers.indices, id: \.self) { index in
-                    let tier = tiers[index]
-                    let isReached = index <= currentIndex
+        return HStack(spacing: 0) {
+            ForEach(tiers.indices, id: \.self) { index in
+                let tier = tiers[index]
+                let isReached = index <= currentIndex
+                let isCurrent = index == currentIndex
 
-                    HStack(spacing: 0) {
-                        Circle()
-                            .fill(isReached ? tierColor(tier) : RQColors.surfaceTertiary)
-                            .frame(width: 12, height: 12)
-                            .overlay(
-                                Image(systemName: tier.icon)
-                                    .font(.system(size: 6))
-                                    .foregroundColor(isReached ? RQColors.background : RQColors.textTertiary)
-                            )
+                HStack(spacing: 0) {
+                    // Tier icon node
+                    VStack(spacing: 4) {
+                        ZStack {
+                            Circle()
+                                .fill(isReached ? tierColor(tier).opacity(0.15) : RQColors.surfaceTertiary.opacity(0.3))
+                                .frame(width: isCurrent ? 36 : 28, height: isCurrent ? 36 : 28)
 
-                        if index < tiers.count - 1 {
-                            Rectangle()
-                                .fill(index < currentIndex ? tierColor(tier) : RQColors.surfaceTertiary)
-                                .frame(height: 2)
+                            Image(systemName: tier.icon)
+                                .font(.system(size: isCurrent ? 16 : 12, weight: .semibold))
+                                .foregroundColor(isReached ? tierColor(tier) : RQColors.textTertiary.opacity(0.4))
                         }
-                    }
-                }
-            }
 
-            // Labels
-            HStack {
-                ForEach(tiers, id: \.rawValue) { tier in
-                    Text(String(tier.displayName.prefix(3)))
-                        .font(.system(size: 8, weight: .semibold))
-                        .foregroundColor(tier == viewModel.currentTier ? tierColor(tier) : RQColors.textTertiary)
-                        .frame(maxWidth: .infinity)
+                        Text(tier.displayName)
+                            .font(.system(size: 9, weight: isCurrent ? .bold : .medium))
+                            .foregroundColor(isReached ? tierColor(tier) : RQColors.textTertiary.opacity(0.5))
+                    }
+
+                    // Connecting line
+                    if index < tiers.count - 1 {
+                        Rectangle()
+                            .fill(index < currentIndex ? tierColor(tier) : RQColors.surfaceTertiary)
+                            .frame(height: 2)
+                            .padding(.bottom, 18) // align with icon center
+                    }
                 }
             }
         }
