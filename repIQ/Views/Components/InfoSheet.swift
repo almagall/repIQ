@@ -23,6 +23,105 @@ struct InfoButton: View {
     }
 }
 
+// MARK: - Multi-Topic Info Button
+
+/// A compact (ⓘ) button that opens a sheet covering multiple topics at once.
+struct MultiInfoButton: View {
+    let topics: [ProgressExplainer.Topic]
+    let title: String
+    @State private var showSheet = false
+
+    var body: some View {
+        Button {
+            showSheet = true
+        } label: {
+            Image(systemName: "info.circle")
+                .font(.system(size: 14))
+                .foregroundColor(RQColors.textTertiary)
+        }
+        .buttonStyle(.plain)
+        .sheet(isPresented: $showSheet) {
+            MultiInfoSheet(topics: topics, title: title)
+        }
+    }
+}
+
+// MARK: - Multi-Topic Info Sheet
+
+/// A sheet that explains multiple related topics in a single scrollable view.
+struct MultiInfoSheet: View {
+    let topics: [ProgressExplainer.Topic]
+    let title: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: RQSpacing.xl) {
+                    ForEach(Array(topics.enumerated()), id: \.offset) { index, topic in
+                        if index > 0 {
+                            Divider().background(RQColors.surfaceTertiary)
+                        }
+
+                        VStack(alignment: .leading, spacing: RQSpacing.md) {
+                            // Icon + title
+                            HStack(spacing: RQSpacing.sm) {
+                                Image(systemName: topic.icon)
+                                    .font(.system(size: 18))
+                                    .foregroundColor(RQColors.accent)
+                                    .frame(width: 28)
+                                Text(topic.title)
+                                    .font(RQTypography.headline)
+                                    .foregroundColor(RQColors.textPrimary)
+                            }
+
+                            // Explanation
+                            Text(topic.explanation)
+                                .font(RQTypography.callout)
+                                .foregroundColor(RQColors.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .lineSpacing(3)
+
+                            // Key points
+                            if !topic.keyPoints.isEmpty {
+                                VStack(alignment: .leading, spacing: RQSpacing.sm) {
+                                    ForEach(Array(topic.keyPoints.enumerated()), id: \.offset) { _, point in
+                                        HStack(alignment: .top, spacing: RQSpacing.sm) {
+                                            Circle()
+                                                .fill(RQColors.accent)
+                                                .frame(width: 4, height: 4)
+                                                .padding(.top, 6)
+                                            Text(point)
+                                                .font(RQTypography.caption)
+                                                .foregroundColor(RQColors.textSecondary)
+                                                .fixedSize(horizontal: false, vertical: true)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, RQSpacing.screenHorizontal)
+                .padding(.top, RQSpacing.lg)
+                .padding(.bottom, RQSpacing.xxxl)
+            }
+            .background(RQColors.background)
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .foregroundColor(RQColors.accent)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+}
+
 // MARK: - Info Sheet
 
 /// A presentation sheet that explains a specific analytics concept.

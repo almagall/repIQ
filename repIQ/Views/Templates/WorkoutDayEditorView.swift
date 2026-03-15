@@ -301,6 +301,17 @@ struct WorkoutDayEditorView: View {
 
                         Spacer()
 
+                        // Settings info button
+                        MultiInfoButton(
+                            topics: [
+                                ProgressExplainer.trainingMode,
+                                ProgressExplainer.targetSets,
+                                ProgressExplainer.repRange,
+                                ProgressExplainer.repCap,
+                            ],
+                            title: "Exercise Settings"
+                        )
+
                         // Superset button — opens picker sheet
                         Button {
                             openSupersetPicker(for: dayExercise)
@@ -339,28 +350,22 @@ struct WorkoutDayEditorView: View {
 
                     // Training mode toggle
                     HStack {
-                        HStack(spacing: RQSpacing.xs) {
-                            Text("Mode")
-                                .font(RQTypography.label)
-                                .textCase(.uppercase)
-                                .tracking(1.5)
-                                .foregroundColor(RQColors.textSecondary)
-                            InfoButton(topic: ProgressExplainer.trainingMode)
-                        }
+                        Text("Mode")
+                            .font(RQTypography.label)
+                            .textCase(.uppercase)
+                            .tracking(1.5)
+                            .foregroundColor(RQColors.textSecondary)
                         Spacer()
                         trainingModeToggle(dayExercise)
                     }
 
                     // Target sets
                     HStack {
-                        HStack(spacing: RQSpacing.xs) {
-                            Text("Target Sets")
-                                .font(RQTypography.label)
-                                .textCase(.uppercase)
-                                .tracking(1.5)
-                                .foregroundColor(RQColors.textSecondary)
-                            InfoButton(topic: ProgressExplainer.targetSets)
-                        }
+                        Text("Target Sets")
+                            .font(RQTypography.label)
+                            .textCase(.uppercase)
+                            .tracking(1.5)
+                            .foregroundColor(RQColors.textSecondary)
                         Spacer()
                         HStack(spacing: RQSpacing.md) {
                             Button {
@@ -398,14 +403,11 @@ struct WorkoutDayEditorView: View {
 
                     // Rep range indicator (shows effective range when capped)
                     HStack {
-                        HStack(spacing: RQSpacing.xs) {
-                            Text("Rep Range")
-                                .font(RQTypography.label)
-                                .textCase(.uppercase)
-                                .tracking(1.5)
-                                .foregroundColor(RQColors.textSecondary)
-                            InfoButton(topic: ProgressExplainer.repRange)
-                        }
+                        Text("Rep Range")
+                            .font(RQTypography.label)
+                            .textCase(.uppercase)
+                            .tracking(1.5)
+                            .foregroundColor(RQColors.textSecondary)
                         Spacer()
                         let effectiveRange = dayExercise.effectiveRepRange
                         Text("\(effectiveRange.lowerBound)-\(effectiveRange.upperBound) reps")
@@ -415,14 +417,11 @@ struct WorkoutDayEditorView: View {
 
                     // Rep cap control
                     HStack {
-                        HStack(spacing: RQSpacing.xs) {
-                            Text("Rep Cap")
-                                .font(RQTypography.label)
-                                .textCase(.uppercase)
-                                .tracking(1.5)
-                                .foregroundColor(RQColors.textSecondary)
-                            InfoButton(topic: ProgressExplainer.repCap)
-                        }
+                        Text("Rep Cap")
+                            .font(RQTypography.label)
+                            .textCase(.uppercase)
+                            .tracking(1.5)
+                            .foregroundColor(RQColors.textSecondary)
                         Spacer()
                         repCapControl(dayExercise)
                     }
