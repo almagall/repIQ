@@ -339,22 +339,28 @@ struct WorkoutDayEditorView: View {
 
                     // Training mode toggle
                     HStack {
-                        Text("Mode")
-                            .font(RQTypography.label)
-                            .textCase(.uppercase)
-                            .tracking(1.5)
-                            .foregroundColor(RQColors.textSecondary)
+                        HStack(spacing: RQSpacing.xs) {
+                            Text("Mode")
+                                .font(RQTypography.label)
+                                .textCase(.uppercase)
+                                .tracking(1.5)
+                                .foregroundColor(RQColors.textSecondary)
+                            InfoButton(topic: ProgressExplainer.trainingMode)
+                        }
                         Spacer()
                         trainingModeToggle(dayExercise)
                     }
 
                     // Target sets
                     HStack {
-                        Text("Target Sets")
-                            .font(RQTypography.label)
-                            .textCase(.uppercase)
-                            .tracking(1.5)
-                            .foregroundColor(RQColors.textSecondary)
+                        HStack(spacing: RQSpacing.xs) {
+                            Text("Target Sets")
+                                .font(RQTypography.label)
+                                .textCase(.uppercase)
+                                .tracking(1.5)
+                                .foregroundColor(RQColors.textSecondary)
+                            InfoButton(topic: ProgressExplainer.targetSets)
+                        }
                         Spacer()
                         HStack(spacing: RQSpacing.md) {
                             Button {
@@ -392,11 +398,14 @@ struct WorkoutDayEditorView: View {
 
                     // Rep range indicator (shows effective range when capped)
                     HStack {
-                        Text("Rep Range")
-                            .font(RQTypography.label)
-                            .textCase(.uppercase)
-                            .tracking(1.5)
-                            .foregroundColor(RQColors.textSecondary)
+                        HStack(spacing: RQSpacing.xs) {
+                            Text("Rep Range")
+                                .font(RQTypography.label)
+                                .textCase(.uppercase)
+                                .tracking(1.5)
+                                .foregroundColor(RQColors.textSecondary)
+                            InfoButton(topic: ProgressExplainer.repRange)
+                        }
                         Spacer()
                         let effectiveRange = dayExercise.effectiveRepRange
                         Text("\(effectiveRange.lowerBound)-\(effectiveRange.upperBound) reps")
@@ -406,11 +415,14 @@ struct WorkoutDayEditorView: View {
 
                     // Rep cap control
                     HStack {
-                        Text("Rep Cap")
-                            .font(RQTypography.label)
-                            .textCase(.uppercase)
-                            .tracking(1.5)
-                            .foregroundColor(RQColors.textSecondary)
+                        HStack(spacing: RQSpacing.xs) {
+                            Text("Rep Cap")
+                                .font(RQTypography.label)
+                                .textCase(.uppercase)
+                                .tracking(1.5)
+                                .foregroundColor(RQColors.textSecondary)
+                            InfoButton(topic: ProgressExplainer.repCap)
+                        }
                         Spacer()
                         repCapControl(dayExercise)
                     }

@@ -278,4 +278,57 @@ enum ProgressExplainer {
         ],
         howToUse: "Address the identified root cause(s) first. Don't change everything at once — adjust one variable, train for 2–3 weeks, then reassess."
     )
+
+    // MARK: - Template Topics
+
+    static let trainingMode = Topic(
+        title: "Training Mode",
+        icon: "figure.strengthtraining.traditional",
+        explanation: "Training mode determines the rep range and RPE target the progression engine uses for this exercise. Choose the mode that matches your goal for this movement.",
+        keyPoints: [
+            "Hypertrophy (10–15 reps, RPE 7–8): Optimized for muscle growth. Higher reps with moderate weight maximize time under tension and metabolic stress.",
+            "Strength (3–5 reps, RPE 8–9): Optimized for max force production. Lower reps with heavier weight build neural efficiency and peak strength.",
+            "You can mix modes within a workout — e.g., strength for compounds, hypertrophy for accessories.",
+        ],
+        howToUse: "Pick Hypertrophy for most exercises if your goal is building muscle. Use Strength for big compounds (squat, bench, deadlift) if you want to get stronger. Changing the mode resets any rep cap you've set."
+    )
+
+    static let targetSets = Topic(
+        title: "Target Sets",
+        icon: "number.circle",
+        explanation: "Target sets is the number of working sets the app will create for this exercise when you start a workout. This doesn't include warm-up or drop sets — those can be added during the workout.",
+        keyPoints: [
+            "3–4 sets per exercise is a good starting point for most lifters.",
+            "More sets = more volume = more stimulus, but also more fatigue.",
+            "Advanced lifters may benefit from 4–5 sets. Beginners often progress well on 2–3.",
+            "Total weekly sets per muscle group matters more than sets per session.",
+        ],
+        howToUse: "Start with 3–4 sets. If you're consistently completing all sets with good form and manageable effort, consider adding a set. If you're struggling to finish or quality drops on the last sets, reduce by one."
+    )
+
+    static let repRange = Topic(
+        title: "Rep Range",
+        icon: "arrow.left.and.right",
+        explanation: "The rep range is automatically set by the training mode and determines the target reps the progression engine aims for. When you hit the top of the range at manageable effort, the engine increases weight.",
+        keyPoints: [
+            "Hypertrophy mode: 10–15 reps. Strength mode: 3–5 reps.",
+            "The progression engine uses this range to decide when to increase weight, add reps, maintain, or deload.",
+            "Hitting the top of the range at or below target RPE triggers a weight increase.",
+            "If a rep cap is set, the effective range will be narrower (e.g., 10–12 instead of 10–15).",
+        ],
+        howToUse: "You don't need to manually adjust this — it follows the training mode. If you want a narrower range (e.g., you don't want to go above 12 reps on bench), use the Rep Cap setting below."
+    )
+
+    static let repCap = Topic(
+        title: "Rep Cap",
+        icon: "arrow.up.to.line",
+        explanation: "Rep cap limits the maximum reps the progression engine will target for this exercise. Without a cap, the engine uses the full rep range of the training mode (e.g., up to 15 for hypertrophy). With a cap, it triggers a weight increase sooner.",
+        keyPoints: [
+            "Off (default): The engine uses the full mode range. For hypertrophy, it won't suggest a weight increase until you hit 15 reps.",
+            "When set (e.g., 12): The engine treats 12 as the top of the range. Hit 12 reps at manageable effort → weight goes up.",
+            "Useful for heavy compounds where high reps feel inefficient or risky (e.g., barbell squats at 15 reps).",
+            "The cap must be within the mode's valid range. Changing modes resets the cap.",
+        ],
+        howToUse: "Leave it Off for most exercises. Turn it on for heavy compounds where you'd rather increase weight sooner. For example, cap hypertrophy bench press at 12 so the engine adds weight once you hit 12 reps instead of waiting until 15."
+    )
 }
