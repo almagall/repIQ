@@ -268,6 +268,40 @@ struct FriendsView: View {
 
     private var searchSection: some View {
         VStack(spacing: RQSpacing.lg) {
+            // Smart matchmaking banner
+            NavigationLink {
+                MatchmakingView(viewModel: viewModel)
+            } label: {
+                HStack(spacing: RQSpacing.md) {
+                    Image(systemName: "person.2.wave.2.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(RQColors.accent)
+                        .frame(width: 40)
+
+                    VStack(alignment: .leading, spacing: RQSpacing.xxs) {
+                        Text("Find Training Partners")
+                            .font(RQTypography.headline)
+                            .foregroundColor(RQColors.textPrimary)
+                        Text("Smart matchmaking based on your training style")
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.textTertiary)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12))
+                        .foregroundColor(RQColors.textTertiary)
+                }
+                .padding(RQSpacing.cardPadding)
+                .background(RQColors.accent.opacity(0.08))
+                .cornerRadius(RQRadius.medium)
+                .overlay(
+                    RoundedRectangle(cornerRadius: RQRadius.medium)
+                        .stroke(RQColors.accent.opacity(0.2), lineWidth: 1)
+                )
+            }
+
             // Search bar
             HStack(spacing: RQSpacing.sm) {
                 Image(systemName: "magnifyingglass")

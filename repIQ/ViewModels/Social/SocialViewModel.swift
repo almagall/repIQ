@@ -19,6 +19,10 @@ final class SocialViewModel {
     // Sent requests tracking (for UI state)
     var sentRequestIds: Set<UUID> = []
 
+    // Achievements (unified milestones + badges)
+    var achievements: [Achievement] = []
+    var celebrationAchievement: Achievement?
+
     // Phase 4/5 state
     var coachingNudges: [CoachingNudge] = []
     var unreadDigestCount: Int = 0
@@ -76,6 +80,16 @@ final class SocialViewModel {
         pendingRequests.count
     }
 
+    /// Total unlocked achievement tiers across all achievements.
+    var totalUnlockedTiers: Int {
+        achievements.reduce(0) { $0 + $1.unlockedCount }
+    }
+
+    /// Total possible achievement tiers.
+    var totalTiers: Int {
+        achievements.reduce(0) { $0 + $1.tiers.count }
+    }
+
     // MARK: - Loading
 
     /// Loads all social data in parallel.
@@ -117,6 +131,17 @@ final class SocialViewModel {
             allBadges = try await allBadgesTask
             activeChallenges = try await challengesTask
             userClubs = try await clubsTask
+
+            // Compute achievements from progress data
+            let progressData = try? await gamificationService.fetchMilestoneProgressData(userId: userId)
+            if let progressData {
+                achievements = AchievementCatalog.evaluate(
+                    data: progressData,
+                    earnedBadges: earnedBadges,
+                    friendCount: friends.count,
+                    fistBumpsGiven: 0 // Would need a query; acceptable default
+                )
+            }
 
             // Phase 4/5: Load coaching nudges and digest count (non-blocking)
             let streak = StreakData(

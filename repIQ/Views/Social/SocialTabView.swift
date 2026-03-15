@@ -60,51 +60,54 @@ struct SocialTabView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showAddFriends = true
-                    } label: {
-                        Image(systemName: "person.badge.plus")
-                            .font(.system(size: 16))
-                            .foregroundColor(RQColors.accent)
-                            .overlay(alignment: .topTrailing) {
-                                if !viewModel.pendingRequests.isEmpty {
-                                    Text("\(viewModel.pendingRequests.count)")
-                                        .font(.system(size: 9, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .padding(.horizontal, 4)
-                                        .padding(.vertical, 1)
-                                        .background(RQColors.error)
-                                        .clipShape(Capsule())
-                                        .offset(x: 6, y: -8)
+                    HStack(spacing: RQSpacing.md) {
+                        // Add friend button
+                        Button {
+                            showAddFriends = true
+                        } label: {
+                            Image(systemName: "person.badge.plus")
+                                .font(.system(size: 16))
+                                .foregroundColor(RQColors.accent)
+                                .overlay(alignment: .topTrailing) {
+                                    if !viewModel.pendingRequests.isEmpty {
+                                        Text("\(viewModel.pendingRequests.count)")
+                                            .font(.system(size: 9, weight: .bold))
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 4)
+                                            .padding(.vertical, 1)
+                                            .background(RQColors.error)
+                                            .clipShape(Capsule())
+                                            .offset(x: 6, y: -8)
+                                    }
                                 }
-                            }
-                            .padding(.trailing, 4)
+                        }
+
+                        // Profile avatar
+                        NavigationLink {
+                            SocialProfileView(viewModel: viewModel)
+                        } label: {
+                            Circle()
+                                .fill(RQColors.accent.opacity(0.2))
+                                .frame(width: 28, height: 28)
+                                .overlay(
+                                    Text(String((viewModel.socialProfile?.displayName ?? "?").prefix(1)).uppercased())
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundColor(RQColors.accent)
+                                )
+                        }
                     }
                 }
 
                 ToolbarItem(placement: .topBarLeading) {
-                    // IQ + Streak summary
-                    HStack(spacing: RQSpacing.md) {
-                        // IQ Points
+                    // Streak only (IQ moved to Leagues)
+                    if viewModel.currentStreak > 0 {
                         HStack(spacing: RQSpacing.xs) {
-                            Image(systemName: "brain.head.profile")
+                            Image(systemName: "flame.fill")
                                 .font(.system(size: 12))
-                                .foregroundColor(RQColors.accent)
-                            Text("\(viewModel.totalIQ)")
+                                .foregroundColor(RQColors.warning)
+                            Text("\(viewModel.currentStreak)")
                                 .font(RQTypography.numbersSmall)
                                 .foregroundColor(RQColors.textPrimary)
-                        }
-
-                        // Streak
-                        if viewModel.currentStreak > 0 {
-                            HStack(spacing: RQSpacing.xs) {
-                                Image(systemName: "flame.fill")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(RQColors.warning)
-                                Text("\(viewModel.currentStreak)")
-                                    .font(RQTypography.numbersSmall)
-                                    .foregroundColor(RQColors.textPrimary)
-                            }
                         }
                     }
                 }
@@ -120,6 +123,13 @@ struct SocialTabView: View {
             }
             .sheet(isPresented: $showAddFriends) {
                 AddFriendsSheet(viewModel: viewModel)
+            }
+            .overlay {
+                if let achievement = viewModel.celebrationAchievement {
+                    AchievementCelebrationOverlay(achievement: achievement) {
+                        viewModel.celebrationAchievement = nil
+                    }
+                }
             }
         }
     }
@@ -201,24 +211,15 @@ struct SocialTabView: View {
     private var discoverSection: some View {
         ScrollView {
             VStack(spacing: RQSpacing.xl) {
-                // Quick links grid
+                // Quick links grid — consolidated to 3 cards
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: RQSpacing.md) {
                     discoverLink(
-                        title: "Find Partners",
-                        subtitle: "Smart matchmaking",
-                        icon: "person.2.wave.2.fill",
-                        color: RQColors.accent
-                    ) {
-                        MatchmakingView(viewModel: viewModel)
-                    }
-
-                    discoverLink(
-                        title: "Milestones",
-                        subtitle: "Achievements",
-                        icon: "medal.fill",
+                        title: "Achievements",
+                        subtitle: "Track progress",
+                        icon: "trophy.fill",
                         color: RQColors.warning
                     ) {
-                        MilestoneCelebrationView(viewModel: viewModel)
+                        AchievementsView(viewModel: viewModel)
                     }
 
                     discoverLink(
@@ -237,24 +238,6 @@ struct SocialTabView: View {
                         color: RQColors.success
                     ) {
                         WeeklyDigestView(viewModel: viewModel)
-                    }
-
-                    discoverLink(
-                        title: "Badges",
-                        subtitle: "Your achievements",
-                        icon: "medal.fill",
-                        color: RQColors.warning
-                    ) {
-                        BadgesView(viewModel: viewModel)
-                    }
-
-                    discoverLink(
-                        title: "Social Profile",
-                        subtitle: "Your stats",
-                        icon: "person.crop.circle.fill",
-                        color: RQColors.accent
-                    ) {
-                        SocialProfileView(viewModel: viewModel)
                     }
                 }
 

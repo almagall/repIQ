@@ -282,6 +282,83 @@ struct GamificationService: Sendable {
         return newlyEarned
     }
 
+    // MARK: - Achievement Progress Data
+
+    /// Fetches user stats needed to compute achievement progress.
+    func fetchMilestoneProgressData(userId: UUID) async throws -> MilestoneProgressData {
+        struct CountRow: Decodable { let count: Int }
+        struct VolumeRow: Decodable { let total_volume: Double? }
+        struct ProfileRow: Decodable {
+            let current_streak: Int
+            let longest_streak: Int
+        }
+
+        // Parallel queries
+        async let sessionsTask: [CountRow] = supabase.from("workout_sessions")
+            .select("count", head: false)
+            .eq("user_id", value: userId.uuidString)
+            .execute()
+            .value
+
+        async let prsTask: [CountRow] = supabase.from("personal_records")
+            .select("count", head: false)
+            .eq("user_id", value: userId.uuidString)
+            .execute()
+            .value
+
+        async let profileTask: ProfileRow = supabase.from("profiles")
+            .select("current_streak, longest_streak")
+            .eq("id", value: userId.uuidString)
+            .single()
+            .execute()
+            .value
+
+        // Volume via RPC or aggregate
+        async let volumeTask: [VolumeRow] = supabase.from("working_sets")
+            .select("total_volume:weight.sum()")
+            .eq("user_id", value: userId.uuidString)
+            .execute()
+            .value
+
+        // Distinct exercises
+        struct ExerciseRow: Decodable { let exercise_id: UUID }
+        async let exercisesTask: [ExerciseRow] = supabase.from("working_sets")
+            .select("exercise_id")
+            .eq("user_id", value: userId.uuidString)
+            .execute()
+            .value
+
+        let sessions = try await sessionsTask
+        let prs = try await prsTask
+        let profile = try await profileTask
+        let volume = try await volumeTask
+        let exercises = try await exercisesTask
+
+        let uniqueExerciseIds = Set(exercises.map(\.exercise_id))
+
+        // Fetch muscle groups for unique exercises
+        var uniqueMuscleGroups = 0
+        if !uniqueExerciseIds.isEmpty {
+            struct MuscleRow: Decodable { let muscle_group: String }
+            let muscles: [MuscleRow] = try await supabase.from("exercises")
+                .select("muscle_group")
+                .in("id", values: uniqueExerciseIds.map(\.uuidString))
+                .execute()
+                .value
+            uniqueMuscleGroups = Set(muscles.map(\.muscle_group)).count
+        }
+
+        return MilestoneProgressData(
+            totalSessions: sessions.first?.count ?? 0,
+            totalVolume: volume.first?.total_volume ?? 0,
+            totalPRs: prs.first?.count ?? 0,
+            bestStreak: profile.longest_streak,
+            currentStreak: profile.current_streak,
+            uniqueExercises: uniqueExerciseIds.count,
+            uniqueMuscleGroups: uniqueMuscleGroups
+        )
+    }
+
     // MARK: - League Evaluation
 
     /// Evaluates league promotion/demotion based on weekly IQ ranking.
