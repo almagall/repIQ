@@ -41,4 +41,14 @@ final class TemplateListViewModel {
             errorMessage = "Failed to delete template."
         }
     }
+
+    func duplicateTemplate(_ template: Template) async {
+        do {
+            guard let userId = try? await supabase.auth.session.user.id else { return }
+            let copy = try await templateService.duplicateTemplate(templateId: template.id, userId: userId)
+            templates.append(copy)
+        } catch {
+            errorMessage = "Failed to duplicate template."
+        }
+    }
 }

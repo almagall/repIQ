@@ -46,4 +46,32 @@ struct ProfileService: Sendable {
             .eq("id", value: userId.uuidString)
             .execute()
     }
+
+    // MARK: - Onboarding
+
+    func updateOnboarding(userId: UUID, experienceLevel: String?, trainingGoal: String?) async throws {
+        struct Payload: Encodable {
+            let has_completed_onboarding: Bool
+            let experience_level: String?
+            let training_goal: String?
+        }
+        try await supabase.from("profiles")
+            .update(Payload(
+                has_completed_onboarding: true,
+                experience_level: experienceLevel,
+                training_goal: trainingGoal
+            ))
+            .eq("id", value: userId.uuidString)
+            .execute()
+    }
+
+    func hasCompletedOnboarding(userId: UUID) async throws -> Bool {
+        let profile: Profile = try await supabase.from("profiles")
+            .select()
+            .eq("id", value: userId.uuidString)
+            .single()
+            .execute()
+            .value
+        return profile.hasCompletedOnboarding
+    }
 }

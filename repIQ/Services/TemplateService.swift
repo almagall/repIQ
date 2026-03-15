@@ -161,4 +161,59 @@ struct TemplateService: Sendable {
             .eq("id", value: id.uuidString)
             .execute()
     }
+
+    // MARK: - Duplicate Template
+
+    /// Creates a deep copy of a template including all workout days and exercises.
+    func duplicateTemplate(templateId: UUID, userId: UUID) async throws -> Template {
+        // 1. Fetch the full template with nested data
+        let original = try await fetchTemplate(id: templateId)
+
+        // 2. Create new template
+        let newTemplate = try await createTemplate(
+            userId: userId,
+            name: "\(original.name) (Copy)",
+            description: original.description,
+            sourceProgram: original.sourceProgram
+        )
+
+        // 3. Duplicate each workout day and its exercises
+        if let days = original.workoutDays {
+            for (dayIndex, day) in days.enumerated() {
+                let newDay = try await createWorkoutDay(
+                    templateId: newTemplate.id,
+                    name: day.name,
+                    description: day.description,
+                    sortOrder: dayIndex
+                )
+
+                if let exercises = day.exercises {
+                    for (exIndex, exercise) in exercises.enumerated() {
+                        let newExercise = try await addExerciseToDay(
+                            workoutDayId: newDay.id,
+                            exerciseId: exercise.exerciseId,
+                            trainingMode: exercise.trainingMode,
+                            targetSets: exercise.targetSets,
+                            sortOrder: exIndex
+                        )
+                        // Preserve rep cap and superset group
+                        if exercise.repCap != nil || exercise.supersetGroup != nil {
+                            try await updateDayExercise(
+                                id: newExercise.id,
+                                trainingMode: exercise.trainingMode,
+                                targetSets: exercise.targetSets,
+                                repCap: exercise.repCap
+                            )
+                            if let group = exercise.supersetGroup {
+                                try await updateSupersetGroup(id: newExercise.id, supersetGroup: group)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4. Return the full new template
+        return try await fetchTemplate(id: newTemplate.id)
+    }
 }

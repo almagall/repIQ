@@ -5,6 +5,7 @@ import Supabase
 final class AppState {
     var isAuthenticated = false
     var isLoading = true
+    var needsOnboarding = false
 
     func listenToAuthChanges() async {
         for await (event, _) in supabase.auth.authStateChanges {
@@ -12,15 +13,30 @@ final class AppState {
             case .initialSession:
                 let session = try? await supabase.auth.session
                 isAuthenticated = session != nil
+                if isAuthenticated {
+                    await checkOnboarding()
+                }
                 isLoading = false
             case .signedIn:
                 isAuthenticated = true
+                await checkOnboarding()
             case .signedOut:
                 isAuthenticated = false
+                needsOnboarding = false
             default:
                 break
             }
         }
+    }
+
+    private func checkOnboarding() async {
+        guard let userId = try? await supabase.auth.session.user.id else { return }
+        let completed = (try? await ProfileService().hasCompletedOnboarding(userId: userId)) ?? true
+        needsOnboarding = !completed
+    }
+
+    func completeOnboarding() {
+        needsOnboarding = false
     }
 }
 
@@ -32,13 +48,20 @@ struct RootView: View {
             if appState.isLoading {
                 splashView
             } else if appState.isAuthenticated {
-                MainTabView()
+                if appState.needsOnboarding {
+                    OnboardingView {
+                        appState.completeOnboarding()
+                    }
+                } else {
+                    MainTabView()
+                }
             } else {
                 AuthView()
             }
         }
         .animation(.easeInOut(duration: 0.3), value: appState.isAuthenticated)
         .animation(.easeInOut(duration: 0.3), value: appState.isLoading)
+        .animation(.easeInOut(duration: 0.3), value: appState.needsOnboarding)
         .task {
             await appState.listenToAuthChanges()
         }

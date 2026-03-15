@@ -95,6 +95,11 @@ struct SignUpView: View {
             .frame(height: 50)
             .cornerRadius(RQRadius.medium)
 
+            // Google Sign In
+            GoogleSignInButton {
+                Task { await viewModel.signInWithGoogle() }
+            }
+
             // Switch to Sign In
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
