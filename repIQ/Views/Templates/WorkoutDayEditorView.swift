@@ -31,11 +31,23 @@ struct WorkoutDayEditorView: View {
 
                 // Exercises Header
                 HStack {
-                    Text("Exercises")
-                        .font(RQTypography.label)
-                        .textCase(.uppercase)
-                        .tracking(1.5)
-                        .foregroundColor(RQColors.textSecondary)
+                    HStack(spacing: RQSpacing.xs) {
+                        Text("Exercises")
+                            .font(RQTypography.label)
+                            .textCase(.uppercase)
+                            .tracking(1.5)
+                            .foregroundColor(RQColors.textSecondary)
+                        MultiInfoButton(
+                            topics: [
+                                ProgressExplainer.trainingMode,
+                                ProgressExplainer.targetSets,
+                                ProgressExplainer.repRange,
+                                ProgressExplainer.repCap,
+                                ProgressExplainer.supersets,
+                            ],
+                            title: "Exercise Settings"
+                        )
+                    }
                     Spacer()
                     Button {
                         showExercisePicker = true
@@ -300,17 +312,6 @@ struct WorkoutDayEditorView: View {
                             .foregroundColor(RQColors.textPrimary)
 
                         Spacer()
-
-                        // Settings info button
-                        MultiInfoButton(
-                            topics: [
-                                ProgressExplainer.trainingMode,
-                                ProgressExplainer.targetSets,
-                                ProgressExplainer.repRange,
-                                ProgressExplainer.repCap,
-                            ],
-                            title: "Exercise Settings"
-                        )
 
                         // Superset button — opens picker sheet
                         Button {

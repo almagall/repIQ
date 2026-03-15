@@ -430,4 +430,17 @@ enum ProgressExplainer {
         ],
         howToUse: "Leave it Off for most exercises. Turn it on for heavy compounds where you'd rather increase weight sooner. For example, cap hypertrophy bench press at 12 so the engine adds weight once you hit 12 reps instead of waiting until 15."
     )
+
+    static let supersets = Topic(
+        title: "Supersets",
+        icon: "link",
+        explanation: "A superset pairs two or more exercises performed back-to-back with no rest between them. You rest only after completing all exercises in the superset. This saves time and increases training density.",
+        keyPoints: [
+            "Tap the link icon on an exercise to pair it with other exercises in the same workout day.",
+            "Superset members are labeled (A, B, C...) and highlighted with an orange accent bar.",
+            "Antagonist supersets (e.g., biceps + triceps) are most effective — opposing muscles recover while the other works.",
+            "Avoid supersetting two exercises that compete for the same muscle group, as fatigue will limit performance on the second.",
+        ],
+        howToUse: "Use supersets to cut workout time without sacrificing volume. Pair exercises that use different muscle groups or equipment. During the workout, the app will guide you through each superset member in order before starting the rest timer."
+    )
 }
