@@ -36,8 +36,19 @@ struct WorkoutDayExercise: Codable, Identifiable, Sendable {
     var restSecondsOverride: Int?
     var notes: String?
     var supersetGroup: Int?
+    var repCap: Int?
     var createdAt: Date
     var exercise: Exercise?
+
+    /// The effective upper bound for reps, respecting the optional rep cap.
+    var effectiveRepMax: Int {
+        min(repCap ?? trainingMode.repRange.upperBound, trainingMode.repRange.upperBound)
+    }
+
+    /// The effective rep range, narrowed by the rep cap if set.
+    var effectiveRepRange: ClosedRange<Int> {
+        trainingMode.repRange.lowerBound...effectiveRepMax
+    }
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -49,6 +60,7 @@ struct WorkoutDayExercise: Codable, Identifiable, Sendable {
         case restSecondsOverride = "rest_seconds_override"
         case notes
         case supersetGroup = "superset_group"
+        case repCap = "rep_cap"
         case createdAt = "created_at"
         case exercise = "exercises"
     }

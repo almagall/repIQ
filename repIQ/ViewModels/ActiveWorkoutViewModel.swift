@@ -41,6 +41,10 @@ final class ActiveWorkoutViewModel {
     var hasPendingSets: Bool { OfflineSetQueue.shared.hasPendingSets }
     var pendingSetCount: Int { OfflineSetQueue.shared.pendingCount }
 
+    // MARK: - PR Tracking (for inline celebration)
+    /// Current personal records per exercise (keyed by exerciseId), fetched at workout start.
+    private var currentPRs: [UUID: [PersonalRecord]] = [:]
+
     // MARK: - Private
     private let workoutService = WorkoutService()
     private let progressionService = ProgressionService()
@@ -257,6 +261,13 @@ final class ActiveWorkoutViewModel {
             let previousData = try await previousDataTask
             let targets = (try? await targetsTask) ?? [:]
 
+            // 3b. Fetch current PRs for inline PR detection
+            for exerciseId in exerciseIds {
+                if let prs = try? await progressionService.fetchCurrentPRs(userId: userId, exerciseId: exerciseId) {
+                    currentPRs[exerciseId] = prs
+                }
+            }
+
             // 4. Build ExerciseLogEntry array
             exercises = dayExercises.sorted(by: { $0.sortOrder < $1.sortOrder }).map { dayExercise in
                 let prevSets = previousData[dayExercise.exerciseId] ?? []
@@ -298,6 +309,7 @@ final class ActiveWorkoutViewModel {
                     sets: sets,
                     previousSets: prevSets.isEmpty ? [] : [prevSets],
                     progressionTarget: target,
+                    repCap: dayExercise.repCap,
                     supersetGroup: dayExercise.supersetGroup
                 )
             }
@@ -404,7 +416,8 @@ final class ActiveWorkoutViewModel {
                     exerciseId: exercise.exerciseId,
                     trainingMode: exercise.trainingMode,
                     equipment: exercise.equipment,
-                    recentSessions: recentSessions
+                    recentSessions: recentSessions,
+                    repCap: exercise.repCap
                 ) {
                     try? await progressionService.saveTarget(target, userId: userId)
 
@@ -521,7 +534,7 @@ final class ActiveWorkoutViewModel {
             }
 
             // Build summary with PR, progression, and gamification data
-            workoutSummary = WorkoutSummaryData(
+            var summary = WorkoutSummaryData(
                 duration: duration,
                 totalSets: totalCompletedSets,
                 totalVolume: totalVolume,
@@ -533,6 +546,9 @@ final class ActiveWorkoutViewModel {
                 longestStreak: streakResult.longestStreak,
                 newBadges: newBadges
             )
+            summary.workoutName = dayName.isEmpty ? templateName : "\(templateName) — \(dayName)"
+            summary.workoutDate = startTime
+            workoutSummary = summary
 
             timerTask?.cancel()
             autoSaveTask?.cancel()
@@ -614,6 +630,29 @@ final class ActiveWorkoutViewModel {
             exercises[exerciseIndex].sets[setIndex].isSaving = false
         }
 
+        // Check for inline PR (weight PR only — most exciting for users)
+        let completedSet = exercises[exerciseIndex].sets[setIndex]
+        if completedSet.isCompleted && completedSet.setType == .working {
+            let exerciseId = exercises[exerciseIndex].exerciseId
+            let prs = currentPRs[exerciseId] ?? []
+            let currentWeightPR = prs.first(where: { $0.recordType == .weight })?.value ?? 0
+
+            if completedSet.weight > currentWeightPR && completedSet.weight > 0 {
+                exercises[exerciseIndex].sets[setIndex].isPR = true
+                // Update tracked PR so subsequent sets compare against the new best
+                if var exercisePRs = currentPRs[exerciseId],
+                   let prIndex = exercisePRs.firstIndex(where: { $0.recordType == .weight }) {
+                    exercisePRs[prIndex] = PersonalRecord(
+                        id: exercisePRs[prIndex].id, userId: exercisePRs[prIndex].userId,
+                        exerciseId: exerciseId, recordType: .weight,
+                        value: completedSet.weight, repsAtWeight: completedSet.reps,
+                        sessionId: sessionId, achievedAt: Date(), createdAt: Date()
+                    )
+                    currentPRs[exerciseId] = exercisePRs
+                }
+            }
+        }
+
         // Start elapsed timer on first confirmed set
         if !timerStarted {
             startTime = Date()
@@ -632,9 +671,14 @@ final class ActiveWorkoutViewModel {
             startRestTimer(seconds: restTimerDuration)
         }
 
-        // Haptic feedback
-        let generator = UIImpactFeedbackGenerator(style: .medium)
-        generator.impactOccurred()
+        // Haptic feedback — stronger for PR
+        if exercises[exerciseIndex].sets[setIndex].isPR {
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+        } else {
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.impactOccurred()
+        }
 
         // Auto-save workout state
         saveWorkoutState()

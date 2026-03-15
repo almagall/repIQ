@@ -390,7 +390,7 @@ struct WorkoutDayEditorView: View {
                         }
                     }
 
-                    // Rep range indicator
+                    // Rep range indicator (shows effective range when capped)
                     HStack {
                         Text("Rep Range")
                             .font(RQTypography.label)
@@ -398,10 +398,21 @@ struct WorkoutDayEditorView: View {
                             .tracking(1.5)
                             .foregroundColor(RQColors.textSecondary)
                         Spacer()
-                        let range = dayExercise.trainingMode.repRange
-                        Text("\(range.lowerBound)-\(range.upperBound) reps")
+                        let effectiveRange = dayExercise.effectiveRepRange
+                        Text("\(effectiveRange.lowerBound)-\(effectiveRange.upperBound) reps")
                             .font(RQTypography.numbersSmall)
                             .foregroundColor(modeColor(dayExercise.trainingMode))
+                    }
+
+                    // Rep cap control
+                    HStack {
+                        Text("Rep Cap")
+                            .font(RQTypography.label)
+                            .textCase(.uppercase)
+                            .tracking(1.5)
+                            .foregroundColor(RQColors.textSecondary)
+                        Spacer()
+                        repCapControl(dayExercise)
                     }
                 }
             }
@@ -440,15 +451,79 @@ struct WorkoutDayEditorView: View {
         return labels[safe: group] ?? "\(group + 1)"
     }
 
+    private func repCapControl(_ dayExercise: WorkoutDayExercise) -> some View {
+        let range = dayExercise.trainingMode.repRange
+        let hasCap = dayExercise.repCap != nil
+        let currentCap = dayExercise.repCap ?? range.upperBound
+
+        return HStack(spacing: RQSpacing.md) {
+            if hasCap {
+                Button {
+                    let newCap = currentCap - 1
+                    let repCap = newCap <= range.lowerBound ? nil : newCap
+                    Task {
+                        await viewModel.updateExerciseMode(
+                            dayExercise,
+                            trainingMode: dayExercise.trainingMode,
+                            targetSets: dayExercise.targetSets,
+                            repCap: repCap
+                        )
+                    }
+                } label: {
+                    Image(systemName: "minus.circle")
+                        .foregroundColor(RQColors.textSecondary)
+                }
+            }
+
+            Button {
+                // Toggle: if off, set to upperBound - 1; if on, turn off
+                let newCap: Int? = hasCap ? nil : max(range.lowerBound, range.upperBound - 1)
+                Task {
+                    await viewModel.updateExerciseMode(
+                        dayExercise,
+                        trainingMode: dayExercise.trainingMode,
+                        targetSets: dayExercise.targetSets,
+                        repCap: newCap
+                    )
+                }
+            } label: {
+                Text(hasCap ? "\(currentCap) reps" : "Off")
+                    .font(RQTypography.numbersSmall)
+                    .foregroundColor(hasCap ? modeColor(dayExercise.trainingMode) : RQColors.textTertiary)
+                    .frame(minWidth: 50, alignment: .center)
+            }
+
+            if hasCap {
+                Button {
+                    let newCap = min(currentCap + 1, range.upperBound)
+                    let repCap: Int? = newCap >= range.upperBound ? nil : newCap
+                    Task {
+                        await viewModel.updateExerciseMode(
+                            dayExercise,
+                            trainingMode: dayExercise.trainingMode,
+                            targetSets: dayExercise.targetSets,
+                            repCap: repCap
+                        )
+                    }
+                } label: {
+                    Image(systemName: "plus.circle")
+                        .foregroundColor(RQColors.textSecondary)
+                }
+            }
+        }
+    }
+
     private func trainingModeToggle(_ dayExercise: WorkoutDayExercise) -> some View {
         HStack(spacing: 0) {
             ForEach(TrainingMode.allCases, id: \.self) { mode in
                 Button {
                     Task {
+                        // Reset rep cap when changing mode (ranges differ)
                         await viewModel.updateExerciseMode(
                             dayExercise,
                             trainingMode: mode,
-                            targetSets: dayExercise.targetSets
+                            targetSets: dayExercise.targetSets,
+                            repCap: nil
                         )
                     }
                 } label: {

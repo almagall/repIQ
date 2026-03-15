@@ -11,7 +11,8 @@ struct ProgressionService: Sendable {
         exerciseId: UUID,
         trainingMode: TrainingMode,
         equipment: String,
-        recentSessions: [[WorkoutSet]]
+        recentSessions: [[WorkoutSet]],
+        repCap: Int? = nil
     ) -> ProgressionTarget? {
         // Need at least 1 session of data
         guard let latestSession = recentSessions.first, !latestSession.isEmpty else {
@@ -19,6 +20,7 @@ struct ProgressionService: Sendable {
         }
 
         let repRange = trainingMode.repRange
+        let effectiveUpperBound = min(repCap ?? repRange.upperBound, repRange.upperBound)
         let targetRPE = trainingMode.targetRPE
         let increment = weightIncrement(for: equipment)
 
@@ -41,7 +43,7 @@ struct ProgressionService: Sendable {
                 trainingMode: trainingMode,
                 targetWeight: bestRecentWeight,
                 targetRepsLow: repRange.lowerBound,
-                targetRepsHigh: min(repRange.lowerBound + 2, repRange.upperBound),
+                targetRepsHigh: min(repRange.lowerBound + 2, effectiveUpperBound),
                 targetRPE: targetRPE,
                 decision: .maintain,
                 reasoning: "Last session was below your recent bests. Keeping targets at your proven capacity.",
@@ -65,20 +67,20 @@ struct ProgressionService: Sendable {
         let tRepsHigh: Int
         let reasoning: String
 
-        if medReps >= repRange.upperBound && avgRPE <= targetRPE {
-            // Hit top of rep range at manageable effort → increase weight
+        if medReps >= effectiveUpperBound && avgRPE <= targetRPE {
+            // Hit top of rep range (or cap) at manageable effort → increase weight
             decision = .increaseWeight
             tWeight = medWeight + increment
             tRepsLow = repRange.lowerBound
-            tRepsHigh = min(repRange.lowerBound + 2, repRange.upperBound)
+            tRepsHigh = min(repRange.lowerBound + 2, effectiveUpperBound)
             reasoning = "Hit top of rep range at manageable effort. Adding weight."
 
         } else if medReps >= repRange.lowerBound && avgRPE <= targetRPE {
             // Within range, manageable effort → increase reps
             decision = .increaseReps
             tWeight = medWeight
-            tRepsLow = min(medReps + 1, repRange.upperBound)
-            tRepsHigh = min(medReps + 2, repRange.upperBound)
+            tRepsLow = min(medReps + 1, effectiveUpperBound)
+            tRepsHigh = min(medReps + 2, effectiveUpperBound)
             reasoning = "Good performance. Aim for 1–2 more reps."
 
         } else if medReps >= repRange.lowerBound && avgRPE > targetRPE {
@@ -96,14 +98,14 @@ struct ProgressionService: Sendable {
                 decision = .deload
                 tWeight = roundToIncrement(medWeight * 0.90, increment)
                 tRepsLow = repRange.lowerBound
-                tRepsHigh = min(repRange.lowerBound + 2, repRange.upperBound)
+                tRepsHigh = min(repRange.lowerBound + 2, effectiveUpperBound)
                 reasoning = "Struggling with target reps. Reducing weight to rebuild."
             } else {
                 // One-off miss — maintain
                 decision = .maintain
                 tWeight = medWeight
                 tRepsLow = repRange.lowerBound
-                tRepsHigh = min(repRange.lowerBound + 2, repRange.upperBound)
+                tRepsHigh = min(repRange.lowerBound + 2, effectiveUpperBound)
                 reasoning = "Missed target reps. Keep weight and aim for range."
             }
 

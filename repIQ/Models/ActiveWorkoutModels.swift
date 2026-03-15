@@ -12,6 +12,7 @@ struct SetEntry: Identifiable {
     var isCompleted: Bool
     var savedSetId: UUID? // non-nil once persisted to workout_sets
     var isSaving: Bool // loading state on checkmark tap
+    var isPR: Bool // true if this set beat a personal record
 
     init(
         setNumber: Int,
@@ -29,6 +30,7 @@ struct SetEntry: Identifiable {
         self.isCompleted = false
         self.savedSetId = nil
         self.isSaving = false
+        self.isPR = false
     }
 }
 
@@ -48,6 +50,7 @@ struct ExerciseLogEntry: Identifiable {
     var progressionTarget: ProgressionTarget? // progression target for this exercise
     var originalExerciseId: UUID? // non-nil if this exercise was substituted
     var isSubstituted: Bool { originalExerciseId != nil }
+    var repCap: Int? // optional rep cap from template exercise config
 
     /// The superset group index, if this exercise is part of a superset.
     var supersetGroup: Int?
@@ -80,6 +83,10 @@ struct WorkoutSummaryData: Identifiable {
     var currentStreak: Int = 0
     var longestStreak: Int = 0
     var newBadges: [Badge] = []
+
+    // Context for sharing
+    var workoutName: String = ""
+    var workoutDate: Date = Date()
 
     init(
         duration: Int,

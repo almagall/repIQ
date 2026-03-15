@@ -3,6 +3,8 @@ import SwiftUI
 struct WorkoutSummaryView: View {
     let summary: WorkoutSummaryData
     let onDismiss: () -> Void
+    @State private var shareImage: UIImage?
+    @State private var showShareSheet = false
 
     var body: some View {
         NavigationStack {
@@ -102,12 +104,26 @@ struct WorkoutSummaryView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        generateShareImage()
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 16))
+                            .foregroundColor(RQColors.accent)
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") {
                         onDismiss()
                     }
                     .font(RQTypography.headline)
                     .foregroundColor(RQColors.accent)
+                }
+            }
+            .sheet(isPresented: $showShareSheet) {
+                if let image = shareImage {
+                    ShareSheet(items: [image])
                 }
             }
         }
@@ -392,4 +408,28 @@ struct WorkoutSummaryView: View {
             ? String(format: "%.0f", weight)
             : String(format: "%.1f", weight)
     }
+
+    // MARK: - Share Image
+
+    private func generateShareImage() {
+        let card = WorkoutShareCard(summary: summary)
+        let renderer = ImageRenderer(content: card)
+        renderer.scale = 2.0
+        if let image = renderer.uiImage {
+            shareImage = image
+            showShareSheet = true
+        }
+    }
+}
+
+// MARK: - Share Sheet
+
+struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }

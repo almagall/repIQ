@@ -205,17 +205,19 @@ final class TemplateEditorViewModel {
         }
     }
 
-    func updateExerciseMode(_ dayExercise: WorkoutDayExercise, trainingMode: TrainingMode, targetSets: Int) async {
+    func updateExerciseMode(_ dayExercise: WorkoutDayExercise, trainingMode: TrainingMode, targetSets: Int, repCap: Int? = nil) async {
         do {
             try await templateService.updateDayExercise(
                 id: dayExercise.id,
                 trainingMode: trainingMode,
-                targetSets: targetSets
+                targetSets: targetSets,
+                repCap: repCap
             )
             for dayIndex in workoutDays.indices {
                 if let exIndex = workoutDays[dayIndex].exercises?.firstIndex(where: { $0.id == dayExercise.id }) {
                     workoutDays[dayIndex].exercises?[exIndex].trainingMode = trainingMode
                     workoutDays[dayIndex].exercises?[exIndex].targetSets = targetSets
+                    workoutDays[dayIndex].exercises?[exIndex].repCap = repCap
                 }
             }
         } catch {

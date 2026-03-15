@@ -114,12 +114,18 @@ struct TemplateService: Sendable {
             .value
     }
 
-    func updateDayExercise(id: UUID, trainingMode: TrainingMode, targetSets: Int) async throws {
+    func updateDayExercise(id: UUID, trainingMode: TrainingMode, targetSets: Int, repCap: Int? = nil) async throws {
+        struct ExerciseUpdate: Encodable {
+            let training_mode: String
+            let target_sets: Int
+            let rep_cap: Int?
+        }
         try await supabase.from("workout_day_exercises")
-            .update([
-                "training_mode": trainingMode.rawValue,
-                "target_sets": "\(targetSets)"
-            ])
+            .update(ExerciseUpdate(
+                training_mode: trainingMode.rawValue,
+                target_sets: targetSets,
+                rep_cap: repCap
+            ))
             .eq("id", value: id.uuidString)
             .execute()
     }

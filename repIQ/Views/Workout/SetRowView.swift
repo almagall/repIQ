@@ -25,6 +25,10 @@ struct SetRowView: View {
         viewModel.exercises[safe: exerciseIndex]?.equipment ?? ""
     }
 
+    private var showPlateBreakdown: Bool {
+        (equipment == "barbell" || equipment == "smith_machine") && (set?.weight ?? 0) > AppConstants.Defaults.barWeight
+    }
+
     @State private var weightText: String = ""
     @State private var repsText: String = ""
 
@@ -138,6 +142,22 @@ struct SetRowView: View {
 
                     Spacer()
 
+                    // PR badge
+                    if set.isPR && set.isCompleted {
+                        HStack(spacing: 2) {
+                            Image(systemName: "trophy.fill")
+                                .font(.system(size: 10))
+                            Text("PR")
+                                .font(.system(size: 10, weight: .black))
+                        }
+                        .foregroundColor(RQColors.warning)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(RQColors.warning.opacity(0.15))
+                        .clipShape(Capsule())
+                        .transition(.scale.combined(with: .opacity))
+                    }
+
                     // Checkmark button
                     Button {
                         Task {
@@ -159,6 +179,11 @@ struct SetRowView: View {
                         }
                     }
                     .disabled(set.isSaving)
+                }
+
+                // Plate breakdown for barbell exercises
+                if showPlateBreakdown {
+                    PlateBreakdownView(weight: set.weight)
                 }
             }
             .padding(.vertical, RQSpacing.xs)
