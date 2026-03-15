@@ -10,7 +10,6 @@ struct SocialTabView: View {
     enum SocialSection: String, CaseIterable {
         case feed = "Feed"
         case friends = "Friends"
-        case leagues = "Leagues"
         case challenges = "Challenges"
         case discover = "Discover"
 
@@ -18,7 +17,6 @@ struct SocialTabView: View {
             switch self {
             case .feed: return "bubble.left.and.bubble.right.fill"
             case .friends: return "person.2.fill"
-            case .leagues: return "trophy.fill"
             case .challenges: return "bolt.fill"
             case .discover: return "sparkles"
             }
@@ -44,8 +42,6 @@ struct SocialTabView: View {
                         FeedView(viewModel: viewModel)
                     case .friends:
                         FriendsView(viewModel: viewModel)
-                    case .leagues:
-                        LeagueView(viewModel: viewModel)
                     case .challenges:
                         ChallengesView(viewModel: viewModel)
                     case .discover:
