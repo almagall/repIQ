@@ -4,8 +4,6 @@ struct DashboardView: View {
     @State private var viewModel = DashboardViewModel()
     @State private var goalViewModel = GoalViewModel()
     @State private var showTemplatePicker = false
-    @State private var showDayPicker = false
-    @State private var selectedTemplate: Template?
 
     @Environment(WorkoutCoordinator.self) private var workoutCoordinator
 
@@ -164,21 +162,10 @@ struct DashboardView: View {
             .sheet(isPresented: $showTemplatePicker) {
                 templatePickerSheet
             }
-            .sheet(isPresented: $showDayPicker) {
-                if let template = selectedTemplate {
-                    WorkoutDayPickerView(template: template) { day, date in
-                        // Dismiss sheet first, then start workout after sheet animation completes
-                        showDayPicker = false
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                            workoutCoordinator.startWorkout(template: template, day: day, date: date)
-                        }
-                    }
-                }
-            }
         }
     }
 
-    // MARK: - Template Picker Sheet
+    // MARK: - Template Picker Sheet (with inline day selection via NavigationStack push)
 
     @ViewBuilder
     private var templatePickerSheet: some View {
@@ -186,15 +173,7 @@ struct DashboardView: View {
             ScrollView {
                 VStack(spacing: RQSpacing.md) {
                     ForEach(viewModel.templates) { template in
-                        Button {
-                            selectedTemplate = template
-                            showTemplatePicker = false
-
-                            // Always show day picker after selecting template
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                showDayPicker = true
-                            }
-                        } label: {
+                        NavigationLink(value: template) {
                             RQCard {
                                 HStack {
                                     VStack(alignment: .leading, spacing: RQSpacing.xs) {
@@ -227,6 +206,14 @@ struct DashboardView: View {
                         showTemplatePicker = false
                     }
                     .foregroundColor(RQColors.textSecondary)
+                }
+            }
+            .navigationDestination(for: Template.self) { template in
+                WorkoutDayPickerView(template: template) { day, date in
+                    showTemplatePicker = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        workoutCoordinator.startWorkout(template: template, day: day, date: date)
+                    }
                 }
             }
         }

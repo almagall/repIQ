@@ -1,6 +1,8 @@
 import Foundation
 
-struct Template: Codable, Identifiable, Sendable {
+struct Template: Codable, Identifiable, Sendable, Hashable {
+    static func == (lhs: Template, rhs: Template) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
     let id: UUID
     var userId: UUID
     var name: String
