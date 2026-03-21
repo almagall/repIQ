@@ -158,6 +158,10 @@ struct SetRowView: View {
                             }
                         }
 
+                    Text("@")
+                        .font(RQTypography.caption)
+                        .foregroundColor(RQColors.textTertiary)
+
                     // RPE badge
                     rpeBadge(set: set)
 
@@ -196,7 +200,7 @@ struct SetRowView: View {
                         } else {
                             Image(systemName: set.isCompleted ? "checkmark.circle.fill" : "circle")
                                 .font(.system(size: 24))
-                                .foregroundColor(set.isCompleted ? completionColor(for: set) : RQColors.textTertiary)
+                                .foregroundColor(set.isCompleted ? RQColors.success : RQColors.textTertiary)
                         }
                     }
                     .disabled(set.isSaving)
@@ -217,6 +221,29 @@ struct SetRowView: View {
                 if set.reps > 0 {
                     repsText = "\(set.reps)"
                 }
+
+                // Auto-fill non-working sets (warmup, drop, failure, cooldown)
+                if set.setType != .working && set.weight == 0 && set.reps == 0 {
+                    if let prev = previousSet {
+                        let w: Double
+                        let r: Int
+                        switch set.setType {
+                        case .warmup:
+                            w = (prev.weight * 0.5 / 5).rounded() * 5
+                            r = prev.reps
+                        case .drop:
+                            w = (prev.weight * 0.7 / 5).rounded() * 5
+                            r = prev.reps + 2
+                        default:
+                            w = prev.weight
+                            r = prev.reps
+                        }
+                        weightText = formatWeight(w)
+                        repsText = "\(r)"
+                        viewModel.updateWeight(exerciseIndex: exerciseIndex, setIndex: setIndex, weight: w)
+                        viewModel.updateReps(exerciseIndex: exerciseIndex, setIndex: setIndex, reps: r)
+                    }
+                }
             }
         )
     }
@@ -233,7 +260,7 @@ struct SetRowView: View {
                 }
             }
         } label: {
-            Text(set.rpe.map { "@\(formatRPE($0))" } ?? "RPE")
+            Text(set.rpe.map { formatRPE($0) } ?? "RPE")
                 .font(RQTypography.numbersSmall)
                 .foregroundColor(set.rpe != nil ? modeColor : RQColors.textTertiary)
                 .frame(width: 56, height: 36)
@@ -241,20 +268,6 @@ struct SetRowView: View {
                 .cornerRadius(RQRadius.small)
         }
         .disabled(set.isCompleted)
-    }
-
-    /// Returns green if the completed set meets the per-set target, yellow/warning if it missed.
-    /// Falls back to green when no progression target exists.
-    private func completionColor(for set: SetEntry) -> Color {
-        guard let target = progressionTarget else { return RQColors.success }
-        let (targetW, targetR, _) = ActiveWorkoutViewModel.perSetTarget(
-            decision: target, previousSet: previousSet,
-            trainingMode: trainingMode, setPosition: setPosition,
-            equipment: equipment
-        )
-        let hitWeight = set.weight >= targetW
-        let hitReps = set.reps >= targetR
-        return (hitWeight && hitReps) ? RQColors.success : RQColors.warning
     }
 
     private var setTypeColor: Color {

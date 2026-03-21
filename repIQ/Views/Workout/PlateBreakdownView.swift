@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// A compact, color-coded plate breakdown showing plates per side for barbell exercises.
-/// Uses Olympic plate color standards for an instantly recognizable visual.
+/// A compact barbell plate breakdown showing plates per side.
+/// Plates are ordered heaviest (inside, near collar) to lightest (outside),
+/// matching how gym-goers load a barbell.
 struct PlateBreakdownView: View {
     let weight: Double
     let barWeight: Double
@@ -19,21 +20,28 @@ struct PlateBreakdownView: View {
         guard let result, !result.plates.isEmpty else { return AnyView(EmptyView()) }
 
         return AnyView(
-            HStack(spacing: 3) {
-                // Bar end cap
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(Color.white.opacity(0.25))
-                    .frame(width: 20, height: 8)
+            HStack(spacing: 0) {
+                // Bar shaft (left side extending out)
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(Color.white.opacity(0.2))
+                    .frame(width: 16, height: 6)
 
                 // Bar collar
                 RoundedRectangle(cornerRadius: 1)
-                    .fill(Color.white.opacity(0.15))
-                    .frame(width: 4, height: 12)
+                    .fill(Color.white.opacity(0.35))
+                    .frame(width: 5, height: 14)
 
-                // Plates (largest to smallest, visually stacked from bar outward)
-                ForEach(Array(result.plates.reversed().enumerated()), id: \.offset) { _, plate in
-                    platePill(plate)
+                // Plates — heaviest on inside (near collar), lightest on outside
+                HStack(spacing: 1.5) {
+                    ForEach(Array(result.plates.enumerated()), id: \.offset) { _, plate in
+                        platePill(plate)
+                    }
                 }
+
+                // Bar shaft (right side extending out)
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(Color.white.opacity(0.2))
+                    .frame(width: 24, height: 6)
 
                 Spacer()
 
@@ -51,11 +59,11 @@ struct PlateBreakdownView: View {
     private func platePill(_ weight: Double) -> some View {
         let config = plateConfig(weight)
         Text(formatPlateWeight(weight))
-            .font(.system(size: 9, weight: .bold, design: .rounded))
+            .font(.system(size: 8, weight: .bold, design: .rounded))
             .foregroundColor(config.textColor)
             .frame(width: config.width, height: config.height)
             .background(
-                RoundedRectangle(cornerRadius: 3)
+                RoundedRectangle(cornerRadius: 2)
                     .fill(config.color)
             )
     }
@@ -68,49 +76,50 @@ struct PlateBreakdownView: View {
     }
 
     /// Olympic plate color coding (lbs) with proportional sizing.
+    /// Heights are proportional to plate weight for a realistic barbell silhouette.
     private func plateConfig(_ weight: Double) -> PlateConfig {
         switch weight {
         case 45:
             return PlateConfig(
                 color: Color(red: 0.2, green: 0.35, blue: 0.7),  // blue
                 textColor: .white,
-                width: 24, height: 32
+                width: 20, height: 34
             )
         case 35:
             return PlateConfig(
                 color: Color(red: 0.75, green: 0.65, blue: 0.15), // yellow
                 textColor: .black,
-                width: 22, height: 28
+                width: 18, height: 30
             )
         case 25:
             return PlateConfig(
                 color: Color(red: 0.2, green: 0.55, blue: 0.3),  // green
                 textColor: .white,
-                width: 22, height: 26
+                width: 18, height: 26
             )
         case 10:
             return PlateConfig(
                 color: Color(red: 0.85, green: 0.85, blue: 0.85), // white/silver
                 textColor: .black,
-                width: 20, height: 22
+                width: 16, height: 22
             )
         case 5:
             return PlateConfig(
                 color: Color(red: 0.7, green: 0.2, blue: 0.2),   // red
                 textColor: .white,
-                width: 18, height: 20
+                width: 14, height: 18
             )
         case 2.5:
             return PlateConfig(
                 color: Color(red: 0.5, green: 0.5, blue: 0.5),   // gray
                 textColor: .white,
-                width: 18, height: 18
+                width: 14, height: 16
             )
         default:
             return PlateConfig(
                 color: Color.gray,
                 textColor: .white,
-                width: 18, height: 20
+                width: 14, height: 18
             )
         }
     }
