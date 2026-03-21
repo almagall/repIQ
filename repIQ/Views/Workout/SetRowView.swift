@@ -222,19 +222,15 @@ struct SetRowView: View {
                     repsText = "\(set.reps)"
                 }
 
-                // Auto-fill non-working sets (warmup, drop, failure, cooldown)
-                if set.setType != .working && set.weight == 0 && set.reps == 0 {
+                // Auto-fill drop and failure sets only (not warmup or cooldown)
+                if (set.setType == .drop || set.setType == .failure) && set.weight == 0 && set.reps == 0 {
                     if let prev = previousSet {
                         let w: Double
                         let r: Int
-                        switch set.setType {
-                        case .warmup:
-                            w = (prev.weight * 0.5 / 5).rounded() * 5
-                            r = prev.reps
-                        case .drop:
+                        if set.setType == .drop {
                             w = (prev.weight * 0.7 / 5).rounded() * 5
                             r = prev.reps + 2
-                        default:
+                        } else {
                             w = prev.weight
                             r = prev.reps
                         }
