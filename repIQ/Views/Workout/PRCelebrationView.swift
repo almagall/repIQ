@@ -6,16 +6,16 @@ struct PRCelebrationView: View {
 
     var body: some View {
         VStack(spacing: RQSpacing.lg) {
-            // Icon
+            // Icon — stays gold
             Image(systemName: celebration.prType.icon)
                 .font(.system(size: 36))
                 .foregroundColor(RQColors.warning)
                 .padding(.top, RQSpacing.lg)
 
-            // Title
+            // Title — brand blue
             Text(celebration.prType.label)
                 .font(RQTypography.title1)
-                .foregroundColor(RQColors.warning)
+                .foregroundColor(RQColors.accent)
 
             // Exercise name
             Text(celebration.exerciseName)
@@ -52,6 +52,20 @@ struct PRCelebrationView: View {
                     Text(celebration.newValue)
                         .font(RQTypography.numbers)
                         .foregroundColor(RQColors.textPrimary)
+
+                    // Estimated 1RM inline under new value
+                    if let est1RM = celebration.estimated1RM {
+                        HStack(spacing: RQSpacing.xs) {
+                            Text("Est. 1RM")
+                                .font(RQTypography.caption)
+                                .foregroundColor(RQColors.textTertiary)
+                            Text("\(formatWeight(est1RM)) lbs")
+                                .font(RQTypography.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(RQColors.accent)
+                        }
+                        .padding(.top, RQSpacing.xxs)
+                    }
                 }
 
                 Image(systemName: "arrow.up")
@@ -81,23 +95,7 @@ struct PRCelebrationView: View {
             .background(RQColors.surfaceTertiary)
             .cornerRadius(RQRadius.large)
 
-            // Estimated 1RM (weight PRs only)
-            if let est1RM = celebration.estimated1RM {
-                HStack(spacing: RQSpacing.sm) {
-                    Text("Est. 1RM")
-                        .font(RQTypography.caption)
-                        .foregroundColor(RQColors.textTertiary)
-                    Text("\(formatWeight(est1RM)) lbs")
-                        .font(RQTypography.numbersSmall)
-                        .foregroundColor(RQColors.accent)
-                }
-                .padding(.horizontal, RQSpacing.lg)
-                .padding(.vertical, RQSpacing.sm)
-                .background(RQColors.accent.opacity(0.1))
-                .cornerRadius(RQRadius.medium)
-            }
-
-            // Continue button
+            // Continue button — brand blue
             Button {
                 onDismiss()
             } label: {
@@ -106,7 +104,7 @@ struct PRCelebrationView: View {
                     .foregroundColor(RQColors.background)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, RQSpacing.md)
-                    .background(RQColors.warning)
+                    .background(RQColors.accent)
                     .cornerRadius(RQRadius.large)
             }
         }
