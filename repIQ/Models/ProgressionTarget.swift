@@ -31,6 +31,7 @@ struct ProgressionTarget: Sendable {
     let previousWeight: Double?
     let previousReps: Int?
     let previousRPE: Double?
+    let estimatedOneRM: Double?
 
     var targetRepRangeDisplay: String {
         if targetRepsLow == targetRepsHigh {

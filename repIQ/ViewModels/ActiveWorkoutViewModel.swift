@@ -155,41 +155,14 @@ final class ActiveWorkoutViewModel {
             return (prev?.weight ?? 0, prev?.reps ?? 0, rpe)
         }
 
-        // No previous set for this position: use exercise-level target
-        guard let prev else {
-            let rpe = expectedRPE(
-                baseRPE: target.targetRPE,
-                trainingMode: trainingMode,
-                setPosition: setPosition
-            )
-            return (target.targetWeight, target.targetRepsLow, rpe)
-        }
-
-        let increment = ProgressionService.weightIncrement(for: equipment)
+        // e1RM-based: all sets get the same exercise-level target (straight sets)
+        // Only RPE varies per set position
         let rpe = expectedRPE(
             baseRPE: target.targetRPE,
             trainingMode: trainingMode,
             setPosition: setPosition
         )
-
-        switch target.decision {
-        case .increaseWeight:
-            // Full weight bump applied to this set's own previous weight
-            // Preserves user's pattern: ramp stays ramp, straight stays straight
-            return (prev.weight + increment, prev.reps, rpe)
-
-        case .increaseReps:
-            // Keep per-set weight, aim for one more rep (capped at target high)
-            return (prev.weight, min(prev.reps + 1, target.targetRepsHigh), rpe)
-
-        case .maintain:
-            // Repeat what you did on this specific set
-            return (prev.weight, prev.reps, rpe)
-
-        case .deload, .deloadVolume:
-            // Reduced weight from target, use target rep range
-            return (target.targetWeight, target.targetRepsLow, rpe)
-        }
+        return (target.targetWeight, target.targetRepsLow, rpe)
     }
 
     /// Computes the expected RPE for a given set position based on training mode.
@@ -366,7 +339,8 @@ final class ActiveWorkoutViewModel {
                 reasoning: "Proactive deload — reducing weight 10% for recovery.",
                 previousWeight: target.previousWeight,
                 previousReps: target.previousReps,
-                previousRPE: target.previousRPE
+                previousRPE: target.previousRPE,
+                estimatedOneRM: target.estimatedOneRM
             )
 
             // Update pre-filled set values to match deload targets
