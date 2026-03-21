@@ -143,6 +143,7 @@ final class ActiveWorkoutViewModel {
         previousSet prev: WorkoutSet?,
         trainingMode: TrainingMode,
         setPosition: Int,
+        totalSets: Int = 4,
         equipment: String = ""
     ) -> (weight: Double, reps: Int, rpe: Double) {
         // No progression target: use previous data or zeros
@@ -150,35 +151,86 @@ final class ActiveWorkoutViewModel {
             let rpe = expectedRPE(
                 baseRPE: trainingMode.targetRPE,
                 trainingMode: trainingMode,
-                setPosition: setPosition
+                setPosition: setPosition,
+                totalSets: totalSets
             )
             return (prev?.weight ?? 0, prev?.reps ?? 0, rpe)
         }
 
-        // e1RM-based: all sets get the same exercise-level target (straight sets)
-        // Only RPE varies per set position
-        let rpe = expectedRPE(
-            baseRPE: target.targetRPE,
-            trainingMode: trainingMode,
-            setPosition: setPosition
-        )
-        return (target.targetWeight, target.targetRepsLow, rpe)
+        let increment = ProgressionService.weightIncrement(for: equipment)
+
+        switch trainingMode {
+        case .hypertrophy:
+            // Straight sets: same weight × same rep target all sets
+            // RPE naturally drifts up with fatigue
+            let rpe = expectedRPE(
+                baseRPE: target.targetRPE,
+                trainingMode: trainingMode,
+                setPosition: setPosition,
+                totalSets: totalSets
+            )
+            return (target.targetWeight, target.targetRepsLow, rpe)
+
+        case .strength:
+            // Ramping to top set + back-off:
+            // Sets ramp up to a peak (second-to-last set), then back off
+            // Example with 4 sets: 85%×5 @6 → 92%×3 @7 → 100%×3 @8 → 85%×5 @7
+            let topSetIndex = max(totalSets - 2, 0) // second-to-last set is the peak
+            let topWeight = target.targetWeight
+            let topReps = target.targetRepsLow
+            let repRange = trainingMode.repRange
+
+            if totalSets <= 1 {
+                // Single set: just do the target
+                return (topWeight, topReps, target.targetRPE)
+            }
+
+            if setPosition == topSetIndex {
+                // Top set: full target weight at low reps
+                return (topWeight, topReps, target.targetRPE)
+
+            } else if setPosition < topSetIndex {
+                // Ramp-up sets: progressively heavier leading to top set
+                let rampProgress = Double(setPosition) / Double(topSetIndex)
+                // Start at ~85%, ramp linearly to 100%
+                let rampPct = 0.85 + rampProgress * 0.15
+                let rampWeight = roundToIncrement(topWeight * rampPct, increment)
+                // Ramp-up reps: start higher, decrease as weight increases
+                let rampReps = max(topReps, repRange.lowerBound + Int(Double(repRange.upperBound - repRange.lowerBound) * (1.0 - rampProgress)))
+                let rpe = 6.0 + rampProgress * (target.targetRPE - 6.0)
+                return (rampWeight, rampReps, min(rpe, target.targetRPE - 0.5))
+
+            } else {
+                // Back-off sets: ~85% of top set, higher reps
+                let backOffWeight = roundToIncrement(topWeight * 0.85, increment)
+                let backOffReps = topReps + 2
+                let backOffPosition = setPosition - topSetIndex - 1
+                let rpe = 7.0 + Double(backOffPosition) * 0.5
+                return (backOffWeight, min(backOffReps, repRange.upperBound), min(rpe, 8.5))
+            }
+        }
     }
 
     /// Computes the expected RPE for a given set position based on training mode.
     /// - Hypertrophy: gently ascending RPE (+0.25 per set from base, capped at 9.0)
-    /// - Strength: flat RPE across all sets
+    /// - Strength: handled inline in perSetTarget for ramping pattern
     private static func expectedRPE(
         baseRPE: Double,
         trainingMode: TrainingMode,
-        setPosition: Int
+        setPosition: Int,
+        totalSets: Int = 4
     ) -> Double {
         switch trainingMode {
         case .hypertrophy:
             return min(baseRPE + Double(setPosition) * 0.25, 9.0)
         case .strength:
-            return baseRPE
+            return baseRPE // strength RPE is managed per-set in perSetTarget
         }
+    }
+
+    private static func roundToIncrement(_ weight: Double, _ increment: Double) -> Double {
+        guard increment > 0 else { return weight }
+        return (weight / increment).rounded(.down) * increment
     }
 
     // MARK: - Exercise Navigation
@@ -265,6 +317,7 @@ final class ActiveWorkoutViewModel {
                         previousSet: prev,
                         trainingMode: dayExercise.trainingMode,
                         setPosition: i - 1,
+                        totalSets: dayExercise.targetSets,
                         equipment: equipmentType
                     )
                     sets.append(SetEntry(
