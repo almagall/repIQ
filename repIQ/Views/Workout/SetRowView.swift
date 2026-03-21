@@ -17,6 +17,10 @@ struct SetRowView: View {
         viewModel.exercises[safe: exerciseIndex]?.sets[safe: setIndex]
     }
 
+    private var totalWorkingSets: Int {
+        viewModel.exercises[safe: exerciseIndex]?.targetSets ?? 4
+    }
+
     private var trainingMode: TrainingMode {
         viewModel.exercises[safe: exerciseIndex]?.trainingMode ?? .hypertrophy
     }
@@ -43,7 +47,7 @@ struct SetRowView: View {
                     let (targetW, targetR, targetRPE) = ActiveWorkoutViewModel.perSetTarget(
                         decision: target, previousSet: previousSet,
                         trainingMode: trainingMode, setPosition: setPosition,
-                        equipment: equipment
+                        totalSets: totalWorkingSets, equipment: equipment
                     )
 
                     HStack(spacing: RQSpacing.sm) {
