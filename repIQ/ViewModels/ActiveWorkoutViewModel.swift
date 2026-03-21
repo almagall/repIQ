@@ -768,13 +768,9 @@ final class ActiveWorkoutViewModel {
 
         let prefillWeight: Double
         switch setType {
-        case .warmup:
-            // Warm-up: use half of last working set weight, or 0
-            let workingWeight = currentSets.last(where: { $0.setType == .working })?.weight ?? 0
-            prefillWeight = lastSameType?.weight ?? (workingWeight * 0.5)
-        case .cooldown:
-            let workingWeight = currentSets.last(where: { $0.setType == .working })?.weight ?? 0
-            prefillWeight = lastSameType?.weight ?? (workingWeight * 0.5)
+        case .warmup, .cooldown:
+            // Never pre-fill warmup or cooldown sets
+            prefillWeight = 0
         default:
             prefillWeight = lastSameType?.weight ?? lastAny?.weight ?? 0
         }
