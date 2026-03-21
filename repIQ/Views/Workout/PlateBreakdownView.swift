@@ -24,7 +24,7 @@ struct PlateBreakdownView: View {
                 // Bar shaft (left side extending out)
                 RoundedRectangle(cornerRadius: 1)
                     .fill(Color.white.opacity(0.2))
-                    .frame(width: 16, height: 6)
+                    .frame(width: 40, height: 6)
 
                 // Bar collar
                 RoundedRectangle(cornerRadius: 1)
@@ -41,14 +41,9 @@ struct PlateBreakdownView: View {
                 // Bar shaft (right side extending out)
                 RoundedRectangle(cornerRadius: 1)
                     .fill(Color.white.opacity(0.2))
-                    .frame(width: 24, height: 6)
+                    .frame(width: 50, height: 6)
 
                 Spacer()
-
-                // Per-side label
-                Text("\(formatWeight(result.perSideWeight))/side")
-                    .font(.system(size: 10, weight: .medium, design: .rounded))
-                    .foregroundColor(RQColors.textTertiary)
             }
             .padding(.horizontal, RQSpacing.sm)
             .padding(.vertical, 4)
