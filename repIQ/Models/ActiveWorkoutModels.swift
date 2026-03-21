@@ -29,6 +29,9 @@ struct PRCelebration: Identifiable, Equatable {
     let newValue: String       // e.g. "230 lbs × 10"
     let previousValue: String  // e.g. "225 lbs × 10"
     let previousDate: Date?    // when the old PR was set
+    let delta: String?         // e.g. "+10 lbs" or "+2 reps"
+    let percentImprovement: Double? // e.g. 4.4 for 4.4%
+    let estimated1RM: Double?  // Epley formula est. 1RM (weight PRs only)
 }
 
 /// Represents a single set row in the active workout UI.

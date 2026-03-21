@@ -703,6 +703,12 @@ final class ActiveWorkoutViewModel {
 
             if completedSet.weight > currentWeightPR && completedSet.weight > 0 {
                 exercises[exerciseIndex].sets[setIndex].prType = .weight
+                let weightDelta = completedSet.weight - currentWeightPR
+                let pctImprovement = currentWeightPR > 0 ? (weightDelta / currentWeightPR) * 100 : nil
+                // Epley formula: 1RM = weight × (1 + reps / 30)
+                let est1RM = completedSet.reps > 1
+                    ? completedSet.weight * (1.0 + Double(completedSet.reps) / 30.0)
+                    : completedSet.weight
                 prCelebration = PRCelebration(
                     exerciseName: exerciseName,
                     prType: .weight,
@@ -710,7 +716,10 @@ final class ActiveWorkoutViewModel {
                     previousValue: currentWeightPR > 0
                         ? "\(formatWeightForPR(currentWeightPR)) lbs × \(weightPR?.repsAtWeight ?? 0)"
                         : "None",
-                    previousDate: weightPR?.achievedAt
+                    previousDate: weightPR?.achievedAt,
+                    delta: currentWeightPR > 0 ? "+\(formatWeightForPR(weightDelta)) lbs" : nil,
+                    percentImprovement: pctImprovement,
+                    estimated1RM: est1RM
                 )
                 // Update tracked PR so subsequent sets compare against the new best
                 if var exercisePRs = currentPRs[exerciseId],
@@ -730,6 +739,8 @@ final class ActiveWorkoutViewModel {
 
                 if completedSet.reps > currentRepPR && completedSet.reps > 0 && completedSet.weight > 0 {
                     exercises[exerciseIndex].sets[setIndex].prType = .reps
+                    let repDelta = completedSet.reps - currentRepPR
+                    let pctImprovement = currentRepPR > 0 ? (Double(repDelta) / Double(currentRepPR)) * 100 : nil
                     prCelebration = PRCelebration(
                         exerciseName: exerciseName,
                         prType: .reps,
@@ -737,7 +748,10 @@ final class ActiveWorkoutViewModel {
                         previousValue: currentRepPR > 0
                             ? "\(formatWeightForPR(completedSet.weight)) lbs × \(currentRepPR)"
                             : "None",
-                        previousDate: repPR?.achievedAt
+                        previousDate: repPR?.achievedAt,
+                        delta: currentRepPR > 0 ? "+\(repDelta) reps" : nil,
+                        percentImprovement: pctImprovement,
+                        estimated1RM: nil
                     )
                     // Update tracked rep PR
                     if var exercisePRs = currentPRs[exerciseId],
@@ -772,10 +786,10 @@ final class ActiveWorkoutViewModel {
             startRestTimer(seconds: restTimerDuration)
         }
 
-        // Haptic feedback — stronger for PR
+        // Haptic feedback — always strong for PR, medium for normal sets
         if exercises[exerciseIndex].sets[setIndex].isPR {
-            let generator = UINotificationFeedbackGenerator()
-            generator.notificationOccurred(.success)
+            let generator = UIImpactFeedbackGenerator(style: .heavy)
+            generator.impactOccurred()
         } else {
             let generator = UIImpactFeedbackGenerator(style: .medium)
             generator.impactOccurred()

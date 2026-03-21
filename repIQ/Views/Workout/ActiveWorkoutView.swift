@@ -23,6 +23,11 @@ struct ActiveWorkoutView: View {
                     Color.black.opacity(0.6)
                         .ignoresSafeArea()
                         .transition(.opacity)
+                        .onTapGesture {
+                            withAnimation(.spring(response: 0.3)) {
+                                viewModel.prCelebration = nil
+                            }
+                        }
 
                     PRCelebrationView(celebration: celebration) {
                         withAnimation(.spring(response: 0.3)) {
