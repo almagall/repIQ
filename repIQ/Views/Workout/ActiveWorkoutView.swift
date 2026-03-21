@@ -24,59 +24,59 @@ struct ActiveWorkoutView: View {
                 }
             }
             .background(RQColors.background)
-            .navigationTitle(viewModel.dayName)
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    HStack(spacing: RQSpacing.sm) {
-                        // Elapsed timer — passive display, no icon
-                        Text(viewModel.elapsedDisplay)
-                            .font(RQTypography.numbersSmall)
-                            .foregroundColor(RQColors.textSecondary)
+                ToolbarItem(placement: .principal) {
+                    VStack(spacing: 1) {
+                        Text(viewModel.dayName)
+                            .font(RQTypography.headline)
+                            .foregroundColor(RQColors.textPrimary)
 
-                        // Offline indicator
-                        if viewModel.isOffline {
-                            Image(systemName: "wifi.slash")
-                                .font(.system(size: 11))
-                                .foregroundColor(RQColors.warning)
-                        }
+                        HStack(spacing: RQSpacing.xs) {
+                            Text(viewModel.elapsedDisplay)
+                                .font(RQTypography.caption)
+                                .foregroundColor(RQColors.textTertiary)
 
-                        // Pending sync indicator
-                        if viewModel.hasPendingSets {
-                            HStack(spacing: 2) {
-                                Image(systemName: "arrow.triangle.2.circlepath")
-                                    .font(.system(size: 10))
-                                Text("\(viewModel.pendingSetCount)")
-                                    .font(RQTypography.caption)
+                            if viewModel.isOffline {
+                                Image(systemName: "wifi.slash")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(RQColors.warning)
                             }
-                            .foregroundColor(RQColors.warning)
+
+                            if viewModel.hasPendingSets {
+                                HStack(spacing: 2) {
+                                    Image(systemName: "arrow.triangle.2.circlepath")
+                                        .font(.system(size: 9))
+                                    Text("\(viewModel.pendingSetCount)")
+                                        .font(.system(size: 10))
+                                }
+                                .foregroundColor(RQColors.warning)
+                            }
                         }
                     }
                 }
 
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: RQSpacing.lg) {
-                        // Overflow menu (abandon lives here)
-                        Menu {
-                            Button(role: .destructive) {
-                                viewModel.showAbandonConfirmation = true
-                            } label: {
-                                Label("Abandon Workout", systemImage: "xmark.circle")
-                            }
+                ToolbarItem(placement: .topBarLeading) {
+                    Menu {
+                        Button(role: .destructive) {
+                            viewModel.showAbandonConfirmation = true
                         } label: {
-                            Image(systemName: "ellipsis")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(RQColors.textSecondary)
+                            Label("Abandon Workout", systemImage: "xmark.circle")
                         }
-
-                        // Finish button
-                        Button("Finish") {
-                            viewModel.showFinishConfirmation = true
-                        }
-                        .font(RQTypography.headline)
-                        .foregroundColor(RQColors.success)
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(RQColors.textSecondary)
                     }
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Finish") {
+                        viewModel.showFinishConfirmation = true
+                    }
+                    .font(RQTypography.headline)
+                    .foregroundColor(RQColors.success)
                 }
             }
             .alert("Finish Workout?", isPresented: $viewModel.showFinishConfirmation) {
@@ -136,13 +136,10 @@ struct ActiveWorkoutView: View {
                 deloadSuggestionBanner(suggestion)
             }
 
-            // Exercise selector with integrated navigation
+            // Exercise selector with integrated navigation + rest timer
             if !viewModel.exercises.isEmpty {
                 exerciseSelector
             }
-
-            // Rest timer settings
-            restTimerSettingsBar
 
             // Current exercise
             ScrollView {
@@ -238,159 +235,105 @@ struct ActiveWorkoutView: View {
     // MARK: - Exercise Selector with Navigation
 
     private var exerciseSelector: some View {
-        HStack(spacing: RQSpacing.sm) {
-            // Previous button
-            Button {
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    viewModel.goToPreviousExercise()
+        VStack(spacing: 0) {
+            HStack(spacing: RQSpacing.sm) {
+                // Previous button
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        viewModel.goToPreviousExercise()
+                    }
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(viewModel.canGoToPrevious ? RQColors.accent : RQColors.textTertiary.opacity(0.3))
+                        .frame(width: 36, height: 36)
                 }
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(viewModel.canGoToPrevious ? RQColors.accent : RQColors.textTertiary.opacity(0.3))
-                    .frame(width: 36, height: 36)
-            }
-            .disabled(!viewModel.canGoToPrevious)
+                .disabled(!viewModel.canGoToPrevious)
 
-            // Exercise dropdown
-            Menu {
-                ForEach(viewModel.exercises.indices, id: \.self) { index in
-                    let exercise = viewModel.exercises[index]
-                    Button {
-                        viewModel.goToExercise(at: index)
-                    } label: {
-                        HStack {
-                            if exercise.supersetGroup != nil {
-                                Image(systemName: "link")
-                            }
-                            Text(exercise.exerciseName)
-                            if exercise.isSubstituted {
-                                Image(systemName: "arrow.triangle.swap")
-                            }
-                            if exercise.isAllSetsCompleted {
-                                Image(systemName: "checkmark.circle.fill")
+                // Exercise dropdown
+                Menu {
+                    ForEach(viewModel.exercises.indices, id: \.self) { index in
+                        let exercise = viewModel.exercises[index]
+                        Button {
+                            viewModel.goToExercise(at: index)
+                        } label: {
+                            HStack {
+                                if exercise.supersetGroup != nil {
+                                    Image(systemName: "link")
+                                }
+                                Text(exercise.exerciseName)
+                                if exercise.isSubstituted {
+                                    Image(systemName: "arrow.triangle.swap")
+                                }
+                                if exercise.isAllSetsCompleted {
+                                    Image(systemName: "checkmark.circle.fill")
+                                }
                             }
                         }
                     }
-                }
-            } label: {
-                HStack(spacing: RQSpacing.sm) {
-                    if let exercise = viewModel.currentExercise {
-                        // Exercise counter badge
-                        Text("\(viewModel.currentExerciseIndex + 1)/\(viewModel.exercises.count)")
-                            .font(RQTypography.caption)
-                            .fontWeight(.semibold)
-                            .foregroundColor(RQColors.background)
-                            .padding(.horizontal, RQSpacing.sm)
-                            .padding(.vertical, RQSpacing.xxs)
-                            .background(RQColors.accent)
-                            .cornerRadius(RQRadius.small)
+                } label: {
+                    HStack(spacing: RQSpacing.sm) {
+                        if let exercise = viewModel.currentExercise {
+                            Text("\(viewModel.currentExerciseIndex + 1)/\(viewModel.exercises.count)")
+                                .font(RQTypography.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(RQColors.background)
+                                .padding(.horizontal, RQSpacing.sm)
+                                .padding(.vertical, RQSpacing.xxs)
+                                .background(RQColors.accent)
+                                .cornerRadius(RQRadius.small)
 
-                        Text(exercise.exerciseName)
-                            .font(RQTypography.headline)
-                            .foregroundColor(RQColors.textPrimary)
-                            .lineLimit(1)
+                            Text(exercise.exerciseName)
+                                .font(RQTypography.headline)
+                                .foregroundColor(RQColors.textPrimary)
+                                .lineLimit(1)
 
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(RQColors.textTertiary)
-                    }
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundColor(RQColors.textTertiary)
+                        }
 
-                    Spacer()
-
-                    // Overall progress
-                    let completed = viewModel.exercises.filter(\.isAllSetsCompleted).count
-                    if completed > 0 {
-                        Text("\(completed) done")
-                            .font(RQTypography.label)
-                            .textCase(.uppercase)
-                            .tracking(1)
-                            .foregroundColor(RQColors.success)
+                        Spacer()
                     }
                 }
-            }
 
-            // Next button
-            Button {
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    viewModel.goToNextExercise()
-                }
-            } label: {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(viewModel.canGoToNext ? RQColors.accent : RQColors.textTertiary.opacity(0.3))
-                    .frame(width: 36, height: 36)
-            }
-            .disabled(!viewModel.canGoToNext)
-        }
-        .padding(.horizontal, RQSpacing.sm)
-        .padding(.vertical, RQSpacing.sm)
-        .background(RQColors.background)
-    }
-
-    // MARK: - Rest Timer Settings
-
-    private var restTimerSettingsBar: some View {
-        HStack(spacing: RQSpacing.md) {
-            // Toggle pill
-            Button {
-                viewModel.restTimerEnabled.toggle()
-            } label: {
-                HStack(spacing: RQSpacing.sm) {
-                    Image(systemName: viewModel.restTimerEnabled ? "timer" : "timer.slash")
-                        .font(.system(size: 13))
-
-                    Text("Rest")
-                        .font(RQTypography.caption)
-                        .fontWeight(.semibold)
-
-                    Text(viewModel.restTimerEnabled ? "ON" : "OFF")
-                        .font(RQTypography.caption)
-                        .fontWeight(.bold)
-                }
-                .foregroundColor(viewModel.restTimerEnabled ? RQColors.accent : RQColors.textTertiary)
-                .padding(.horizontal, RQSpacing.md)
-                .padding(.vertical, RQSpacing.sm)
-                .background(viewModel.restTimerEnabled ? RQColors.accent.opacity(0.15) : RQColors.surfaceTertiary)
-                .cornerRadius(RQRadius.large)
-            }
-
-            // Duration controls (only when enabled)
-            if viewModel.restTimerEnabled {
-                // Decrease
+                // Rest timer pill
                 Button {
-                    viewModel.adjustRestTimerDuration(by: -15)
+                    viewModel.restTimerEnabled.toggle()
                 } label: {
-                    Image(systemName: "minus")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(RQColors.textSecondary)
-                        .frame(width: 28, height: 28)
-                        .background(RQColors.surfaceTertiary)
-                        .clipShape(Circle())
+                    HStack(spacing: 4) {
+                        Image(systemName: viewModel.restTimerEnabled ? "timer" : "timer.slash")
+                            .font(.system(size: 11))
+                        if viewModel.restTimerEnabled {
+                            Text(formattedRestDuration)
+                                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        }
+                    }
+                    .foregroundColor(viewModel.restTimerEnabled ? RQColors.accent : RQColors.textTertiary)
+                    .padding(.horizontal, RQSpacing.sm)
+                    .padding(.vertical, 6)
+                    .background(viewModel.restTimerEnabled ? RQColors.accent.opacity(0.15) : RQColors.surfaceTertiary)
+                    .cornerRadius(RQRadius.large)
                 }
 
-                Text(formattedRestDuration)
-                    .font(RQTypography.numbersSmall)
-                    .foregroundColor(RQColors.textPrimary)
-                    .frame(minWidth: 40)
-
-                // Increase
+                // Next button
                 Button {
-                    viewModel.adjustRestTimerDuration(by: 15)
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        viewModel.goToNextExercise()
+                    }
                 } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(RQColors.textSecondary)
-                        .frame(width: 28, height: 28)
-                        .background(RQColors.surfaceTertiary)
-                        .clipShape(Circle())
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(viewModel.canGoToNext ? RQColors.accent : RQColors.textTertiary.opacity(0.3))
+                        .frame(width: 36, height: 36)
                 }
+                .disabled(!viewModel.canGoToNext)
             }
+            .padding(.horizontal, RQSpacing.sm)
+            .padding(.vertical, RQSpacing.xs)
 
-            Spacer()
+            Divider().background(RQColors.surfaceTertiary.opacity(0.5))
         }
-        .padding(.horizontal, RQSpacing.screenHorizontal)
-        .padding(.vertical, RQSpacing.xs)
         .background(RQColors.background)
     }
 

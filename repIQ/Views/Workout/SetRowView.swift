@@ -110,7 +110,7 @@ struct SetRowView: View {
                 }
 
                 // Input row
-                HStack(spacing: RQSpacing.xs) {
+                HStack(spacing: RQSpacing.sm) {
                     // Set number badge
                     Text("\(set.setNumber)")
                         .font(RQTypography.caption)
@@ -120,18 +120,13 @@ struct SetRowView: View {
                         .background(set.isCompleted ? setTypeColor : setTypeColor.opacity(0.2))
                         .clipShape(Circle())
 
-                    // Weight stepper −
-                    stepperButton(systemName: "minus", disabled: set.isCompleted) {
-                        adjustWeight(by: -weightStep)
-                    }
-
-                    // Weight input (auto-filled from progression target)
+                    // Weight input
                     TextField(weightPlaceholder, text: $weightText)
                         .font(RQTypography.numbersSmall)
                         .foregroundColor(set.isCompleted ? RQColors.textSecondary : RQColors.textPrimary)
                         .keyboardType(.decimalPad)
                         .multilineTextAlignment(.center)
-                        .frame(width: 56, height: 36)
+                        .frame(width: 64, height: 36)
                         .background(RQColors.surfaceTertiary)
                         .cornerRadius(RQRadius.small)
                         .focused($focusedField, equals: .weight)
@@ -142,27 +137,17 @@ struct SetRowView: View {
                             }
                         }
 
-                    // Weight stepper +
-                    stepperButton(systemName: "plus", disabled: set.isCompleted) {
-                        adjustWeight(by: weightStep)
-                    }
-
                     Text("×")
                         .font(RQTypography.caption)
                         .foregroundColor(RQColors.textTertiary)
 
-                    // Reps stepper −
-                    stepperButton(systemName: "minus", disabled: set.isCompleted) {
-                        adjustReps(by: -1)
-                    }
-
-                    // Reps input (auto-filled from progression target)
+                    // Reps input
                     TextField(repsPlaceholder, text: $repsText)
                         .font(RQTypography.numbersSmall)
                         .foregroundColor(set.isCompleted ? RQColors.textSecondary : RQColors.textPrimary)
                         .keyboardType(.numberPad)
                         .multilineTextAlignment(.center)
-                        .frame(width: 40, height: 36)
+                        .frame(width: 48, height: 36)
                         .background(RQColors.surfaceTertiary)
                         .cornerRadius(RQRadius.small)
                         .focused($focusedField, equals: .reps)
@@ -172,11 +157,6 @@ struct SetRowView: View {
                                 viewModel.updateReps(exerciseIndex: exerciseIndex, setIndex: setIndex, reps: reps)
                             }
                         }
-
-                    // Reps stepper +
-                    stepperButton(systemName: "plus", disabled: set.isCompleted) {
-                        adjustReps(by: 1)
-                    }
 
                     // RPE badge
                     rpeBadge(set: set)
@@ -215,7 +195,7 @@ struct SetRowView: View {
                                 .frame(width: 28, height: 28)
                         } else {
                             Image(systemName: set.isCompleted ? "checkmark.circle.fill" : "circle")
-                                .font(.system(size: 22))
+                                .font(.system(size: 24))
                                 .foregroundColor(set.isCompleted ? completionColor(for: set) : RQColors.textTertiary)
                         }
                     }
@@ -318,11 +298,7 @@ struct SetRowView: View {
         return previousSet.map { "\($0.reps)" } ?? "0"
     }
 
-    // MARK: - Stepper & Fill Helpers
-
-    private var weightStep: Double {
-        ProgressionService.weightIncrement(for: equipment)
-    }
+    // MARK: - Fill Helpers
 
     private var hasTargetValues: Bool {
         if progressionTarget != nil { return true }
@@ -351,33 +327,6 @@ struct SetRowView: View {
         if rpe > 0 {
             viewModel.updateRPE(exerciseIndex: exerciseIndex, setIndex: setIndex, rpe: rpe)
         }
-    }
-
-    private func adjustWeight(by delta: Double) {
-        let current = Double(weightText) ?? set?.weight ?? 0
-        let newWeight = max(0, current + delta)
-        weightText = formatWeight(newWeight)
-        viewModel.updateWeight(exerciseIndex: exerciseIndex, setIndex: setIndex, weight: newWeight)
-    }
-
-    private func adjustReps(by delta: Int) {
-        let current = Int(repsText) ?? set?.reps ?? 0
-        let newReps = max(1, current + delta)
-        repsText = "\(newReps)"
-        viewModel.updateReps(exerciseIndex: exerciseIndex, setIndex: setIndex, reps: newReps)
-    }
-
-    @ViewBuilder
-    private func stepperButton(systemName: String, disabled: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 10, weight: .bold))
-                .foregroundColor(disabled ? RQColors.textTertiary.opacity(0.4) : RQColors.textSecondary)
-                .frame(width: 22, height: 22)
-                .background(RQColors.surfaceTertiary)
-                .clipShape(Circle())
-        }
-        .disabled(disabled)
     }
 
     private let rpeValues: [Double] = stride(from: 1.0, through: 10.0, by: 0.5).map { $0 }
