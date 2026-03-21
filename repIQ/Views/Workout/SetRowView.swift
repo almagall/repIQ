@@ -262,9 +262,9 @@ struct SetRowView: View {
         } label: {
             Text(set.rpe.map { formatRPE($0) } ?? "RPE")
                 .font(RQTypography.numbersSmall)
-                .foregroundColor(set.rpe != nil ? modeColor : RQColors.textTertiary)
+                .foregroundColor(set.rpe != nil ? RQColors.textPrimary : RQColors.textTertiary)
                 .frame(width: 56, height: 36)
-                .background(set.rpe != nil ? modeColor.opacity(0.15) : RQColors.surfaceTertiary)
+                .background(RQColors.surfaceTertiary)
                 .cornerRadius(RQRadius.small)
         }
         .disabled(set.isCompleted)
