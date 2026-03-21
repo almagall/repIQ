@@ -131,6 +131,11 @@ struct ActiveWorkoutView: View {
     @ViewBuilder
     private var workoutContent: some View {
         VStack(spacing: 0) {
+            // Workout progress bar
+            if !viewModel.exercises.isEmpty {
+                workoutProgressBar
+            }
+
             // Proactive deload suggestion banner
             if let suggestion = viewModel.deloadSuggestion {
                 deloadSuggestionBanner(suggestion)
@@ -302,17 +307,17 @@ struct ActiveWorkoutView: View {
                     viewModel.restTimerEnabled.toggle()
                 } label: {
                     HStack(spacing: 4) {
-                        Image(systemName: viewModel.restTimerEnabled ? "timer" : "timer.slash")
-                            .font(.system(size: 11))
+                        Image(systemName: "clock.fill")
+                            .font(.system(size: 13))
                         if viewModel.restTimerEnabled {
                             Text(formattedRestDuration)
                                 .font(.system(size: 11, weight: .semibold, design: .rounded))
                         }
                     }
-                    .foregroundColor(viewModel.restTimerEnabled ? RQColors.accent : RQColors.textTertiary)
+                    .foregroundColor(viewModel.restTimerEnabled ? RQColors.accent : RQColors.textTertiary.opacity(0.4))
                     .padding(.horizontal, RQSpacing.sm)
                     .padding(.vertical, 6)
-                    .background(viewModel.restTimerEnabled ? RQColors.accent.opacity(0.15) : RQColors.surfaceTertiary)
+                    .background(viewModel.restTimerEnabled ? RQColors.accent.opacity(0.15) : RQColors.surfaceTertiary.opacity(0.5))
                     .cornerRadius(RQRadius.large)
                 }
 
@@ -335,6 +340,27 @@ struct ActiveWorkoutView: View {
             Divider().background(RQColors.surfaceTertiary.opacity(0.5))
         }
         .background(RQColors.background)
+    }
+
+    // MARK: - Workout Progress Bar
+
+    private var workoutProgressBar: some View {
+        let totalExercises = viewModel.exercises.count
+        let completedExercises = viewModel.exercises.filter(\.isAllSetsCompleted).count
+        let progress = totalExercises > 0 ? Double(completedExercises) / Double(totalExercises) : 0
+
+        return GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Rectangle()
+                    .fill(RQColors.surfaceTertiary.opacity(0.5))
+
+                Rectangle()
+                    .fill(RQColors.accent)
+                    .frame(width: geo.size.width * progress)
+                    .animation(.easeInOut(duration: 0.3), value: progress)
+            }
+        }
+        .frame(height: 3)
     }
 
     // MARK: - Helpers

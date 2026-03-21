@@ -298,6 +298,8 @@ struct ExerciseLogView: View {
                 .frame(width: 8)
             Text("REPS")
                 .frame(width: 48, alignment: .center)
+            Text("")
+                .frame(width: 8)
             Text("RPE")
             Spacer()
         }
