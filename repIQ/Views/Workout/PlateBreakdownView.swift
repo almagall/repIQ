@@ -38,10 +38,10 @@ struct PlateBreakdownView: View {
                     }
                 }
 
-                // Bar shaft (right side extending out)
+                // Bar shaft (right side, short end cap)
                 RoundedRectangle(cornerRadius: 1)
                     .fill(Color.white.opacity(0.2))
-                    .frame(width: 50, height: 6)
+                    .frame(width: 10, height: 6)
 
                 Spacer()
             }
