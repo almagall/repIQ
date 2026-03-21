@@ -54,7 +54,6 @@ struct WorkoutDayPickerView: View {
                         ForEach(days.sorted(by: { $0.sortOrder < $1.sortOrder })) { day in
                             Button {
                                 onDaySelected(day, workoutDate)
-                                dismiss()
                             } label: {
                                 dayCard(day)
                             }

@@ -167,7 +167,11 @@ struct DashboardView: View {
             .sheet(isPresented: $showDayPicker) {
                 if let template = selectedTemplate {
                     WorkoutDayPickerView(template: template) { day, date in
-                        workoutCoordinator.startWorkout(template: template, day: day, date: date)
+                        // Dismiss sheet first, then start workout after sheet animation completes
+                        showDayPicker = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                            workoutCoordinator.startWorkout(template: template, day: day, date: date)
+                        }
                     }
                 }
             }
