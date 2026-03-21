@@ -18,11 +18,26 @@ struct ActiveWorkoutView: View {
                         .transition(.opacity)
                 }
 
+                // PR celebration overlay
+                if let celebration = viewModel.prCelebration {
+                    Color.black.opacity(0.6)
+                        .ignoresSafeArea()
+                        .transition(.opacity)
+
+                    PRCelebrationView(celebration: celebration) {
+                        withAnimation(.spring(response: 0.3)) {
+                            viewModel.prCelebration = nil
+                        }
+                    }
+                    .transition(.scale(scale: 0.8).combined(with: .opacity))
+                }
+
                 // Loading overlay
                 if viewModel.isLoading && viewModel.exercises.isEmpty {
                     LoadingOverlay(message: "Starting workout...")
                 }
             }
+            .animation(.spring(response: 0.35), value: viewModel.prCelebration != nil)
             .background(RQColors.background)
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)

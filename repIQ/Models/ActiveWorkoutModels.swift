@@ -1,5 +1,36 @@
 import Foundation
 
+/// The type of personal record achieved on a set.
+enum PRType: Equatable {
+    case weight    // Heaviest weight ever lifted on this exercise
+    case reps      // Most reps ever at this weight
+
+    var label: String {
+        switch self {
+        case .weight: return "Weight PR"
+        case .reps: return "Rep PR"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .weight: return "trophy.fill"
+        case .reps: return "flame.fill"
+        }
+    }
+}
+
+/// Data for the PR celebration popup shown after completing a PR set.
+struct PRCelebration: Identifiable, Equatable {
+    static func == (lhs: PRCelebration, rhs: PRCelebration) -> Bool { lhs.id == rhs.id }
+    let id = UUID()
+    let exerciseName: String
+    let prType: PRType
+    let newValue: String       // e.g. "230 lbs × 10"
+    let previousValue: String  // e.g. "225 lbs × 10"
+    let previousDate: Date?    // when the old PR was set
+}
+
 /// Represents a single set row in the active workout UI.
 /// Mutable local state — once completed, maps to a WorkoutSet in Supabase.
 struct SetEntry: Identifiable {
@@ -12,7 +43,9 @@ struct SetEntry: Identifiable {
     var isCompleted: Bool
     var savedSetId: UUID? // non-nil once persisted to workout_sets
     var isSaving: Bool // loading state on checkmark tap
-    var isPR: Bool // true if this set beat a personal record
+    var prType: PRType? // non-nil if this set beat a personal record
+
+    var isPR: Bool { prType != nil }
 
     init(
         setNumber: Int,
@@ -30,7 +63,7 @@ struct SetEntry: Identifiable {
         self.isCompleted = false
         self.savedSetId = nil
         self.isSaving = false
-        self.isPR = false
+        self.prType = nil
     }
 }
 

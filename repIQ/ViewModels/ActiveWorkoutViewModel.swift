@@ -21,6 +21,9 @@ final class ActiveWorkoutViewModel {
     // MARK: - Exercise Substitution
     var showExerciseSubstitution = false
 
+    // MARK: - PR Celebration
+    var prCelebration: PRCelebration?
+
     // MARK: - Deload Suggestion
     var deloadSuggestion: ProgressionService.DeloadSuggestion?
 
@@ -687,15 +690,28 @@ final class ActiveWorkoutViewModel {
             exercises[exerciseIndex].sets[setIndex].isSaving = false
         }
 
-        // Check for inline PR (weight PR only — most exciting for users)
+        // Check for inline PRs (weight PR and rep PR)
         let completedSet = exercises[exerciseIndex].sets[setIndex]
         if completedSet.isCompleted && completedSet.setType == .working {
             let exerciseId = exercises[exerciseIndex].exerciseId
+            let exerciseName = exercises[exerciseIndex].exerciseName
             let prs = currentPRs[exerciseId] ?? []
-            let currentWeightPR = prs.first(where: { $0.recordType == .weight })?.value ?? 0
+
+            // Weight PR: heaviest weight ever lifted
+            let weightPR = prs.first(where: { $0.recordType == .weight })
+            let currentWeightPR = weightPR?.value ?? 0
 
             if completedSet.weight > currentWeightPR && completedSet.weight > 0 {
-                exercises[exerciseIndex].sets[setIndex].isPR = true
+                exercises[exerciseIndex].sets[setIndex].prType = .weight
+                prCelebration = PRCelebration(
+                    exerciseName: exerciseName,
+                    prType: .weight,
+                    newValue: "\(formatWeightForPR(completedSet.weight)) lbs × \(completedSet.reps)",
+                    previousValue: currentWeightPR > 0
+                        ? "\(formatWeightForPR(currentWeightPR)) lbs × \(weightPR?.repsAtWeight ?? 0)"
+                        : "None",
+                    previousDate: weightPR?.achievedAt
+                )
                 // Update tracked PR so subsequent sets compare against the new best
                 if var exercisePRs = currentPRs[exerciseId],
                    let prIndex = exercisePRs.firstIndex(where: { $0.recordType == .weight }) {
@@ -706,6 +722,34 @@ final class ActiveWorkoutViewModel {
                         sessionId: sessionId, achievedAt: Date(), createdAt: Date()
                     )
                     currentPRs[exerciseId] = exercisePRs
+                }
+            } else {
+                // Rep PR: most reps ever at this exact weight
+                let repPR = prs.first(where: { $0.recordType == .reps && $0.value == completedSet.weight })
+                let currentRepPR = Int(repPR?.repsAtWeight ?? 0)
+
+                if completedSet.reps > currentRepPR && completedSet.reps > 0 && completedSet.weight > 0 {
+                    exercises[exerciseIndex].sets[setIndex].prType = .reps
+                    prCelebration = PRCelebration(
+                        exerciseName: exerciseName,
+                        prType: .reps,
+                        newValue: "\(formatWeightForPR(completedSet.weight)) lbs × \(completedSet.reps)",
+                        previousValue: currentRepPR > 0
+                            ? "\(formatWeightForPR(completedSet.weight)) lbs × \(currentRepPR)"
+                            : "None",
+                        previousDate: repPR?.achievedAt
+                    )
+                    // Update tracked rep PR
+                    if var exercisePRs = currentPRs[exerciseId],
+                       let prIndex = exercisePRs.firstIndex(where: { $0.recordType == .reps && $0.value == completedSet.weight }) {
+                        exercisePRs[prIndex] = PersonalRecord(
+                            id: exercisePRs[prIndex].id, userId: exercisePRs[prIndex].userId,
+                            exerciseId: exerciseId, recordType: .reps,
+                            value: completedSet.weight, repsAtWeight: completedSet.reps,
+                            sessionId: sessionId, achievedAt: Date(), createdAt: Date()
+                        )
+                        currentPRs[exerciseId] = exercisePRs
+                    }
                 }
             }
         }
@@ -1112,5 +1156,11 @@ final class ActiveWorkoutViewModel {
         restTimerActive = false
         restTimerRemaining = 0
         restTimerTarget = 0
+    }
+
+    private func formatWeightForPR(_ weight: Double) -> String {
+        weight.truncatingRemainder(dividingBy: 1) == 0
+            ? String(format: "%.0f", weight)
+            : String(format: "%.1f", weight)
     }
 }

@@ -168,12 +168,12 @@ struct SetRowView: View {
                     Spacer()
 
                     // PR badge
-                    if set.isPR && set.isCompleted {
+                    if let prType = set.prType, set.isCompleted {
                         HStack(spacing: 2) {
-                            Image(systemName: "trophy.fill")
+                            Image(systemName: prType.icon)
                                 .font(.system(size: 10))
-                            Text("PR")
-                                .font(.system(size: 10, weight: .black))
+                            Text(prType.label)
+                                .font(.system(size: 9, weight: .black))
                         }
                         .foregroundColor(RQColors.warning)
                         .padding(.horizontal, 6)
