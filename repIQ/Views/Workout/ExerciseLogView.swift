@@ -50,6 +50,11 @@ struct ExerciseLogView: View {
 
                     // Grouped set sections
                     ForEach(groupedSets, id: \.type) { group in
+                        // Add Warm Up button before working sets section
+                        if group.type == .working {
+                            addWarmUpButton
+                        }
+
                         sectionHeader(for: group.type, count: group.sets.count)
 
                         // Column headers
@@ -308,6 +313,26 @@ struct ExerciseLogView: View {
     }
 
     // MARK: - Add Set Menu
+
+    private var addWarmUpButton: some View {
+        Button {
+            viewModel.addSet(exerciseIndex: exerciseIndex, setType: .warmup)
+        } label: {
+            HStack(spacing: RQSpacing.xs) {
+                Image(systemName: "plus.circle")
+                    .font(.system(size: 12))
+                Text("Add Warm Up")
+                    .font(RQTypography.caption)
+                    .fontWeight(.semibold)
+            }
+            .foregroundColor(RQColors.warmup)
+            .padding(.horizontal, RQSpacing.md)
+            .padding(.vertical, 6)
+            .background(RQColors.warmup.opacity(0.1))
+            .cornerRadius(RQRadius.medium)
+        }
+        .padding(.top, RQSpacing.xs)
+    }
 
     private var addSetMenu: some View {
         Menu {
