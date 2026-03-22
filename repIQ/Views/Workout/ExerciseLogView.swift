@@ -6,7 +6,7 @@ struct ExerciseLogView: View {
 
     @State private var setToDelete: Int?
     @State private var showDeleteConfirmation = false
-    @State private var showDecisionInfo = false
+    @State private var showDecisionInfoSheet = false
 
     private var exercise: ExerciseLogEntry? {
         viewModel.exercises[safe: exerciseIndex]
@@ -194,12 +194,13 @@ struct ExerciseLogView: View {
                         .foregroundColor(decisionColor(target.decision))
 
                     Button {
-                        showDecisionInfo = true
+                        showDecisionInfoSheet = true
                     } label: {
                         Image(systemName: "info.circle")
                             .font(.system(size: 11))
                             .foregroundColor(RQColors.textTertiary)
                     }
+                    .buttonStyle(.plain)
 
                     Text("·")
                         .foregroundColor(RQColors.textTertiary)
@@ -223,10 +224,8 @@ struct ExerciseLogView: View {
                             .foregroundColor(RQColors.textTertiary)
                     }
                 }
-                .alert(target.decision.displayName, isPresented: $showDecisionInfo) {
-                    Button("Got it", role: .cancel) {}
-                } message: {
-                    Text(target.reasoning)
+                .sheet(isPresented: $showDecisionInfoSheet) {
+                    InfoSheet(topic: decisionTopic(target))
                 }
             }
 
@@ -265,6 +264,75 @@ struct ExerciseLogView: View {
     }
 
     // MARK: - Decision Helpers
+
+    private func decisionTopic(_ target: ProgressionTarget) -> ProgressExplainer.Topic {
+        let (title, icon, explanation, keyPoints, howToUse): (String, String, String, [String], String)
+
+        switch target.decision {
+        case .increaseWeight:
+            title = "Increase Weight"
+            icon = "arrow.up.circle.fill"
+            explanation = target.reasoning
+            keyPoints = [
+                "Your estimated 1RM is trending upward across recent sessions.",
+                "Weight is prescribed as a percentage of your current e1RM for your target rep range.",
+                "After increasing weight, your reps will reset to the bottom of the range — this is normal.",
+            ]
+            howToUse = "Focus on hitting the target weight for the prescribed reps on each set. If you can't complete the minimum reps, the weight may auto-adjust next session."
+
+        case .increaseReps:
+            title = "Increase Reps"
+            icon = "arrow.up.right.circle.fill"
+            explanation = target.reasoning
+            keyPoints = [
+                "Your strength is stable — estimated 1RM hasn't changed significantly.",
+                "Adding reps at the same weight is how you earn the next weight increase.",
+                "Once you hit the top of your rep range on all sets, weight will go up.",
+            ]
+            howToUse = "Keep the same weight and aim for 1-2 more reps than last session. When you consistently hit the top of your rep range, the algorithm will prescribe a weight increase."
+
+        case .maintain:
+            title = "Maintain"
+            icon = "arrow.right.circle.fill"
+            explanation = target.reasoning
+            keyPoints = [
+                "This is not a setback — maintaining is part of the progression cycle.",
+                "Your body may need time to adapt before the next jump.",
+                "Repeating the same performance builds the capacity for future progress.",
+            ]
+            howToUse = "Match what you did last session. Focus on form and controlled reps. Consistent effort at the same load builds the foundation for your next progression."
+
+        case .deload:
+            title = "Deload"
+            icon = "arrow.down.circle.fill"
+            explanation = target.reasoning
+            keyPoints = [
+                "Your estimated 1RM has been declining — a sign of accumulated fatigue.",
+                "Reducing weight temporarily allows your body to recover and rebuild.",
+                "Deloads are a proven strategy for breaking through plateaus.",
+            ]
+            howToUse = "Use the reduced weight this session. Focus on crisp, controlled reps. You should feel strong again within 1-2 sessions, at which point the algorithm will push you forward."
+
+        case .deloadVolume:
+            title = "Reduce Volume"
+            icon = "arrow.down.circle.fill"
+            explanation = target.reasoning
+            keyPoints = [
+                "Reducing the number of sets helps manage fatigue while keeping intensity high.",
+                "This is typically suggested after extended periods of high-volume training.",
+                "Your weight targets remain the same — just fewer sets.",
+            ]
+            howToUse = "Complete the prescribed sets at full effort. The reduced volume gives your body a chance to recover without losing strength."
+        }
+
+        return ProgressExplainer.Topic(
+            title: title,
+            icon: icon,
+            explanation: explanation,
+            keyPoints: keyPoints,
+            howToUse: howToUse
+        )
+    }
 
     private func decisionIcon(_ decision: ProgressionDecision) -> String {
         switch decision {
