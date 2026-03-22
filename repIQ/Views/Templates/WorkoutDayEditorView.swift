@@ -342,8 +342,8 @@ struct WorkoutDayEditorView: View {
                                     dayExercise.supersetGroup != nil
                                         ? RQColors.warning
                                         : (currentDay.exercises?.count ?? 0) >= 2
-                                            ? RQColors.textTertiary
-                                            : RQColors.surfaceTertiary
+                                            ? RQColors.textPrimary
+                                            : RQColors.textTertiary
                                 )
                         }
                         .disabled((currentDay.exercises?.count ?? 0) < 2 && dayExercise.supersetGroup == nil)
