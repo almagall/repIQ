@@ -3,7 +3,11 @@ import SwiftUI
 struct DashboardView: View {
     @State private var viewModel = DashboardViewModel()
     @State private var goalViewModel = GoalViewModel()
+    @State private var templateListViewModel = TemplateListViewModel()
     @State private var showTemplatePicker = false
+    @State private var showCreateTemplate = false
+    @State private var showProgramBrowser = false
+    @State private var showNewTemplateOptions = false
 
     @Environment(WorkoutCoordinator.self) private var workoutCoordinator
 
@@ -17,6 +21,9 @@ struct DashboardView: View {
                             showTemplatePicker = true
                         }
                     }
+
+                    // My Templates
+                    templatesSection
 
                     // Recent Workout
                     RQCard {
@@ -118,31 +125,6 @@ struct DashboardView: View {
                             }
                         }
                     }
-
-                    // Templates count
-                    RQCard {
-                        HStack {
-                            VStack(alignment: .leading, spacing: RQSpacing.xs) {
-                                Text("Templates")
-                                    .font(RQTypography.label)
-                                    .textCase(.uppercase)
-                                    .tracking(1.5)
-                                    .foregroundColor(RQColors.textSecondary)
-                                Text("\(viewModel.templateCount)")
-                                    .font(RQTypography.numbers)
-                                    .foregroundColor(RQColors.textPrimary)
-                                Text(viewModel.templateCount > 0
-                                    ? "Workout programs ready"
-                                    : "Create your first template")
-                                    .font(RQTypography.caption)
-                                    .foregroundColor(RQColors.textTertiary)
-                            }
-                            Spacer()
-                            Image(systemName: "rectangle.stack.fill")
-                                .font(.system(size: 24))
-                                .foregroundColor(RQColors.accent)
-                        }
-                    }
                 }
                 .padding(.horizontal, RQSpacing.screenHorizontal)
                 .padding(.top, RQSpacing.lg)
@@ -154,13 +136,147 @@ struct DashboardView: View {
             .task {
                 await viewModel.loadDashboard()
                 await goalViewModel.loadGoals()
+                await templateListViewModel.loadTemplates()
             }
             .refreshable {
                 await viewModel.loadDashboard()
                 await goalViewModel.loadGoals()
+                await templateListViewModel.loadTemplates()
             }
             .sheet(isPresented: $showTemplatePicker) {
                 templatePickerSheet
+            }
+            .confirmationDialog("New Template", isPresented: $showNewTemplateOptions, titleVisibility: .visible) {
+                Button("Custom Template") {
+                    showCreateTemplate = true
+                }
+                Button("Browse Programs") {
+                    showProgramBrowser = true
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Create your own template or choose from proven workout programs.")
+            }
+            .navigationDestination(isPresented: $showCreateTemplate) {
+                TemplateEditorView(viewModel: TemplateEditorViewModel())
+            }
+            .navigationDestination(isPresented: $showProgramBrowser) {
+                ProgramBrowserView(onProgramCreated: {
+                    showProgramBrowser = false
+                    Task { await templateListViewModel.loadTemplates() }
+                })
+            }
+        }
+    }
+
+    // MARK: - My Templates Section
+
+    @ViewBuilder
+    private var templatesSection: some View {
+        VStack(alignment: .leading, spacing: RQSpacing.md) {
+            // Section header
+            HStack {
+                Text("My Templates")
+                    .font(RQTypography.label)
+                    .textCase(.uppercase)
+                    .tracking(1.5)
+                    .foregroundColor(RQColors.textSecondary)
+
+                Spacer()
+
+                Button {
+                    showNewTemplateOptions = true
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(RQColors.accent)
+                }
+            }
+
+            if templateListViewModel.templates.isEmpty && !templateListViewModel.isLoading {
+                // Empty state
+                RQCard {
+                    VStack(spacing: RQSpacing.md) {
+                        Image(systemName: "rectangle.stack.badge.plus")
+                            .font(.system(size: 28))
+                            .foregroundColor(RQColors.textTertiary)
+
+                        Text("No templates yet")
+                            .font(RQTypography.headline)
+                            .foregroundColor(RQColors.textPrimary)
+
+                        Text("Create a custom template or browse proven programs")
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.textTertiary)
+                            .multilineTextAlignment(.center)
+
+                        Button {
+                            showNewTemplateOptions = true
+                        } label: {
+                            Text("Get Started")
+                                .font(RQTypography.caption)
+                                .fontWeight(.bold)
+                                .foregroundColor(RQColors.background)
+                                .padding(.horizontal, RQSpacing.xl)
+                                .padding(.vertical, RQSpacing.sm)
+                                .background(RQColors.accent)
+                                .cornerRadius(RQRadius.medium)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, RQSpacing.md)
+                }
+            } else {
+                // Template cards
+                ForEach(templateListViewModel.templates) { template in
+                    NavigationLink {
+                        TemplateDetailView(
+                            template: template,
+                            onDelete: {
+                                Task { await templateListViewModel.deleteTemplate(template) }
+                            },
+                            onDuplicate: {
+                                await templateListViewModel.duplicateTemplate(template)
+                            }
+                        )
+                    } label: {
+                        templateCard(template)
+                    }
+                }
+            }
+        }
+    }
+
+    private func templateCard(_ template: Template) -> some View {
+        RQCard {
+            HStack {
+                VStack(alignment: .leading, spacing: RQSpacing.sm) {
+                    Text(template.name)
+                        .font(RQTypography.headline)
+                        .foregroundColor(RQColors.textPrimary)
+                    if let desc = template.description, !desc.isEmpty {
+                        Text(desc)
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.textTertiary)
+                            .lineLimit(2)
+                    }
+                    let dayCount = template.workoutDays?.count ?? 0
+                    let totalExercises = template.workoutDays?.reduce(0) { $0 + ($1.exercises?.count ?? 0) } ?? 0
+                    HStack(spacing: RQSpacing.sm) {
+                        Text("\(dayCount) day\(dayCount == 1 ? "" : "s")")
+                            .font(RQTypography.footnote)
+                            .foregroundColor(RQColors.textSecondary)
+                        Text("\u{00B7}")
+                            .foregroundColor(RQColors.textTertiary)
+                        Text("\(totalExercises) exercise\(totalExercises == 1 ? "" : "s")")
+                            .font(RQTypography.footnote)
+                            .foregroundColor(RQColors.textSecondary)
+                    }
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12))
+                    .foregroundColor(RQColors.textTertiary)
             }
         }
     }
