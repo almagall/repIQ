@@ -201,9 +201,18 @@ struct ExerciseLogView: View {
 
                     Spacer()
 
-                    Text("RPE \(formatRPE(target.targetRPE))")
-                        .font(RQTypography.caption)
-                        .foregroundColor(RQColors.textTertiary)
+                    // RPE range for hypertrophy, single value for strength
+                    if exercise.trainingMode == .hypertrophy {
+                        let baseRPE = target.targetRPE
+                        let topRPE = min(baseRPE + Double(exercise.targetSets - 1) * 0.25, 9.0)
+                        Text("RPE \(formatRPE(baseRPE))–\(formatRPE(topRPE))")
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.textTertiary)
+                    } else {
+                        Text("RPE 6–\(formatRPE(target.targetRPE))")
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.textTertiary)
+                    }
                 }
             }
 
