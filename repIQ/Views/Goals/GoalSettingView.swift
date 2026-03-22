@@ -473,7 +473,8 @@ struct CreateGoalView: View {
 
     private func goalCreatedOverlay(_ goal: Goal) -> some View {
         ZStack {
-            Color.black.opacity(0.7)
+            Rectangle()
+                .fill(.ultraThinMaterial)
                 .ignoresSafeArea()
                 .onTapGesture {
                     onCreated(goal)
