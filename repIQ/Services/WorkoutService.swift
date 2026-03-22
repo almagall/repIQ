@@ -257,6 +257,20 @@ struct WorkoutService: Sendable {
         return workoutSet
     }
 
+    /// Updates an existing set's weight, reps, and RPE.
+    func updateSet(id: UUID, weight: Double, reps: Int, rpe: Double?) async throws {
+        struct UpdatePayload: Encodable {
+            let weight: Double
+            let reps: Int
+            let rpe: Double?
+        }
+
+        try await supabase.from("workout_sets")
+            .update(UpdatePayload(weight: weight, reps: reps, rpe: rpe))
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
     /// Deletes a set by ID.
     func deleteSet(id: UUID) async throws {
         try await supabase.from("workout_sets")
