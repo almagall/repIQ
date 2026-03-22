@@ -6,6 +6,7 @@ struct ExerciseLogView: View {
 
     @State private var setToDelete: Int?
     @State private var showDeleteConfirmation = false
+    @State private var showDecisionInfo = false
 
     private var exercise: ExerciseLogEntry? {
         viewModel.exercises[safe: exerciseIndex]
@@ -192,6 +193,14 @@ struct ExerciseLogView: View {
                         .fontWeight(.semibold)
                         .foregroundColor(decisionColor(target.decision))
 
+                    Button {
+                        showDecisionInfo = true
+                    } label: {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 11))
+                            .foregroundColor(RQColors.textTertiary)
+                    }
+
                     Text("·")
                         .foregroundColor(RQColors.textTertiary)
 
@@ -213,6 +222,11 @@ struct ExerciseLogView: View {
                             .font(RQTypography.caption)
                             .foregroundColor(RQColors.textTertiary)
                     }
+                }
+                .alert(target.decision.displayName, isPresented: $showDecisionInfo) {
+                    Button("Got it", role: .cancel) {}
+                } message: {
+                    Text(target.reasoning)
                 }
             }
 
@@ -319,6 +333,7 @@ struct ExerciseLogView: View {
             Text("")
                 .frame(width: 8)
             Text("RPE")
+                .frame(width: 56, alignment: .center)
             Spacer()
         }
         .font(RQTypography.caption)

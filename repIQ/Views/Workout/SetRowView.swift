@@ -50,16 +50,17 @@ struct SetRowView: View {
                         totalSets: totalWorkingSets, equipment: equipment
                     )
 
-                    HStack(spacing: RQSpacing.sm) {
+                    HStack(spacing: RQSpacing.xs) {
                         Spacer().frame(width: 32)
 
                         Text("Target")
-                            .font(RQTypography.label)
-                            .tracking(0.5)
+                            .font(RQTypography.caption)
+                            .fontWeight(.semibold)
                             .foregroundColor(RQColors.accent.opacity(0.6))
 
                         Text("\(formatWeight(targetW)) × \(targetR)")
-                            .font(RQTypography.numbersSmall)
+                            .font(RQTypography.caption)
+                            .fontWeight(.semibold)
                             .foregroundColor(RQColors.accent.opacity(0.7))
 
                         Spacer()
