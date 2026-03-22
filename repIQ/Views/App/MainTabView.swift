@@ -10,7 +10,7 @@ struct MainTabView: View {
         @Bindable var coordinator = workoutCoordinator
 
         TabView(selection: $selectedTab) {
-            Tab("Dashboard", systemImage: "house.fill", value: 0) {
+            Tab("Home", systemImage: "house.fill", value: 0) {
                 DashboardView()
             }
 
