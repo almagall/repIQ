@@ -230,6 +230,9 @@ struct CreateGoalView: View {
     @State private var showReview = false
     @State private var createdGoal: Goal?
     @State private var errorMessage: String?
+    @State private var loggedExercises: [Exercise] = []
+    @State private var isLoadingLogged = false
+    @State private var exercisePickerTab: Int = 0 // 0 = logged, 1 = all
     var onCreated: (Goal) -> Void
 
     var body: some View {
@@ -335,17 +338,90 @@ struct CreateGoalView: View {
                                     .tracking(1.5)
                                     .foregroundColor(RQColors.textSecondary)
 
-                                Button {
-                                    showExercisePicker = true
-                                } label: {
-                                    HStack {
-                                        Text(selectedExercise?.name ?? "Select Exercise")
-                                            .font(RQTypography.body)
-                                            .foregroundColor(selectedExercise != nil ? RQColors.textPrimary : RQColors.textTertiary)
-                                        Spacer()
-                                        Image(systemName: "chevron.right")
-                                            .font(.system(size: 12))
+                                // Tab toggle: My Exercises vs All Exercises
+                                HStack(spacing: 0) {
+                                    Button {
+                                        exercisePickerTab = 0
+                                    } label: {
+                                        Text("My Exercises")
+                                            .font(RQTypography.caption)
+                                            .fontWeight(.semibold)
+                                            .foregroundColor(exercisePickerTab == 0 ? .white : RQColors.textSecondary)
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, RQSpacing.sm)
+                                            .background(exercisePickerTab == 0 ? RQColors.accent : RQColors.surfaceTertiary)
+                                    }
+
+                                    Button {
+                                        exercisePickerTab = 1
+                                    } label: {
+                                        Text("All Exercises")
+                                            .font(RQTypography.caption)
+                                            .fontWeight(.semibold)
+                                            .foregroundColor(exercisePickerTab == 1 ? .white : RQColors.textSecondary)
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, RQSpacing.sm)
+                                            .background(exercisePickerTab == 1 ? RQColors.accent : RQColors.surfaceTertiary)
+                                    }
+                                }
+                                .cornerRadius(RQRadius.medium)
+
+                                if exercisePickerTab == 0 {
+                                    // Previously logged exercises
+                                    if isLoadingLogged {
+                                        HStack {
+                                            ProgressView()
+                                                .progressViewStyle(CircularProgressViewStyle(tint: RQColors.accent))
+                                                .scaleEffect(0.7)
+                                            Text("Loading exercises...")
+                                                .font(RQTypography.caption)
+                                                .foregroundColor(RQColors.textTertiary)
+                                        }
+                                    } else if loggedExercises.isEmpty {
+                                        Text("No exercises logged yet. Use All Exercises to browse.")
+                                            .font(RQTypography.caption)
                                             .foregroundColor(RQColors.textTertiary)
+                                    } else {
+                                        VStack(spacing: RQSpacing.xs) {
+                                            ForEach(loggedExercises) { exercise in
+                                                Button {
+                                                    selectedExercise = exercise
+                                                    fetchCurrentBest()
+                                                } label: {
+                                                    HStack {
+                                                        VStack(alignment: .leading, spacing: 2) {
+                                                            Text(exercise.name)
+                                                                .font(RQTypography.body)
+                                                                .foregroundColor(RQColors.textPrimary)
+                                                            Text("\(exercise.muscleGroup.capitalized) \u{00B7} \(exercise.equipment.capitalized)")
+                                                                .font(RQTypography.caption)
+                                                                .foregroundColor(RQColors.textTertiary)
+                                                        }
+                                                        Spacer()
+                                                        if selectedExercise?.id == exercise.id {
+                                                            Image(systemName: "checkmark.circle.fill")
+                                                                .foregroundColor(RQColors.accent)
+                                                        }
+                                                    }
+                                                    .padding(.vertical, RQSpacing.xs)
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    // All exercises — opens full picker
+                                    Button {
+                                        showExercisePicker = true
+                                    } label: {
+                                        HStack {
+                                            Text(selectedExercise?.name ?? "Browse All Exercises")
+                                                .font(RQTypography.body)
+                                                .foregroundColor(selectedExercise != nil ? RQColors.textPrimary : RQColors.textTertiary)
+                                            Spacer()
+                                            Image(systemName: "chevron.right")
+                                                .font(.system(size: 12))
+                                                .foregroundColor(RQColors.textTertiary)
+                                        }
                                     }
                                 }
 
@@ -370,6 +446,9 @@ struct CreateGoalView: View {
                                     }
                                 }
                             }
+                        }
+                        .task {
+                            await loadLoggedExercises()
                         }
                     }
 
@@ -571,6 +650,15 @@ struct CreateGoalView: View {
         guard let value = Double(targetValue), value > 0 else { return false }
         if (goalType == .weight || goalType == .reps) && selectedExercise == nil { return false }
         return true
+    }
+
+    private func loadLoggedExercises() async {
+        isLoadingLogged = true
+        do {
+            guard let userId = try? await supabase.auth.session.user.id else { return }
+            loggedExercises = try await GoalService().fetchLoggedExercises(userId: userId)
+        } catch {}
+        isLoadingLogged = false
     }
 
     private func fetchCurrentBest() {
