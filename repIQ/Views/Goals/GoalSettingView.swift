@@ -440,7 +440,7 @@ struct CreateGoalView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Create") {
-                        showReview = true
+                        Task { await createGoal() }
                     }
                     .foregroundColor(RQColors.accent)
                     .disabled(!isFormValid || isCreating)
@@ -462,9 +462,6 @@ struct CreateGoalView: View {
                 Text(errorMessage ?? "")
             }
             .overlay {
-                if showReview {
-                    goalReviewOverlay
-                }
                 if let goal = createdGoal {
                     goalCreatedOverlay(goal)
                 }
@@ -472,93 +469,7 @@ struct CreateGoalView: View {
         }
     }
 
-    // MARK: - Review Overlay
-
-    @ViewBuilder
-    private var goalReviewOverlay: some View {
-        ZStack {
-            Color.black.opacity(0.7)
-                .ignoresSafeArea()
-                .onTapGesture { showReview = false }
-
-            VStack(spacing: RQSpacing.lg) {
-                Image(systemName: "target")
-                    .font(.system(size: 36))
-                    .foregroundColor(RQColors.accent)
-
-                Text("Review Goal")
-                    .font(RQTypography.title1)
-                    .foregroundColor(RQColors.textPrimary)
-
-                VStack(spacing: RQSpacing.md) {
-                    if let name = selectedExercise?.name {
-                        reviewRow(label: "Exercise", value: name)
-                    }
-                    reviewRow(label: "Type", value: goalType == .weight && isEstimated1RM ? "Estimated 1RM" : goalType.displayName)
-                    reviewRow(label: "Target", value: "\(targetValue) \(targetUnit)")
-                    if currentBest > 0 {
-                        reviewRow(label: "Current Best", value: "\(formatValue(currentBest)) \(targetUnit)")
-                    }
-                    if hasTargetDate {
-                        let daysFromNow = Calendar.current.dateComponents([.day], from: Date(), to: targetDate).day ?? 0
-                        reviewRow(label: "Deadline", value: "\(daysFromNow) days from now")
-                    }
-                }
-                .padding(RQSpacing.lg)
-                .background(RQColors.surfaceSecondary)
-                .cornerRadius(RQRadius.large)
-
-                HStack(spacing: RQSpacing.md) {
-                    Button {
-                        showReview = false
-                    } label: {
-                        Text("Edit")
-                            .font(RQTypography.body)
-                            .fontWeight(.semibold)
-                            .foregroundColor(RQColors.textSecondary)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, RQSpacing.md)
-                            .background(RQColors.surfaceTertiary)
-                            .cornerRadius(RQRadius.medium)
-                    }
-
-                    Button {
-                        showReview = false
-                        Task { await createGoal() }
-                    } label: {
-                        Text("Confirm")
-                            .font(RQTypography.body)
-                            .fontWeight(.bold)
-                            .foregroundColor(.black)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, RQSpacing.md)
-                            .background(RQColors.accent)
-                            .cornerRadius(RQRadius.medium)
-                    }
-                    .disabled(isCreating)
-                }
-            }
-            .padding(RQSpacing.xl)
-            .padding(.horizontal, RQSpacing.md)
-        }
-        .transition(.opacity)
-        .animation(.easeInOut(duration: 0.2), value: showReview)
-    }
-
-    private func reviewRow(label: String, value: String) -> some View {
-        HStack {
-            Text(label)
-                .font(RQTypography.caption)
-                .foregroundColor(RQColors.textTertiary)
-            Spacer()
-            Text(value)
-                .font(RQTypography.body)
-                .fontWeight(.medium)
-                .foregroundColor(RQColors.textPrimary)
-        }
-    }
-
-    // MARK: - Goal Created Overlay
+    // MARK: - Goal Created Confirmation
 
     private func goalCreatedOverlay(_ goal: Goal) -> some View {
         ZStack {
@@ -574,26 +485,26 @@ struct CreateGoalView: View {
                     .font(.system(size: 48))
                     .foregroundColor(RQColors.success)
 
-                Text("Goal Set")
-                    .font(RQTypography.title1)
+                Text("Goal Created")
+                    .font(RQTypography.title2)
                     .foregroundColor(RQColors.textPrimary)
 
-                VStack(spacing: RQSpacing.xs) {
+                VStack(spacing: RQSpacing.md) {
                     if let name = goal.exerciseName {
-                        Text(name)
-                            .font(RQTypography.headline)
-                            .foregroundColor(RQColors.textPrimary)
+                        confirmationRow(label: "Exercise", value: name)
                     }
-                    Text("\(goal.goalTypeBadge): \(goal.displayTarget)")
-                        .font(RQTypography.body)
-                        .foregroundColor(RQColors.textSecondary)
-
-                    if let timeDisplay = goal.timeRemainingDisplay {
-                        Text(timeDisplay)
-                            .font(RQTypography.caption)
-                            .foregroundColor(RQColors.textTertiary)
+                    confirmationRow(label: "Type", value: goal.goalTypeBadge)
+                    confirmationRow(label: "Target", value: goal.displayTarget)
+                    if goal.startingValue > 0 {
+                        confirmationRow(label: "Starting From", value: "\(formatValue(goal.startingValue)) \(goal.unit)")
+                    }
+                    if let targetDate = goal.targetDate {
+                        confirmationRow(label: "Deadline", value: deadlineDisplay(targetDate))
                     }
                 }
+                .padding(RQSpacing.lg)
+                .background(RQColors.surfaceSecondary)
+                .cornerRadius(RQRadius.large)
 
                 Button {
                     onCreated(goal)
@@ -613,6 +524,26 @@ struct CreateGoalView: View {
             .padding(.horizontal, RQSpacing.md)
         }
         .transition(.opacity)
+    }
+
+    private func confirmationRow(label: String, value: String) -> some View {
+        HStack {
+            Text(label)
+                .font(RQTypography.caption)
+                .foregroundColor(RQColors.textTertiary)
+            Spacer()
+            Text(value)
+                .font(RQTypography.body)
+                .fontWeight(.medium)
+                .foregroundColor(RQColors.textPrimary)
+        }
+    }
+
+    private func deadlineDisplay(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        let daysFromNow = Calendar.current.dateComponents([.day], from: Date(), to: date).day ?? 0
+        return "\(formatter.string(from: date)) (\(daysFromNow) days)"
     }
 
     private var targetPlaceholder: String {
