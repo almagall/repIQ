@@ -66,7 +66,33 @@ struct WorkoutDayEditorView: View {
                 // Exercise List
                 if let exercises = currentDay.exercises?.sorted(by: { $0.sortOrder < $1.sortOrder }), !exercises.isEmpty {
                     ForEach(Array(exercises.enumerated()), id: \.element.id) { index, dayExercise in
-                        exerciseCard(dayExercise, index: index, total: exercises.count)
+                        let nextExercise = exercises[safe: index + 1]
+                        let sharesGroupWithNext = dayExercise.supersetGroup != nil
+                            && dayExercise.supersetGroup == nextExercise?.supersetGroup
+
+                        VStack(spacing: 0) {
+                            exerciseCard(dayExercise, index: index, total: exercises.count)
+
+                            // Superset connector line between grouped exercises
+                            if sharesGroupWithNext {
+                                HStack(spacing: RQSpacing.sm) {
+                                    Rectangle()
+                                        .fill(RQColors.warning)
+                                        .frame(width: 3, height: 20)
+                                        .padding(.leading, RQSpacing.md)
+
+                                    Image(systemName: "arrow.down")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(RQColors.warning)
+
+                                    Text("no rest")
+                                        .font(.system(size: 9, weight: .semibold, design: .rounded))
+                                        .foregroundColor(RQColors.warning.opacity(0.7))
+
+                                    Spacer()
+                                }
+                            }
+                        }
                     }
                 } else {
                     RQCard {
