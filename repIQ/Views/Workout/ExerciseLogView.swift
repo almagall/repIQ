@@ -169,6 +169,35 @@ struct ExerciseLogView: View {
                     .background(RQColors.surfaceTertiary)
                     .clipShape(Circle())
             }
+
+            // Exercise options menu (superset, etc.)
+            Menu {
+                if exercise.supersetGroup != nil {
+                    Button(role: .destructive) {
+                        viewModel.removeFromAdHocSuperset(exerciseIndex: exerciseIndex)
+                    } label: {
+                        Label("Remove from Superset", systemImage: "link.badge.minus")
+                    }
+                } else {
+                    let available = viewModel.availableExercisesForSuperset(excluding: exerciseIndex)
+                    if !available.isEmpty {
+                        Menu("Superset with...") {
+                            ForEach(available, id: \.index) { item in
+                                Button(item.name) {
+                                    viewModel.createAdHocSuperset(exerciseIndex: exerciseIndex, withExerciseIndex: item.index)
+                                }
+                            }
+                        }
+                    }
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(RQColors.textSecondary)
+                    .frame(width: 32, height: 32)
+                    .background(RQColors.surfaceTertiary)
+                    .clipShape(Circle())
+            }
         }
     }
 

@@ -109,11 +109,65 @@ final class ActiveWorkoutViewModel {
     }
 
     var canGoToPrevious: Bool {
-        currentExerciseIndex > 0
+        currentGroupPosition > 0
     }
 
     var canGoToNext: Bool {
-        currentExerciseIndex < exercises.count - 1
+        currentGroupPosition < allGroups.count - 1
+    }
+
+    /// Triggers ScrollViewReader to scroll to a specific exercise within the stacked superset view.
+    var scrollToExerciseIndex: Int?
+
+    // MARK: - Group Navigation
+
+    /// All exercise indices in the current superset group (or just the current index for solo exercises).
+    var currentGroupIndices: [Int] {
+        guard let group = exercises[safe: currentExerciseIndex]?.supersetGroup else {
+            return [currentExerciseIndex]
+        }
+        return exercises.enumerated()
+            .filter { $0.element.supersetGroup == group }
+            .map(\.offset)
+    }
+
+    /// Clusters exercises into groups: superset members are grouped together, solo exercises are their own group.
+    var allGroups: [[Int]] {
+        var groups: [[Int]] = []
+        var seen = Set<Int>()
+        for (i, exercise) in exercises.enumerated() {
+            guard !seen.contains(i) else { continue }
+            if let group = exercise.supersetGroup {
+                let members = exercises.enumerated()
+                    .filter { $0.element.supersetGroup == group }
+                    .map(\.offset)
+                groups.append(members)
+                seen.formUnion(members)
+            } else {
+                groups.append([i])
+                seen.insert(i)
+            }
+        }
+        return groups
+    }
+
+    /// The position of the current group in allGroups (for the counter badge).
+    var currentGroupPosition: Int {
+        allGroups.firstIndex(where: { $0.contains(currentExerciseIndex) }) ?? 0
+    }
+
+    /// Current round number for a superset group (1-based).
+    func supersetCurrentRound(for groupIndices: [Int]) -> Int {
+        let completedCounts = groupIndices.map { idx in
+            exercises[safe: idx]?.sets.filter { $0.setType == .working && $0.isCompleted }.count ?? 0
+        }
+        return min(completedCounts.min() ?? 0, supersetTotalRounds(for: groupIndices) - 1) + 1
+    }
+
+    /// Total rounds for a superset group.
+    func supersetTotalRounds(for groupIndices: [Int]) -> Int {
+        guard let first = groupIndices.first else { return 1 }
+        return exercises[safe: first]?.targetSets ?? 3
     }
 
     // MARK: - Per-Set Target Computation
@@ -223,17 +277,29 @@ final class ActiveWorkoutViewModel {
 
     func goToPreviousExercise() {
         guard canGoToPrevious else { return }
-        currentExerciseIndex -= 1
+        let prevGroup = allGroups[currentGroupPosition - 1]
+        currentExerciseIndex = prevGroup.first ?? currentExerciseIndex
     }
 
     func goToNextExercise() {
         guard canGoToNext else { return }
-        currentExerciseIndex += 1
+        let nextGroup = allGroups[currentGroupPosition + 1]
+        currentExerciseIndex = nextGroup.first ?? currentExerciseIndex
     }
 
     func goToExercise(at index: Int) {
         guard exercises.indices.contains(index) else { return }
-        currentExerciseIndex = index
+        // Navigate to the group that contains this index
+        if let group = exercises[index].supersetGroup {
+            let groupStart = exercises.enumerated()
+                .filter { $0.element.supersetGroup == group }
+                .map(\.offset)
+                .first ?? index
+            currentExerciseIndex = groupStart
+            scrollToExerciseIndex = index
+        } else {
+            currentExerciseIndex = index
+        }
     }
 
     // MARK: - Lifecycle
@@ -789,13 +855,22 @@ final class ActiveWorkoutViewModel {
         }
 
         // Superset auto-advance: if in a superset and not the last exercise,
-        // skip rest timer and move to next exercise in the group.
+        // skip rest timer and scroll to next exercise in the stacked view.
         if isInSuperset(exerciseIndex),
            let nextIndex = nextSupersetExercise(after: exerciseIndex) {
-            // Auto-advance to next superset exercise (no rest between)
-            currentExerciseIndex = nextIndex
+            // Auto-scroll to next superset exercise within stacked view (no rest)
+            scrollToExerciseIndex = nextIndex
+        } else if isInSuperset(exerciseIndex) && isLastInSuperset(exerciseIndex) {
+            // Last exercise in superset round: scroll back to first exercise for next round
+            if let firstInGroup = currentGroupIndices.first {
+                scrollToExerciseIndex = firstInGroup
+            }
+            // Start rest timer after completing the full superset round
+            if restTimerEnabled {
+                startRestTimer(seconds: restTimerDuration)
+            }
         } else if restTimerEnabled {
-            // Normal flow or last exercise in superset: start rest timer
+            // Normal flow: start rest timer
             startRestTimer(seconds: restTimerDuration)
         }
 
@@ -1175,6 +1250,54 @@ final class ActiveWorkoutViewModel {
     /// Returns true if this exercise is the last in its superset group.
     func isLastInSuperset(_ exerciseIndex: Int) -> Bool {
         return nextSupersetExercise(after: exerciseIndex) == nil
+    }
+
+    // MARK: - Ad-Hoc Supersets (session-only, not persisted to template)
+
+    /// Returns exercises available to superset with the given exercise.
+    func availableExercisesForSuperset(excluding exerciseIndex: Int) -> [(index: Int, name: String)] {
+        let currentGroup = exercises[safe: exerciseIndex]?.supersetGroup
+        return exercises.enumerated()
+            .filter { idx, ex in
+                idx != exerciseIndex && ex.supersetGroup != currentGroup
+            }
+            .map { (index: $0.offset, name: $0.element.exerciseName) }
+    }
+
+    /// Creates a session-only superset between two exercises.
+    func createAdHocSuperset(exerciseIndex: Int, withExerciseIndex: Int) {
+        let newGroup = (exercises.compactMap(\.supersetGroup).max() ?? -1) + 1
+        exercises[exerciseIndex].supersetGroup = newGroup
+        exercises[withExerciseIndex].supersetGroup = newGroup
+
+        // Reorder so they're adjacent
+        let targetIdx = withExerciseIndex
+        let destIdx = exerciseIndex + 1
+
+        if targetIdx != destIdx {
+            let exercise = exercises.remove(at: targetIdx)
+            let insertAt = targetIdx < destIdx ? destIdx - 1 : destIdx
+            exercises.insert(exercise, at: insertAt)
+        }
+
+        // Navigate to the group start
+        let groupStart = exercises.enumerated()
+            .filter { $0.element.supersetGroup == newGroup }
+            .map(\.offset)
+            .first ?? exerciseIndex
+        currentExerciseIndex = groupStart
+    }
+
+    /// Removes an exercise from its ad-hoc superset group.
+    func removeFromAdHocSuperset(exerciseIndex: Int) {
+        guard let group = exercises[safe: exerciseIndex]?.supersetGroup else { return }
+        exercises[exerciseIndex].supersetGroup = nil
+
+        // If only 1 exercise remains in the group, remove it too
+        let remaining = exercises.enumerated().filter { $0.element.supersetGroup == group }
+        if remaining.count == 1, let orphan = remaining.first {
+            exercises[orphan.offset].supersetGroup = nil
+        }
     }
 
     // MARK: - Timers
