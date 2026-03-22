@@ -170,7 +170,7 @@ struct ExerciseLogView: View {
                     .clipShape(Circle())
             }
 
-            // Exercise options menu (superset, etc.)
+            // Superset menu (chain icon, matches template editor)
             Menu {
                 if exercise.supersetGroup != nil {
                     Button(role: .destructive) {
@@ -181,22 +181,17 @@ struct ExerciseLogView: View {
                 } else {
                     let available = viewModel.availableExercisesForSuperset(excluding: exerciseIndex)
                     if !available.isEmpty {
-                        Menu("Superset with...") {
-                            ForEach(available, id: \.index) { item in
-                                Button(item.name) {
-                                    viewModel.createAdHocSuperset(exerciseIndex: exerciseIndex, withExerciseIndex: item.index)
-                                }
+                        ForEach(available, id: \.index) { item in
+                            Button(item.name) {
+                                viewModel.createAdHocSuperset(exerciseIndex: exerciseIndex, withExerciseIndex: item.index)
                             }
                         }
                     }
                 }
             } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(RQColors.textSecondary)
-                    .frame(width: 32, height: 32)
-                    .background(RQColors.surfaceTertiary)
-                    .clipShape(Circle())
+                Image(systemName: exercise.supersetGroup != nil ? "link.circle.fill" : "link.circle")
+                    .font(.system(size: 18))
+                    .foregroundColor(exercise.supersetGroup != nil ? RQColors.supersetGold : RQColors.textSecondary)
             }
         }
     }
