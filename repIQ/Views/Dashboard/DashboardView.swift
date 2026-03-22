@@ -221,7 +221,7 @@ struct DashboardView: View {
                                 .foregroundColor(RQColors.textSecondary)
 
                             let count = templateListViewModel.templates.count
-                            Text("\(count) program\(count == 1 ? "" : "s")")
+                            Text("\(count) template\(count == 1 ? "" : "s")")
                                 .font(RQTypography.numbers)
                                 .foregroundColor(RQColors.textPrimary)
 
@@ -233,6 +233,9 @@ struct DashboardView: View {
                         Image(systemName: "rectangle.stack.fill")
                             .font(.system(size: 24))
                             .foregroundColor(RQColors.accent)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(RQColors.textTertiary)
                     }
                 }
             }
