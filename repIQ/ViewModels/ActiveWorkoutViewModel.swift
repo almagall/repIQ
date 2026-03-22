@@ -1259,7 +1259,11 @@ final class ActiveWorkoutViewModel {
         let currentGroup = exercises[safe: exerciseIndex]?.supersetGroup
         return exercises.enumerated()
             .filter { idx, ex in
-                idx != exerciseIndex && ex.supersetGroup != currentGroup
+                guard idx != exerciseIndex else { return false }
+                // If the source exercise isn't in a superset, show all other exercises
+                guard let currentGroup else { return true }
+                // If the source is in a superset, exclude exercises already in the same group
+                return ex.supersetGroup != currentGroup
             }
             .map { (index: $0.offset, name: $0.element.exerciseName) }
     }
