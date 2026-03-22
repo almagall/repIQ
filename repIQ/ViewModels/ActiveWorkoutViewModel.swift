@@ -172,42 +172,27 @@ final class ActiveWorkoutViewModel {
             return (target.targetWeight, target.targetRepsLow, rpe)
 
         case .strength:
-            // Ramping to top set + back-off:
-            // Sets ramp up to a peak (second-to-last set), then back off
-            // Example with 4 sets: 85%×5 @6 → 92%×3 @7 → 100%×3 @8 → 85%×5 @7
-            let topSetIndex = max(totalSets - 2, 0) // second-to-last set is the peak
+            // Ascending RPE model (Barbell Medicine / 5/3/1 style):
+            // All sets use the same rep target. Weight increases each set.
+            // Last set is the top set (heaviest, highest RPE).
+            // Example with 4 sets: 82%×3 @6 → 88%×3 @7 → 94%×3 @7.5 → 100%×3 @8
             let topWeight = target.targetWeight
             let topReps = target.targetRepsLow
-            let repRange = trainingMode.repRange
+            let lastIndex = max(totalSets - 1, 0)
 
             if totalSets <= 1 {
-                // Single set: just do the target
                 return (topWeight, topReps, target.targetRPE)
             }
 
-            if setPosition == topSetIndex {
-                // Top set: full target weight at low reps
-                return (topWeight, topReps, target.targetRPE)
+            // Linear ramp from ~80% to 100% of top weight
+            let progress = Double(setPosition) / Double(lastIndex)
+            let weightPct = 0.80 + progress * 0.20
+            let setWeight = roundToIncrement(topWeight * weightPct, increment)
 
-            } else if setPosition < topSetIndex {
-                // Ramp-up sets: progressively heavier leading to top set
-                let rampProgress = Double(setPosition) / Double(topSetIndex)
-                // Start at ~85%, ramp linearly to 100%
-                let rampPct = 0.85 + rampProgress * 0.15
-                let rampWeight = roundToIncrement(topWeight * rampPct, increment)
-                // Ramp-up reps: start higher, decrease as weight increases
-                let rampReps = max(topReps, repRange.lowerBound + Int(Double(repRange.upperBound - repRange.lowerBound) * (1.0 - rampProgress)))
-                let rpe = 6.0 + rampProgress * (target.targetRPE - 6.0)
-                return (rampWeight, rampReps, min(rpe, target.targetRPE - 0.5))
+            // RPE ramps from 6 to target RPE (typically 8)
+            let rpe = 6.0 + progress * (target.targetRPE - 6.0)
 
-            } else {
-                // Back-off sets: ~85% of top set, higher reps
-                let backOffWeight = roundToIncrement(topWeight * 0.85, increment)
-                let backOffReps = topReps + 2
-                let backOffPosition = setPosition - topSetIndex - 1
-                let rpe = 7.0 + Double(backOffPosition) * 0.5
-                return (backOffWeight, min(backOffReps, repRange.upperBound), min(rpe, 8.5))
-            }
+            return (setWeight, topReps, rpe)
         }
     }
 
