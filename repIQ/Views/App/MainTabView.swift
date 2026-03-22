@@ -14,20 +14,16 @@ struct MainTabView: View {
                 DashboardView()
             }
 
-            Tab("Templates", systemImage: "rectangle.stack.fill", value: 1) {
-                TemplateListView(selectedTab: $selectedTab)
-            }
-
-            Tab("Progress", systemImage: "chart.line.uptrend.xyaxis", value: 2) {
+            Tab("Progress", systemImage: "chart.line.uptrend.xyaxis", value: 1) {
                 ProgressTabView()
             }
 
-            Tab("Social", systemImage: "person.2.fill", value: 3) {
+            Tab("Social", systemImage: "person.2.fill", value: 2) {
                 SocialTabView(viewModel: socialViewModel)
             }
             .badge(socialViewModel.notificationCount)
 
-            Tab("Profile", systemImage: "person.fill", value: 4) {
+            Tab("Profile", systemImage: "person.fill", value: 3) {
                 ProfileView()
             }
         }
