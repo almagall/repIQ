@@ -166,29 +166,68 @@ struct ActiveWorkoutView: View {
                 exerciseSelector
             }
 
-            // Current exercise
-            ScrollView {
-                VStack(spacing: RQSpacing.lg) {
-                    // Error message
-                    if let error = viewModel.errorMessage {
-                        Text(error)
-                            .font(RQTypography.footnote)
-                            .foregroundColor(RQColors.error)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, RQSpacing.md)
-                    }
+            // Exercise content — stacked for supersets, single for solo
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: RQSpacing.lg) {
+                        // Error message
+                        if let error = viewModel.errorMessage {
+                            Text(error)
+                                .font(RQTypography.footnote)
+                                .foregroundColor(RQColors.error)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, RQSpacing.md)
+                        }
 
-                    // Single exercise card
-                    ExerciseLogView(
-                        viewModel: viewModel,
-                        exerciseIndex: viewModel.currentExerciseIndex
-                    )
+                        let groupIndices = viewModel.currentGroupIndices
+                        let isSuperset = groupIndices.count > 1
+
+                        // Superset header with round indicator
+                        if isSuperset {
+                            supersetHeader(groupIndices: groupIndices)
+                        }
+
+                        // Stacked exercise cards (or single for solo)
+                        HStack(alignment: .top, spacing: RQSpacing.sm) {
+                            // Gold bracket bar for supersets
+                            if isSuperset {
+                                RoundedRectangle(cornerRadius: 2)
+                                    .fill(RQColors.supersetGold)
+                                    .frame(width: 3)
+                            }
+
+                            VStack(spacing: 0) {
+                                ForEach(Array(groupIndices.enumerated()), id: \.element) { position, exerciseIdx in
+                                    VStack(spacing: 0) {
+                                        ExerciseLogView(
+                                            viewModel: viewModel,
+                                            exerciseIndex: exerciseIdx
+                                        )
+                                        .id(exerciseIdx)
+
+                                        // Gold connector between superset exercises
+                                        if isSuperset && position < groupIndices.count - 1 {
+                                            supersetConnector
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, RQSpacing.screenHorizontal)
+                    .padding(.top, RQSpacing.lg)
+                    .padding(.bottom, RQSpacing.xxxl)
                 }
-                .padding(.horizontal, RQSpacing.screenHorizontal)
-                .padding(.top, RQSpacing.lg)
-                .padding(.bottom, RQSpacing.xxxl)
+                .scrollDismissesKeyboard(.interactively)
+                .onChange(of: viewModel.scrollToExerciseIndex) { _, newValue in
+                    if let target = newValue {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            proxy.scrollTo(target, anchor: .top)
+                        }
+                        viewModel.scrollToExerciseIndex = nil
+                    }
+                }
             }
-            .scrollDismissesKeyboard(.interactively)
         }
     }
 
@@ -299,7 +338,7 @@ struct ActiveWorkoutView: View {
                 } label: {
                     HStack(spacing: RQSpacing.sm) {
                         if let exercise = viewModel.currentExercise {
-                            Text("\(viewModel.currentExerciseIndex + 1)/\(viewModel.exercises.count)")
+                            Text("\(viewModel.currentGroupPosition + 1)/\(viewModel.allGroups.count)")
                                 .font(RQTypography.caption)
                                 .fontWeight(.semibold)
                                 .foregroundColor(RQColors.background)
@@ -360,6 +399,62 @@ struct ActiveWorkoutView: View {
             Divider().background(RQColors.surfaceTertiary.opacity(0.5))
         }
         .background(RQColors.background)
+    }
+
+    // MARK: - Superset Components
+
+    private func supersetHeader(groupIndices: [Int]) -> some View {
+        let groupLabel = supersetGroupLabel(for: groupIndices)
+        let currentRound = viewModel.supersetCurrentRound(for: groupIndices)
+        let totalRounds = viewModel.supersetTotalRounds(for: groupIndices)
+
+        return HStack {
+            Image(systemName: "link")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundColor(RQColors.supersetGold)
+
+            Text("SUPERSET \(groupLabel)")
+                .font(RQTypography.label)
+                .textCase(.uppercase)
+                .tracking(1)
+                .foregroundColor(RQColors.supersetGold)
+
+            Spacer()
+
+            Text("Round \(currentRound) of \(totalRounds)")
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundColor(RQColors.supersetGold)
+        }
+        .padding(.horizontal, RQSpacing.md)
+        .padding(.vertical, RQSpacing.sm)
+        .background(RQColors.supersetGold.opacity(0.1))
+        .cornerRadius(RQRadius.small)
+    }
+
+    private var supersetConnector: some View {
+        HStack(spacing: RQSpacing.sm) {
+            Rectangle()
+                .fill(RQColors.supersetGold)
+                .frame(width: 3, height: 20)
+
+            Image(systemName: "arrow.down")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(RQColors.supersetGold)
+
+            Text("no rest")
+                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                .foregroundColor(RQColors.supersetGold.opacity(0.7))
+
+            Spacer()
+        }
+        .padding(.leading, RQSpacing.md)
+    }
+
+    private func supersetGroupLabel(for groupIndices: [Int]) -> String {
+        guard let firstIdx = groupIndices.first,
+              let group = viewModel.exercises[safe: firstIdx]?.supersetGroup else { return "" }
+        let labels = ["A", "B", "C", "D", "E"]
+        return labels[safe: group] ?? "\(group + 1)"
     }
 
     // MARK: - Workout Progress Bar
