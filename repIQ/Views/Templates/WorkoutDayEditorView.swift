@@ -7,6 +7,8 @@ struct WorkoutDayEditorView: View {
     @State private var selectedTrainingMode: TrainingMode = .hypertrophy
     @State private var supersetSource: WorkoutDayExercise?
     @State private var supersetSelections: Set<UUID> = []
+    @State private var exerciseToDelete: WorkoutDayExercise?
+    @State private var showDeleteConfirmation = false
 
     private var currentDay: WorkoutDay {
         viewModel.workoutDays.first(where: { $0.id == day.id }) ?? day
@@ -105,6 +107,21 @@ struct WorkoutDayEditorView: View {
         }
         .sheet(item: $supersetSource) { source in
             supersetPickerSheet(source: source)
+        }
+        .alert("Delete Exercise", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) {
+                exerciseToDelete = nil
+            }
+            Button("Delete", role: .destructive) {
+                if let exercise = exerciseToDelete {
+                    Task {
+                        await viewModel.removeExercise(exercise, from: currentDay)
+                        exerciseToDelete = nil
+                    }
+                }
+            }
+        } message: {
+            Text("Are you sure you want to remove \(exerciseToDelete?.exercise?.name ?? "this exercise") from this workout day?")
         }
     }
 
@@ -220,6 +237,7 @@ struct WorkoutDayEditorView: View {
             }
         }
         .presentationDetents([.medium, .large])
+        .presentationBackground(RQColors.background)
     }
 
     // Preview of what the superset will look like
@@ -311,21 +329,31 @@ struct WorkoutDayEditorView: View {
                             .font(RQTypography.headline)
                             .foregroundColor(RQColors.textPrimary)
 
-                        Spacer()
-
-                        // Superset button — opens picker sheet
+                        // Superset button — next to exercise name
                         Button {
-                            openSupersetPicker(for: dayExercise)
+                            let exerciseCount = currentDay.exercises?.count ?? 0
+                            if exerciseCount >= 2 {
+                                openSupersetPicker(for: dayExercise)
+                            }
                         } label: {
                             Image(systemName: dayExercise.supersetGroup != nil ? "link.circle.fill" : "link.circle")
                                 .font(.system(size: 18))
-                                .foregroundColor(dayExercise.supersetGroup != nil ? RQColors.warning : RQColors.textTertiary)
+                                .foregroundColor(
+                                    dayExercise.supersetGroup != nil
+                                        ? RQColors.warning
+                                        : (currentDay.exercises?.count ?? 0) >= 2
+                                            ? RQColors.textTertiary
+                                            : RQColors.surfaceTertiary
+                                )
                         }
+                        .disabled((currentDay.exercises?.count ?? 0) < 2 && dayExercise.supersetGroup == nil)
 
+                        Spacer()
+
+                        // Delete button — spaced away from superset
                         Button {
-                            Task {
-                                await viewModel.removeExercise(dayExercise, from: currentDay)
-                            }
+                            exerciseToDelete = dayExercise
+                            showDeleteConfirmation = true
                         } label: {
                             Image(systemName: "trash")
                                 .font(.system(size: 14))
