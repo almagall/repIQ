@@ -84,11 +84,15 @@ struct SessionDetailView: View {
                     }
                     .disabled(isSaving)
                 } else {
-                    Button {
-                        enterEditMode()
+                    Menu {
+                        Button {
+                            enterEditMode()
+                        } label: {
+                            Label("Edit Workout", systemImage: "pencil")
+                        }
                     } label: {
-                        Image(systemName: "pencil")
-                            .foregroundColor(RQColors.accent)
+                        Image(systemName: "ellipsis.circle")
+                            .foregroundColor(RQColors.textSecondary)
                     }
                 }
             }
