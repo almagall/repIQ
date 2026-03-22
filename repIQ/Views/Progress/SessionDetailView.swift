@@ -4,6 +4,18 @@ struct SessionDetailView: View {
     @Bindable var viewModel: ProgressDashboardViewModel
     let sessionId: UUID
 
+    @State private var isEditing = false
+    @State private var editedSets: [UUID: EditableSet] = [:]
+    @State private var isSaving = false
+
+    private let workoutService = WorkoutService()
+
+    struct EditableSet {
+        var weight: String
+        var reps: String
+        var rpe: String
+    }
+
     var body: some View {
         ScrollView {
             if viewModel.isLoadingDetail {
@@ -55,9 +67,80 @@ struct SessionDetailView: View {
         .navigationTitle("Session Detail")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                if isEditing {
+                    Button {
+                        Task { await saveEdits() }
+                    } label: {
+                        if isSaving {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: RQColors.accent))
+                        } else {
+                            Text("Save")
+                                .fontWeight(.semibold)
+                                .foregroundColor(RQColors.accent)
+                        }
+                    }
+                    .disabled(isSaving)
+                } else {
+                    Button {
+                        enterEditMode()
+                    } label: {
+                        Image(systemName: "pencil")
+                            .foregroundColor(RQColors.accent)
+                    }
+                }
+            }
+
+            if isEditing {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        isEditing = false
+                        editedSets = [:]
+                    }
+                    .foregroundColor(RQColors.textSecondary)
+                }
+            }
+        }
         .task {
             await viewModel.loadSessionDetail(sessionId: sessionId)
         }
+    }
+
+    // MARK: - Edit Mode
+
+    private func enterEditMode() {
+        guard let detail = viewModel.sessionDetail else { return }
+        editedSets = [:]
+        for set in detail.sets {
+            editedSets[set.id] = EditableSet(
+                weight: formatWeight(set.weight),
+                reps: "\(set.reps)",
+                rpe: set.rpe.map { formatRPE($0) } ?? ""
+            )
+        }
+        isEditing = true
+    }
+
+    private func saveEdits() async {
+        isSaving = true
+        for (setId, edited) in editedSets {
+            let weight = Double(edited.weight) ?? 0
+            let reps = Int(edited.reps) ?? 0
+            let rpe = Double(edited.rpe)
+
+            do {
+                try await workoutService.updateSet(id: setId, weight: weight, reps: reps, rpe: rpe)
+            } catch {
+                // Continue saving other sets
+            }
+        }
+        // Reload to reflect changes
+        await viewModel.loadSessionDetail(sessionId: sessionId)
+        isEditing = false
+        editedSets = [:]
+        isSaving = false
     }
 
     // MARK: - Stat Card
@@ -128,13 +211,17 @@ struct SessionDetailView: View {
 
                 // Set rows
                 ForEach(sets) { set in
-                    setRow(set)
+                    if isEditing {
+                        editableSetRow(set)
+                    } else {
+                        setRow(set)
+                    }
                 }
             }
         }
     }
 
-    // MARK: - Set Row
+    // MARK: - Set Row (Read-only)
 
     private func setRow(_ set: WorkoutSet) -> some View {
         HStack(spacing: RQSpacing.sm) {
@@ -173,6 +260,72 @@ struct SessionDetailView: View {
             }
         }
         .padding(.vertical, RQSpacing.xxs)
+    }
+
+    // MARK: - Set Row (Editable)
+
+    private func editableSetRow(_ set: WorkoutSet) -> some View {
+        HStack(spacing: RQSpacing.sm) {
+            Text("\(set.setNumber)")
+                .font(RQTypography.numbersSmall)
+                .foregroundColor(RQColors.textPrimary)
+                .frame(width: 30, alignment: .center)
+
+            Text(set.setType.shortName)
+                .font(RQTypography.caption)
+                .foregroundColor(colorForSetType(set.setType))
+                .frame(width: 40, alignment: .center)
+
+            // Editable weight
+            TextField("0", text: editBinding(for: set.id, keyPath: \.weight))
+                .font(RQTypography.numbersSmall)
+                .foregroundColor(RQColors.textPrimary)
+                .multilineTextAlignment(.center)
+                .keyboardType(.decimalPad)
+                .frame(width: 56)
+                .padding(.vertical, 4)
+                .background(RQColors.surfaceTertiary)
+                .cornerRadius(RQRadius.small)
+
+            // Editable reps
+            TextField("0", text: editBinding(for: set.id, keyPath: \.reps))
+                .font(RQTypography.numbersSmall)
+                .foregroundColor(RQColors.textPrimary)
+                .multilineTextAlignment(.center)
+                .keyboardType(.numberPad)
+                .frame(width: 40)
+                .padding(.vertical, 4)
+                .background(RQColors.surfaceTertiary)
+                .cornerRadius(RQRadius.small)
+
+            // Editable RPE
+            TextField("—", text: editBinding(for: set.id, keyPath: \.rpe))
+                .font(RQTypography.numbersSmall)
+                .foregroundColor(RQColors.textSecondary)
+                .multilineTextAlignment(.center)
+                .keyboardType(.decimalPad)
+                .frame(width: 40)
+                .padding(.vertical, 4)
+                .background(RQColors.surfaceTertiary)
+                .cornerRadius(RQRadius.small)
+
+            Spacer()
+
+            if set.isPR {
+                Text("PR")
+                    .font(RQTypography.caption)
+                    .fontWeight(.bold)
+                    .foregroundColor(RQColors.warning)
+            }
+        }
+        .padding(.vertical, RQSpacing.xxs)
+    }
+
+    private func editBinding(for setId: UUID, keyPath: WritableKeyPath<EditableSet, String>) -> Binding<String> {
+        Binding(
+            get: { editedSets[setId]?[keyPath: keyPath] ?? "" },
+            set: { editedSets[setId]?[keyPath: keyPath] = $0 }
+        )
     }
 
     // MARK: - Helpers
