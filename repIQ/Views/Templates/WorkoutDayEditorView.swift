@@ -249,6 +249,8 @@ struct WorkoutDayEditorView: View {
                                 partners: supersetSelections,
                                 in: currentDay
                             )
+                            // Reload to ensure superset groups are reflected in the UI
+                            await viewModel.reload()
                             supersetSource = nil
                         }
                     }
