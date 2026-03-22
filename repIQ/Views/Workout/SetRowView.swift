@@ -53,21 +53,18 @@ struct SetRowView: View {
                     HStack(spacing: RQSpacing.sm) {
                         Spacer().frame(width: 32)
 
-                        Text("Target:")
-                            .font(RQTypography.caption)
-                            .foregroundColor(RQColors.accent.opacity(0.5))
+                        Text("Target")
+                            .font(RQTypography.label)
+                            .tracking(0.5)
+                            .foregroundColor(RQColors.accent.opacity(0.6))
 
                         Text("\(formatWeight(targetW)) × \(targetR)")
-                            .font(RQTypography.caption)
-                            .foregroundColor(RQColors.accent.opacity(0.5))
-
-                        Text("@\(formatRPE(targetRPE))")
-                            .font(RQTypography.caption)
-                            .foregroundColor(RQColors.accent.opacity(0.35))
+                            .font(RQTypography.numbersSmall)
+                            .foregroundColor(RQColors.accent.opacity(0.7))
 
                         Spacer()
                     }
-                    .padding(.bottom, 2)
+                    .padding(.bottom, 3)
                 } else if let prev = previousSet {
                     // No progression target: show raw previous session data
                     HStack(spacing: RQSpacing.sm) {
