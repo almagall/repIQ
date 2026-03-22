@@ -77,17 +77,17 @@ struct WorkoutDayEditorView: View {
                             if sharesGroupWithNext {
                                 HStack(spacing: RQSpacing.sm) {
                                     Rectangle()
-                                        .fill(RQColors.warning)
+                                        .fill(RQColors.supersetGold)
                                         .frame(width: 3, height: 20)
                                         .padding(.leading, RQSpacing.md)
 
                                     Image(systemName: "arrow.down")
                                         .font(.system(size: 10, weight: .bold))
-                                        .foregroundColor(RQColors.warning)
+                                        .foregroundColor(RQColors.supersetGold)
 
                                     Text("no rest")
                                         .font(.system(size: 9, weight: .semibold, design: .rounded))
-                                        .foregroundColor(RQColors.warning.opacity(0.7))
+                                        .foregroundColor(RQColors.supersetGold.opacity(0.7))
 
                                     Spacer()
                                 }
@@ -164,7 +164,7 @@ struct WorkoutDayEditorView: View {
                     VStack(spacing: RQSpacing.sm) {
                         Image(systemName: "link.circle.fill")
                             .font(.system(size: 36))
-                            .foregroundColor(RQColors.warning)
+                            .foregroundColor(RQColors.supersetGold)
 
                         Text("Superset with \(source.exercise?.name ?? "Exercise")")
                             .font(RQTypography.headline)
@@ -191,7 +191,7 @@ struct WorkoutDayEditorView: View {
                                 HStack(spacing: RQSpacing.md) {
                                     Image(systemName: supersetSelections.contains(exercise.id) ? "checkmark.circle.fill" : "circle")
                                         .font(.system(size: 22))
-                                        .foregroundColor(supersetSelections.contains(exercise.id) ? RQColors.warning : RQColors.textTertiary)
+                                        .foregroundColor(supersetSelections.contains(exercise.id) ? RQColors.supersetGold : RQColors.textTertiary)
 
                                     VStack(alignment: .leading, spacing: RQSpacing.xxs) {
                                         Text(exercise.exercise?.name ?? "Unknown")
@@ -217,11 +217,11 @@ struct WorkoutDayEditorView: View {
                                 .padding(RQSpacing.md)
                                 .background(
                                     RoundedRectangle(cornerRadius: RQRadius.medium)
-                                        .fill(supersetSelections.contains(exercise.id) ? RQColors.warning.opacity(0.1) : RQColors.surfaceSecondary)
+                                        .fill(supersetSelections.contains(exercise.id) ? RQColors.supersetGold.opacity(0.1) : RQColors.surfaceSecondary)
                                 )
                                 .overlay(
                                     RoundedRectangle(cornerRadius: RQRadius.medium)
-                                        .stroke(supersetSelections.contains(exercise.id) ? RQColors.warning.opacity(0.4) : Color.clear, lineWidth: 1)
+                                        .stroke(supersetSelections.contains(exercise.id) ? RQColors.supersetGold.opacity(0.4) : Color.clear, lineWidth: 1)
                                 )
                             }
                         }
@@ -277,7 +277,7 @@ struct WorkoutDayEditorView: View {
             Text("SUPERSET PREVIEW")
                 .font(RQTypography.label)
                 .tracking(1)
-                .foregroundColor(RQColors.warning)
+                .foregroundColor(RQColors.supersetGold)
 
             Text(selectedNames.joined(separator: "  \u{2192}  "))
                 .font(RQTypography.subheadline)
@@ -287,10 +287,10 @@ struct WorkoutDayEditorView: View {
         }
         .padding(RQSpacing.md)
         .frame(maxWidth: .infinity)
-        .background(RQColors.warning.opacity(0.1))
+        .background(RQColors.supersetGold.opacity(0.1))
         .overlay(
             Rectangle()
-                .fill(RQColors.warning)
+                .fill(RQColors.supersetGold)
                 .frame(height: 2),
             alignment: .top
         )
@@ -314,7 +314,7 @@ struct WorkoutDayEditorView: View {
                             .textCase(.uppercase)
                             .tracking(1)
                     }
-                    .foregroundColor(RQColors.warning)
+                    .foregroundColor(RQColors.supersetGold)
                     .padding(.horizontal, RQSpacing.md)
                     .padding(.vertical, RQSpacing.xs)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -366,7 +366,7 @@ struct WorkoutDayEditorView: View {
                                 .font(.system(size: 18))
                                 .foregroundColor(
                                     dayExercise.supersetGroup != nil
-                                        ? RQColors.warning
+                                        ? RQColors.supersetGold
                                         : (currentDay.exercises?.count ?? 0) >= 2
                                             ? RQColors.textPrimary
                                             : RQColors.textTertiary
@@ -486,7 +486,7 @@ struct WorkoutDayEditorView: View {
                 // Left accent bar for superset members
                 dayExercise.supersetGroup != nil
                     ? RoundedRectangle(cornerRadius: 2)
-                        .fill(RQColors.warning)
+                        .fill(RQColors.supersetGold)
                         .frame(width: 3)
                         .padding(.vertical, RQSpacing.sm)
                         .frame(maxWidth: .infinity, alignment: .leading)

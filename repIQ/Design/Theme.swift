@@ -23,6 +23,9 @@ enum RQColors {
     static let error = Color(hex: "FF3B30")
     static let info = Color(hex: "5AC8FA")
 
+    // Superset
+    static let supersetGold = Color(hex: "FFD700")
+
     // Training Modes
     static let hypertrophy = Color(hex: "9B59B6")
     static let strength = Color(hex: "FF6B35")

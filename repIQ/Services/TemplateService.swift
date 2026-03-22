@@ -133,6 +133,16 @@ struct TemplateService: Sendable {
     func updateSupersetGroup(id: UUID, supersetGroup: Int?) async throws {
         struct SupersetUpdate: Encodable {
             let superset_group: Int?
+
+            // Explicitly encode null instead of skipping the key
+            func encode(to encoder: Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                try container.encode(superset_group, forKey: .superset_group)
+            }
+
+            enum CodingKeys: String, CodingKey {
+                case superset_group
+            }
         }
         try await supabase.from("workout_day_exercises")
             .update(SupersetUpdate(superset_group: supersetGroup))
