@@ -50,9 +50,13 @@ struct ExerciseLogView: View {
 
                     // Grouped set sections
                     ForEach(groupedSets, id: \.type) { group in
-                        // Add Warm Up button before working sets section
+                        // Warmup suggestion or add button before working sets
                         if group.type == .working {
-                            addWarmUpButton
+                            if viewModel.shouldSuggestWarmup(exerciseIndex: exerciseIndex) {
+                                warmupSuggestionCard
+                            } else {
+                                addWarmUpButton
+                            }
                         }
 
                         sectionHeader(for: group.type, count: group.sets.count)
@@ -313,6 +317,72 @@ struct ExerciseLogView: View {
     }
 
     // MARK: - Add Set Menu
+
+    private var warmupSuggestionCard: some View {
+        let weights = viewModel.suggestedWarmupWeights(exerciseIndex: exerciseIndex)
+
+        return VStack(spacing: 0) {
+            HStack {
+                HStack(spacing: RQSpacing.sm) {
+                    Image(systemName: "lightbulb.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(RQColors.warmup)
+
+                    Text("Suggested Warm-Up")
+                        .font(RQTypography.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(RQColors.textSecondary)
+                }
+
+                Spacer()
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        viewModel.addSuggestedWarmups(exerciseIndex: exerciseIndex)
+                    }
+                } label: {
+                    Text("Add")
+                        .font(RQTypography.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(RQColors.background)
+                        .padding(.horizontal, RQSpacing.md)
+                        .padding(.vertical, 5)
+                        .background(RQColors.warmup)
+                        .cornerRadius(RQRadius.medium)
+                }
+            }
+
+            if let weights {
+                HStack(spacing: RQSpacing.lg) {
+                    HStack(spacing: RQSpacing.xs) {
+                        Text("W1")
+                            .font(RQTypography.label)
+                            .foregroundColor(RQColors.warmup)
+                        Text("\(formatWeight(weights.warmup1)) × 10")
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.textTertiary)
+                    }
+
+                    HStack(spacing: RQSpacing.xs) {
+                        Text("W2")
+                            .font(RQTypography.label)
+                            .foregroundColor(RQColors.warmup)
+                        Text("\(formatWeight(weights.warmup2)) × 5")
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.textTertiary)
+                    }
+                }
+                .padding(.top, RQSpacing.sm)
+            }
+        }
+        .padding(RQSpacing.md)
+        .background(
+            RoundedRectangle(cornerRadius: RQRadius.medium)
+                .strokeBorder(RQColors.warmup.opacity(0.3), style: StrokeStyle(lineWidth: 1, dash: [5, 3]))
+                .background(RQColors.warmup.opacity(0.05).cornerRadius(RQRadius.medium))
+        )
+        .padding(.top, RQSpacing.sm)
+    }
 
     private var addWarmUpButton: some View {
         Button {

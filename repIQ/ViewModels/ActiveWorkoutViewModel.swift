@@ -827,6 +827,58 @@ final class ActiveWorkoutViewModel {
         }
     }
 
+    /// Inserts 2 pre-filled warmup sets for compound barbell exercises:
+    /// Warmup 1: ~50% of working weight × 10 reps
+    /// Warmup 2: ~75% of working weight × 5 reps
+    func addSuggestedWarmups(exerciseIndex: Int) {
+        guard exercises.indices.contains(exerciseIndex) else { return }
+        let exercise = exercises[exerciseIndex]
+
+        // Use the first working set's weight as the reference
+        let workingWeight = exercise.sets.first(where: { $0.setType == .working })?.weight
+            ?? exercise.progressionTarget?.targetWeight ?? 0
+        guard workingWeight > 0 else { return }
+
+        let increment = ProgressionService.weightIncrement(for: exercise.equipment)
+
+        let warmup1Weight = Self.roundToIncrement(workingWeight * 0.50, increment)
+        let warmup2Weight = Self.roundToIncrement(workingWeight * 0.75, increment)
+
+        let warmup1 = SetEntry(setNumber: 1, setType: .warmup, weight: warmup1Weight, reps: 10)
+        let warmup2 = SetEntry(setNumber: 2, setType: .warmup, weight: warmup2Weight, reps: 5)
+
+        // Insert at the beginning (before working sets)
+        exercises[exerciseIndex].sets.insert(warmup2, at: 0)
+        exercises[exerciseIndex].sets.insert(warmup1, at: 0)
+
+        renumberSets(exerciseIndex: exerciseIndex)
+    }
+
+    /// Whether an exercise should show the warmup suggestion card.
+    /// Only for barbell/smith machine hypertrophy exercises with no existing warmup sets.
+    func shouldSuggestWarmup(exerciseIndex: Int) -> Bool {
+        guard let exercise = exercises[safe: exerciseIndex] else { return false }
+        let isCompound = exercise.equipment == "barbell" || exercise.equipment == "smith_machine"
+        let isHypertrophy = exercise.trainingMode == .hypertrophy
+        let hasNoWarmups = !exercise.sets.contains(where: { $0.setType == .warmup })
+        let hasWorkingWeight = exercise.sets.first(where: { $0.setType == .working })?.weight ?? 0 > 0
+            || exercise.progressionTarget?.targetWeight ?? 0 > 0
+        return isCompound && isHypertrophy && hasNoWarmups && hasWorkingWeight
+    }
+
+    /// Returns the suggested warmup weights for display in the suggestion card.
+    func suggestedWarmupWeights(exerciseIndex: Int) -> (warmup1: Double, warmup2: Double)? {
+        guard let exercise = exercises[safe: exerciseIndex] else { return nil }
+        let workingWeight = exercise.sets.first(where: { $0.setType == .working })?.weight
+            ?? exercise.progressionTarget?.targetWeight ?? 0
+        guard workingWeight > 0 else { return nil }
+        let increment = ProgressionService.weightIncrement(for: exercise.equipment)
+        return (
+            warmup1: Self.roundToIncrement(workingWeight * 0.50, increment),
+            warmup2: Self.roundToIncrement(workingWeight * 0.75, increment)
+        )
+    }
+
     func addSet(exerciseIndex: Int, setType: SetType = .working) {
         guard exercises.indices.contains(exerciseIndex) else { return }
 
