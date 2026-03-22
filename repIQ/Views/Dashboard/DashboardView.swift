@@ -123,9 +123,17 @@ struct DashboardView: View {
                                                 .frame(height: 4)
                                             }
 
-                                            Text("\(Int(goal.progress * 100))%")
-                                                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                                .foregroundColor(RQColors.accent)
+                                            VStack(alignment: .trailing, spacing: 2) {
+                                                Text("\(Int(goal.progress * 100))%")
+                                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                                    .foregroundColor(RQColors.accent)
+
+                                                if let days = goal.daysRemaining {
+                                                    Text(days < 0 ? "Overdue" : "\(days)d left")
+                                                        .font(.system(size: 9, weight: .medium, design: .rounded))
+                                                        .foregroundColor(days < 0 ? .red : RQColors.textTertiary)
+                                                }
+                                            }
                                         }
                                     }
                                 }
