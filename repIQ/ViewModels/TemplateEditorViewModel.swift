@@ -328,7 +328,7 @@ final class TemplateEditorViewModel {
                 workoutDays[dayIndex].exercises?[exIndex].supersetGroup = group
             }
         } catch {
-            errorMessage = "Failed to update superset."
+            errorMessage = "Failed to update superset: \(error.localizedDescription)"
         }
     }
 
