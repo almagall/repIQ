@@ -8,6 +8,8 @@ struct DashboardView: View {
     @State private var showCreateTemplate = false
     @State private var showProgramBrowser = false
     @State private var showNewTemplateOptions = false
+    @State private var showCalendarView = false
+    @State private var calendarMonth = Date()
 
     @Environment(WorkoutCoordinator.self) private var workoutCoordinator
 
@@ -67,6 +69,9 @@ struct DashboardView: View {
                             }
                         }
                     }
+
+                    // Activity (Week / Calendar toggle)
+                    activityCard
 
                     // Goals
                     NavigationLink {
@@ -140,9 +145,6 @@ struct DashboardView: View {
                             }
                         }
                     }
-
-                    // Weekly Activity
-                    weeklyActivityCard
                 }
                 .padding(.horizontal, RQSpacing.screenHorizontal)
                 .padding(.top, RQSpacing.lg)
@@ -260,57 +262,195 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Weekly Activity Card
+    // MARK: - Activity Card (Week / Calendar toggle)
 
-    private var weeklyActivityCard: some View {
-        // Days ordered Mon-Sun for display
-        let dayLabels = ["M", "T", "W", "T", "F", "S", "S"]
-        // Calendar weekday indices for Mon(1)-Sun(0) mapped to Calendar's Sun=1..Sat=7
-        // Display order: Mon=2, Tue=3, Wed=4, Thu=5, Fri=6, Sat=7, Sun=1
-        // weeklyTrainingDays uses 0=Sun..6=Sat
-        let calendarIndices = [1, 2, 3, 4, 5, 6, 0] // Mon..Sun mapped to our 0-based
-
-        let today = Calendar.current.component(.weekday, from: Date()) - 1 // 0=Sun..6=Sat
-        let trainedCount = viewModel.weeklyTrainingDays.count
-
-        return RQCard {
+    private var activityCard: some View {
+        RQCard {
             VStack(spacing: RQSpacing.md) {
                 HStack {
-                    Text("This Week")
+                    Text("Activity")
                         .font(RQTypography.label)
                         .textCase(.uppercase)
                         .tracking(1.5)
                         .foregroundColor(RQColors.textSecondary)
+
                     Spacer()
-                    Text("\(trainedCount) day\(trainedCount == 1 ? "" : "s") trained")
-                        .font(RQTypography.caption)
-                        .foregroundColor(RQColors.textTertiary)
+
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showCalendarView.toggle()
+                            if showCalendarView { calendarMonth = Date() }
+                        }
+                    } label: {
+                        Image(systemName: showCalendarView ? "list.bullet" : "calendar")
+                            .font(.system(size: 14))
+                            .foregroundColor(RQColors.accent)
+                    }
                 }
 
-                HStack(spacing: 0) {
-                    ForEach(0..<7, id: \.self) { i in
-                        let dayIndex = calendarIndices[i]
-                        let trained = viewModel.weeklyTrainingDays.contains(dayIndex)
-                        let isToday = dayIndex == today
-
-                        VStack(spacing: RQSpacing.xs) {
-                            Text(dayLabels[i])
-                                .font(.system(size: 11, weight: .medium, design: .rounded))
-                                .foregroundColor(isToday ? RQColors.textPrimary : RQColors.textTertiary)
-
-                            Circle()
-                                .fill(trained ? RQColors.accent : RQColors.surfaceTertiary)
-                                .frame(width: 28, height: 28)
-                                .overlay(
-                                    Circle()
-                                        .stroke(isToday ? RQColors.accent : Color.clear, lineWidth: 2)
-                                )
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
+                if showCalendarView {
+                    calendarView
+                } else {
+                    weekView
                 }
             }
         }
+    }
+
+    // MARK: - Week View
+
+    private var weekView: some View {
+        let dayLabels = ["M", "T", "W", "T", "F", "S", "S"]
+        let calendarIndices = [1, 2, 3, 4, 5, 6, 0]
+        let today = Calendar.current.component(.weekday, from: Date()) - 1
+        let trainedCount = viewModel.weeklyTrainingDays.count
+
+        return VStack(spacing: RQSpacing.md) {
+            HStack {
+                Text("\(trainedCount) day\(trainedCount == 1 ? "" : "s") trained this week")
+                    .font(RQTypography.caption)
+                    .foregroundColor(RQColors.textTertiary)
+                Spacer()
+            }
+
+            HStack(spacing: 0) {
+                ForEach(0..<7, id: \.self) { i in
+                    let dayIndex = calendarIndices[i]
+                    let trained = viewModel.weeklyTrainingDays.contains(dayIndex)
+                    let isToday = dayIndex == today
+
+                    VStack(spacing: RQSpacing.xs) {
+                        Text(dayLabels[i])
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .foregroundColor(isToday ? RQColors.textPrimary : RQColors.textTertiary)
+
+                        Circle()
+                            .fill(trained ? RQColors.accent : RQColors.surfaceTertiary)
+                            .frame(width: 28, height: 28)
+                            .overlay(
+                                Circle()
+                                    .stroke(isToday ? RQColors.accent : Color.clear, lineWidth: 2)
+                            )
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+        }
+    }
+
+    // MARK: - Calendar View
+
+    private var calendarView: some View {
+        let calendar = Calendar.current
+        let monthFormatter: DateFormatter = {
+            let f = DateFormatter()
+            f.dateFormat = "MMMM yyyy"
+            return f
+        }()
+
+        return VStack(spacing: RQSpacing.md) {
+            // Month navigation
+            HStack {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        calendarMonth = calendar.date(byAdding: .month, value: -1, to: calendarMonth) ?? calendarMonth
+                    }
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(RQColors.accent)
+                }
+
+                Spacer()
+
+                Text(monthFormatter.string(from: calendarMonth))
+                    .font(RQTypography.headline)
+                    .foregroundColor(RQColors.textPrimary)
+
+                Spacer()
+
+                // Only allow forward if not current month
+                let isCurrentMonth = calendar.isDate(calendarMonth, equalTo: Date(), toGranularity: .month)
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        calendarMonth = calendar.date(byAdding: .month, value: 1, to: calendarMonth) ?? calendarMonth
+                    }
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(isCurrentMonth ? RQColors.textTertiary.opacity(0.3) : RQColors.accent)
+                }
+                .disabled(isCurrentMonth)
+            }
+
+            // Day headers
+            let dayHeaders = ["S", "M", "T", "W", "T", "F", "S"]
+            HStack(spacing: 0) {
+                ForEach(0..<7, id: \.self) { i in
+                    Text(dayHeaders[i])
+                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                        .foregroundColor(RQColors.textTertiary)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+
+            // Calendar grid
+            let days = calendarDays(for: calendarMonth)
+            let today = calendar.startOfDay(for: Date())
+
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 7), spacing: RQSpacing.xs) {
+                ForEach(days, id: \.self) { date in
+                    if let date {
+                        let isTrainingDay = viewModel.allTrainingDates.contains(calendar.startOfDay(for: date))
+                        let isToday = calendar.startOfDay(for: date) == today
+                        let dayNum = calendar.component(.day, from: date)
+
+                        Text("\(dayNum)")
+                            .font(.system(size: 12, weight: isToday ? .bold : .regular, design: .rounded))
+                            .foregroundColor(isToday ? .white : (isTrainingDay ? RQColors.accent : RQColors.textTertiary))
+                            .frame(width: 28, height: 28)
+                            .background(
+                                Circle()
+                                    .fill(isToday ? RQColors.accent : (isTrainingDay ? RQColors.accent.opacity(0.15) : Color.clear))
+                            )
+                            .frame(maxWidth: .infinity)
+                    } else {
+                        Text("")
+                            .frame(width: 28, height: 28)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+            }
+
+            // Monthly summary
+            let monthDates = viewModel.allTrainingDates.filter {
+                calendar.isDate($0, equalTo: calendarMonth, toGranularity: .month)
+            }
+            Text("\(monthDates.count) workout\(monthDates.count == 1 ? "" : "s") this month")
+                .font(RQTypography.caption)
+                .foregroundColor(RQColors.textTertiary)
+        }
+    }
+
+    /// Returns an array of optional dates for the calendar grid.
+    /// `nil` entries represent empty cells before the first day of the month.
+    private func calendarDays(for month: Date) -> [Date?] {
+        let calendar = Calendar.current
+        guard let range = calendar.range(of: .day, in: .month, for: month),
+              let firstOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: month)) else {
+            return []
+        }
+
+        let firstWeekday = calendar.component(.weekday, from: firstOfMonth) - 1 // 0=Sun
+        var days: [Date?] = Array(repeating: nil, count: firstWeekday)
+
+        for day in range {
+            if let date = calendar.date(byAdding: .day, value: day - 1, to: firstOfMonth) {
+                days.append(date)
+            }
+        }
+
+        return days
     }
 
     // MARK: - Template Picker Sheet (with inline day selection via NavigationStack push)

@@ -8,6 +8,8 @@ final class DashboardViewModel {
     var totalSessionCount: Int = 0
     /// Which weekdays (0=Sun, 1=Mon, ..., 6=Sat) had a completed workout this week
     var weeklyTrainingDays: Set<Int> = []
+    /// All dates (start of day) that had a completed workout
+    var allTrainingDates: Set<Date> = []
     var isLoading = false
     var templateCount: Int = 0
     var templates: [Template] = []
@@ -32,15 +34,20 @@ final class DashboardViewModel {
 
             // Compute which days this week had workouts
             let calendar = Calendar.current
+            let completedDates = loadedSessions
+                .filter { $0.status == .completed }
+                .compactMap(\.completedAt)
+
             if let weekInterval = calendar.dateInterval(of: .weekOfYear, for: Date()) {
                 weeklyTrainingDays = Set(
-                    loadedSessions
-                        .filter { $0.status == .completed }
-                        .compactMap(\.completedAt)
+                    completedDates
                         .filter { weekInterval.contains($0) }
                         .map { calendar.component(.weekday, from: $0) - 1 } // 0=Sun..6=Sat
                 )
             }
+
+            // All training dates (day granularity) for calendar view
+            allTrainingDates = Set(completedDates.map { calendar.startOfDay(for: $0) })
 
             let loadedTemplates = try await templates
             self.templates = loadedTemplates
