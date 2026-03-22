@@ -6,6 +6,8 @@ final class DashboardViewModel {
     var recentSession: WorkoutSession?
     var weeklySetCount: Int = 0
     var totalSessionCount: Int = 0
+    /// Which weekdays (0=Sun, 1=Mon, ..., 6=Sat) had a completed workout this week
+    var weeklyTrainingDays: Set<Int> = []
     var isLoading = false
     var templateCount: Int = 0
     var templates: [Template] = []
@@ -27,13 +29,26 @@ final class DashboardViewModel {
             weeklySetCount = try await setCount
             let loadedSessions = try await allSessions
             totalSessionCount = loadedSessions.filter { $0.status == .completed }.count
+
+            // Compute which days this week had workouts
+            let calendar = Calendar.current
+            if let weekInterval = calendar.dateInterval(of: .weekOfYear, for: Date()) {
+                weeklyTrainingDays = Set(
+                    loadedSessions
+                        .filter { $0.status == .completed }
+                        .compactMap(\.completedAt)
+                        .filter { weekInterval.contains($0) }
+                        .map { calendar.component(.weekday, from: $0) - 1 } // 0=Sun..6=Sat
+                )
+            }
+
             let loadedTemplates = try await templates
             self.templates = loadedTemplates
             templateCount = loadedTemplates.count
 
             // Sync widget data
             WidgetService.syncFromDashboard(
-                streak: 0, // Streak is loaded by analytics; will be updated next refresh
+                streak: 0,
                 weeklySetCount: weeklySetCount,
                 lastSession: recentSession?.completedAt
             )

@@ -68,31 +68,6 @@ struct DashboardView: View {
                         }
                     }
 
-                    // Weekly Volume
-                    RQCard {
-                        HStack {
-                            VStack(alignment: .leading, spacing: RQSpacing.xs) {
-                                Text("This Week")
-                                    .font(RQTypography.label)
-                                    .textCase(.uppercase)
-                                    .tracking(1.5)
-                                    .foregroundColor(RQColors.textSecondary)
-                                Text("\(viewModel.weeklySetCount) sets")
-                                    .font(RQTypography.numbers)
-                                    .foregroundColor(RQColors.textPrimary)
-                                Text(viewModel.weeklySetCount > 0
-                                    ? "Keep up the great work"
-                                    : "Start your first workout")
-                                    .font(RQTypography.caption)
-                                    .foregroundColor(RQColors.textTertiary)
-                            }
-                            Spacer()
-                            Image(systemName: "flame.fill")
-                                .font(.system(size: 24))
-                                .foregroundColor(RQColors.accent)
-                        }
-                    }
-
                     // Active Goals
                     if !goalViewModel.activeGoals.isEmpty {
                         NavigationLink {
@@ -147,6 +122,9 @@ struct DashboardView: View {
                             }
                         }
                     }
+
+                    // Weekly Activity
+                    weeklyActivityCard
                 }
                 .padding(.horizontal, RQSpacing.screenHorizontal)
                 .padding(.top, RQSpacing.lg)
@@ -258,6 +236,59 @@ struct DashboardView: View {
                         Image(systemName: "chevron.right")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(RQColors.textTertiary)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Weekly Activity Card
+
+    private var weeklyActivityCard: some View {
+        // Days ordered Mon-Sun for display
+        let dayLabels = ["M", "T", "W", "T", "F", "S", "S"]
+        // Calendar weekday indices for Mon(1)-Sun(0) mapped to Calendar's Sun=1..Sat=7
+        // Display order: Mon=2, Tue=3, Wed=4, Thu=5, Fri=6, Sat=7, Sun=1
+        // weeklyTrainingDays uses 0=Sun..6=Sat
+        let calendarIndices = [1, 2, 3, 4, 5, 6, 0] // Mon..Sun mapped to our 0-based
+
+        let today = Calendar.current.component(.weekday, from: Date()) - 1 // 0=Sun..6=Sat
+        let trainedCount = viewModel.weeklyTrainingDays.count
+
+        return RQCard {
+            VStack(spacing: RQSpacing.md) {
+                HStack {
+                    Text("This Week")
+                        .font(RQTypography.label)
+                        .textCase(.uppercase)
+                        .tracking(1.5)
+                        .foregroundColor(RQColors.textSecondary)
+                    Spacer()
+                    Text("\(trainedCount) day\(trainedCount == 1 ? "" : "s") trained")
+                        .font(RQTypography.caption)
+                        .foregroundColor(RQColors.textTertiary)
+                }
+
+                HStack(spacing: 0) {
+                    ForEach(0..<7, id: \.self) { i in
+                        let dayIndex = calendarIndices[i]
+                        let trained = viewModel.weeklyTrainingDays.contains(dayIndex)
+                        let isToday = dayIndex == today
+
+                        VStack(spacing: RQSpacing.xs) {
+                            Text(dayLabels[i])
+                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                                .foregroundColor(isToday ? RQColors.textPrimary : RQColors.textTertiary)
+
+                            Circle()
+                                .fill(trained ? RQColors.accent : RQColors.surfaceTertiary)
+                                .frame(width: 28, height: 28)
+                                .overlay(
+                                    Circle()
+                                        .stroke(isToday ? RQColors.accent : Color.clear, lineWidth: 2)
+                                )
+                        }
+                        .frame(maxWidth: .infinity)
                     }
                 }
             }
