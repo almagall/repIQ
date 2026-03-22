@@ -131,7 +131,7 @@ struct DashboardView: View {
                 .padding(.bottom, RQSpacing.xxxl)
             }
             .background(RQColors.background)
-            .navigationTitle("Dashboard")
+            .navigationTitle("Home")
             .toolbarColorScheme(.dark, for: .navigationBar)
             .task {
                 await viewModel.loadDashboard()
