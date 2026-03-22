@@ -104,6 +104,30 @@ struct GoalService: Sendable {
             .execute()
     }
 
+    /// Fetches exercises the user has previously logged in completed workouts.
+    func fetchLoggedExercises(userId: UUID) async throws -> [Exercise] {
+        // Get distinct exercise_ids from completed workout sets
+        let sets: [WorkoutSet] = try await supabase.from("workout_sets")
+            .select("*, workout_sessions!inner(*)")
+            .eq("workout_sessions.user_id", value: userId.uuidString)
+            .eq("workout_sessions.status", value: "completed")
+            .execute()
+            .value
+
+        let uniqueIds = Array(Set(sets.map(\.exerciseId)))
+        guard !uniqueIds.isEmpty else { return [] }
+
+        // Fetch the exercise details
+        let exercises: [Exercise] = try await supabase.from("exercises")
+            .select()
+            .in("id", values: uniqueIds.map(\.uuidString))
+            .order("name")
+            .execute()
+            .value
+
+        return exercises
+    }
+
     /// Fetches the current best weight or e1RM for an exercise to use as starting value.
     func fetchCurrentBest(userId: UUID, exerciseId: UUID, isEstimated1RM: Bool) async throws -> Double {
         let sets: [WorkoutSet] = try await supabase.from("workout_sets")
