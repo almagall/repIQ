@@ -500,7 +500,7 @@ struct WorkoutDayEditorView: View {
             if hasCap {
                 Button {
                     let newCap = currentCap - 1
-                    let repCap = newCap <= range.lowerBound ? nil : newCap
+                    let repCap = newCap < range.lowerBound ? nil : newCap
                     Task {
                         await viewModel.updateExerciseMode(
                             dayExercise,
