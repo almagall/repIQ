@@ -47,7 +47,9 @@ struct WorkoutDayExercise: Codable, Identifiable, Sendable {
 
     /// The effective rep range, narrowed by the rep cap if set.
     var effectiveRepRange: ClosedRange<Int> {
-        trainingMode.repRange.lowerBound...effectiveRepMax
+        let lower = trainingMode.repRange.lowerBound
+        let upper = max(effectiveRepMax, lower)
+        return lower...upper
     }
 
     enum CodingKeys: String, CodingKey {
