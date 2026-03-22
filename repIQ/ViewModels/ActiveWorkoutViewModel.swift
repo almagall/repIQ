@@ -21,6 +21,9 @@ final class ActiveWorkoutViewModel {
     // MARK: - Exercise Substitution
     var showExerciseSubstitution = false
 
+    // MARK: - Warmup Suggestion Dismissals
+    var dismissedWarmupSuggestions: Set<Int> = [] // exercise indices where user dismissed suggestion
+
     // MARK: - PR Celebration
     var prCelebration: PRCelebration?
 
@@ -933,6 +936,7 @@ final class ActiveWorkoutViewModel {
     /// Whether an exercise should show the warmup suggestion card.
     /// Only for barbell/smith machine hypertrophy exercises with no existing warmup sets.
     func shouldSuggestWarmup(exerciseIndex: Int) -> Bool {
+        guard !dismissedWarmupSuggestions.contains(exerciseIndex) else { return false }
         guard let exercise = exercises[safe: exerciseIndex] else { return false }
         let isCompound = exercise.equipment == "barbell" || exercise.equipment == "smith_machine"
         let isHypertrophy = exercise.trainingMode == .hypertrophy
@@ -940,6 +944,10 @@ final class ActiveWorkoutViewModel {
         let hasWorkingWeight = exercise.sets.first(where: { $0.setType == .working })?.weight ?? 0 > 0
             || exercise.progressionTarget?.targetWeight ?? 0 > 0
         return isCompound && isHypertrophy && hasNoWarmups && hasWorkingWeight
+    }
+
+    func dismissWarmupSuggestion(exerciseIndex: Int) {
+        dismissedWarmupSuggestions.insert(exerciseIndex)
     }
 
     /// Returns the suggested warmup weights for display in the suggestion card.

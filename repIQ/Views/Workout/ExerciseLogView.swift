@@ -51,13 +51,12 @@ struct ExerciseLogView: View {
 
                     // Grouped set sections
                     ForEach(groupedSets, id: \.type) { group in
-                        // Warmup suggestion or add button before working sets
+                        // Warmup suggestion and/or add button before working sets
                         if group.type == .working {
                             if viewModel.shouldSuggestWarmup(exerciseIndex: exerciseIndex) {
                                 warmupSuggestionCard
-                            } else {
-                                addWarmUpButton
                             }
+                            addWarmUpButton
                         }
 
                         sectionHeader(for: group.type, count: group.sets.count)
@@ -466,6 +465,19 @@ struct ExerciseLogView: View {
                         .background(RQColors.warmup)
                         .cornerRadius(RQRadius.medium)
                 }
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        viewModel.dismissWarmupSuggestion(exerciseIndex: exerciseIndex)
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(RQColors.textTertiary)
+                        .frame(width: 22, height: 22)
+                        .background(RQColors.surfaceTertiary)
+                        .clipShape(Circle())
+                }
             }
 
             if let weights {
@@ -502,6 +514,7 @@ struct ExerciseLogView: View {
 
     private var addWarmUpButton: some View {
         Button {
+            viewModel.dismissWarmupSuggestion(exerciseIndex: exerciseIndex)
             viewModel.addSet(exerciseIndex: exerciseIndex, setType: .warmup)
         } label: {
             HStack(spacing: RQSpacing.xs) {
