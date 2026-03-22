@@ -443,4 +443,19 @@ enum ProgressExplainer {
         ],
         howToUse: "Use supersets to cut workout time without sacrificing volume. Pair exercises that use different muscle groups or equipment. During the workout, the app will guide you through each superset member in order before starting the rest timer."
     )
+
+    // MARK: - Goal Topics
+
+    static let goalWeightType = Topic(
+        title: "Weight Goal Types",
+        icon: "scalemass.fill",
+        explanation: "Weight goals can track either the actual weight you lift or your estimated one-rep max (e1RM). These are fundamentally different measures of strength.",
+        keyPoints: [
+            "Actual Weight tracks the heaviest weight you complete for at least one rep. You must physically lift the target weight to achieve the goal.",
+            "Estimated 1RM calculates your theoretical max from any set. For example, lifting 225 lbs for 8 reps estimates a 1RM of about 285 lbs.",
+            "Use Actual Weight when you want to hit a specific number on the bar (e.g., a 315 lb squat).",
+            "Use Estimated 1RM when you train with moderate reps and want to track peak strength potential without maxing out.",
+        ],
+        howToUse: "If you train with 3-5 reps and regularly test heavy singles, use Actual Weight. If you train with 8-12 reps and rarely max out, Estimated 1RM gives you a better picture of your true strength progression."
+    )
 }

@@ -7,7 +7,6 @@ struct GoalSettingView: View {
 
     var body: some View {
         VStack(spacing: RQSpacing.lg) {
-            // Active Goals
             if viewModel.activeGoals.isEmpty && !viewModel.isLoading {
                 EmptyStateView(
                     icon: "target",
@@ -70,62 +69,118 @@ struct GoalSettingView: View {
         }
     }
 
+    // MARK: - Redesigned Goal Card
+
     private func goalCard(_ goal: Goal) -> some View {
         RQCard {
             VStack(alignment: .leading, spacing: RQSpacing.md) {
-                HStack {
-                    Image(systemName: goal.goalType.icon)
-                        .font(.system(size: 16))
-                        .foregroundColor(RQColors.accent)
-
+                // Header: exercise name + type badge + pace status
+                HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: RQSpacing.xxs) {
                         if let name = goal.exerciseName {
                             Text(name)
                                 .font(RQTypography.headline)
                                 .foregroundColor(RQColors.textPrimary)
                         }
-                        Text("\(goal.goalType.displayName): \(goal.displayTarget)")
-                            .font(RQTypography.caption)
-                            .foregroundColor(RQColors.textSecondary)
+
+                        HStack(spacing: RQSpacing.sm) {
+                            // Goal type badge
+                            Text(goal.goalTypeBadge)
+                                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                .foregroundColor(RQColors.accent)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(RQColors.accent.opacity(0.15))
+                                .cornerRadius(4)
+
+                            Text("Target: \(goal.displayTarget)")
+                                .font(RQTypography.caption)
+                                .foregroundColor(RQColors.textSecondary)
+                        }
                     }
 
                     Spacer()
 
                     if goal.isCompleted {
                         Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 22))
                             .foregroundColor(RQColors.success)
                     } else {
+                        // Pace status pill (when target date set)
+                        let pace = goal.paceStatus
+                        if pace != .noDate {
+                            Text(pace.label)
+                                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                .foregroundColor(pace.color)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(pace.color.opacity(0.15))
+                                .cornerRadius(4)
+                        }
+                    }
+                }
+
+                // Progress bar with percentage
+                VStack(spacing: RQSpacing.xs) {
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Capsule()
+                                .fill(RQColors.surfaceTertiary)
+                                .frame(height: 6)
+
+                            Capsule()
+                                .fill(goal.isCompleted ? RQColors.success : RQColors.accent)
+                                .frame(width: geo.size.width * goal.progress, height: 6)
+                        }
+                    }
+                    .frame(height: 6)
+
+                    HStack {
                         Text("\(Int(goal.progress * 100))%")
-                            .font(RQTypography.numbersSmall)
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
                             .foregroundColor(RQColors.accent)
+
+                        if !goal.isCompleted && goal.delta > 0 {
+                            Text("-- \(formatDelta(goal.delta)) \(goal.unit) to go")
+                                .font(RQTypography.caption)
+                                .foregroundColor(RQColors.textTertiary)
+                        }
+
+                        Spacer()
+
+                        // Milestone label
+                        if let milestone = goal.milestoneLabel, !goal.isCompleted {
+                            Text(milestone)
+                                .font(.system(size: 10, weight: .medium, design: .rounded))
+                                .foregroundColor(RQColors.textSecondary)
+                                .italic()
+                        }
                     }
                 }
 
-                // Progress bar
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        Capsule()
-                            .fill(RQColors.surfaceTertiary)
-                            .frame(height: 6)
-
-                        Capsule()
-                            .fill(goal.isCompleted ? RQColors.success : RQColors.accent)
-                            .frame(width: geo.size.width * goal.progress, height: 6)
-                    }
-                }
-                .frame(height: 6)
-
-                HStack {
-                    Text("Current: \(goal.displayCurrent)")
+                // Actionable insight
+                if !goal.isCompleted {
+                    Text(goal.nextStepDescription)
                         .font(RQTypography.caption)
-                        .foregroundColor(RQColors.textTertiary)
+                        .foregroundColor(RQColors.textSecondary)
+                }
 
-                    Spacer()
+                // Time remaining (when target date set)
+                if let timeDisplay = goal.timeRemainingDisplay, !goal.isCompleted {
+                    HStack(spacing: RQSpacing.xs) {
+                        Image(systemName: "clock")
+                            .font(.system(size: 11))
+                            .foregroundColor(goal.isOverdue ? .red : RQColors.textTertiary)
 
-                    if let targetDate = goal.targetDate {
-                        Text("By \(targetDate, style: .date)")
+                        Text(timeDisplay)
                             .font(RQTypography.caption)
-                            .foregroundColor(RQColors.textTertiary)
+                            .foregroundColor(goal.isOverdue ? .red : RQColors.textTertiary)
+
+                        if let targetDate = goal.targetDate {
+                            Text("(\(targetDate, style: .date))")
+                                .font(RQTypography.caption)
+                                .foregroundColor(RQColors.textTertiary)
+                        }
                     }
                 }
             }
@@ -150,6 +205,12 @@ struct GoalSettingView: View {
             }
         }
     }
+
+    private func formatDelta(_ value: Double) -> String {
+        value.truncatingRemainder(dividingBy: 1) == 0
+            ? String(format: "%.0f", value)
+            : String(format: "%.1f", value)
+    }
 }
 
 // MARK: - Create Goal View
@@ -157,12 +218,15 @@ struct GoalSettingView: View {
 struct CreateGoalView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var goalType: GoalType = .weight
+    @State private var isEstimated1RM = false
     @State private var selectedExercise: Exercise?
     @State private var targetValue = ""
-    @State private var targetDate = Date().addingTimeInterval(90 * 24 * 3600) // 90 days out
+    @State private var targetDate = Date().addingTimeInterval(90 * 24 * 3600)
     @State private var hasTargetDate = true
     @State private var showExercisePicker = false
     @State private var isCreating = false
+    @State private var currentBest: Double = 0
+    @State private var isFetchingBest = false
     var onCreated: (Goal) -> Void
 
     var body: some View {
@@ -181,6 +245,7 @@ struct CreateGoalView: View {
                             ForEach([GoalType.weight, .reps, .consistency], id: \.self) { type in
                                 Button {
                                     goalType = type
+                                    if type != .weight { isEstimated1RM = false }
                                 } label: {
                                     HStack {
                                         Image(systemName: type.icon)
@@ -199,6 +264,60 @@ struct CreateGoalView: View {
                                     }
                                     .padding(.vertical, RQSpacing.xs)
                                 }
+                            }
+                        }
+                    }
+
+                    // Weight Goal Mode: Actual vs Est. 1RM
+                    if goalType == .weight {
+                        RQCard {
+                            VStack(alignment: .leading, spacing: RQSpacing.md) {
+                                HStack {
+                                    Text("Weight Goal Type")
+                                        .font(RQTypography.label)
+                                        .textCase(.uppercase)
+                                        .tracking(1.5)
+                                        .foregroundColor(RQColors.textSecondary)
+
+                                    Spacer()
+
+                                    InfoButton(topic: ProgressExplainer.goalWeightType)
+                                }
+
+                                HStack(spacing: 0) {
+                                    Button {
+                                        isEstimated1RM = false
+                                        fetchCurrentBest()
+                                    } label: {
+                                        Text("Actual Weight")
+                                            .font(RQTypography.caption)
+                                            .fontWeight(.semibold)
+                                            .foregroundColor(!isEstimated1RM ? .white : RQColors.textSecondary)
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, RQSpacing.sm)
+                                            .background(!isEstimated1RM ? RQColors.accent : RQColors.surfaceTertiary)
+                                    }
+
+                                    Button {
+                                        isEstimated1RM = true
+                                        fetchCurrentBest()
+                                    } label: {
+                                        Text("Estimated 1RM")
+                                            .font(RQTypography.caption)
+                                            .fontWeight(.semibold)
+                                            .foregroundColor(isEstimated1RM ? .white : RQColors.textSecondary)
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, RQSpacing.sm)
+                                            .background(isEstimated1RM ? RQColors.accent : RQColors.surfaceTertiary)
+                                    }
+                                }
+                                .cornerRadius(RQRadius.medium)
+
+                                Text(isEstimated1RM
+                                    ? "Track your estimated max based on any set you complete"
+                                    : "Track the heaviest weight you actually lift for reps")
+                                    .font(RQTypography.caption)
+                                    .foregroundColor(RQColors.textTertiary)
                             }
                         }
                     }
@@ -223,6 +342,27 @@ struct CreateGoalView: View {
                                         Spacer()
                                         Image(systemName: "chevron.right")
                                             .font(.system(size: 12))
+                                            .foregroundColor(RQColors.textTertiary)
+                                    }
+                                }
+
+                                // Current best display
+                                if selectedExercise != nil && currentBest > 0 {
+                                    HStack(spacing: RQSpacing.xs) {
+                                        Image(systemName: "info.circle")
+                                            .font(.system(size: 12))
+                                            .foregroundColor(RQColors.accent)
+                                        Text("Current \(isEstimated1RM ? "est. 1RM" : "best"): \(formatValue(currentBest)) lbs")
+                                            .font(RQTypography.caption)
+                                            .foregroundColor(RQColors.accent)
+                                    }
+                                } else if isFetchingBest {
+                                    HStack(spacing: RQSpacing.xs) {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: RQColors.accent))
+                                            .scaleEffect(0.7)
+                                        Text("Loading current best...")
+                                            .font(RQTypography.caption)
                                             .foregroundColor(RQColors.textTertiary)
                                     }
                                 }
@@ -269,6 +409,12 @@ struct CreateGoalView: View {
                             .tint(RQColors.accent)
 
                             if hasTargetDate {
+                                // Days from now context
+                                let daysFromNow = Calendar.current.dateComponents([.day], from: Date(), to: targetDate).day ?? 0
+                                Text("\(daysFromNow) days from today")
+                                    .font(RQTypography.caption)
+                                    .foregroundColor(RQColors.textTertiary)
+
                                 DatePicker("", selection: $targetDate, in: Date()..., displayedComponents: .date)
                                     .datePickerStyle(.graphical)
                                     .tint(RQColors.accent)
@@ -301,6 +447,7 @@ struct CreateGoalView: View {
                 ExercisePickerView { exercise in
                     selectedExercise = exercise
                     showExercisePicker = false
+                    fetchCurrentBest()
                 }
             }
         }
@@ -308,7 +455,7 @@ struct CreateGoalView: View {
 
     private var targetPlaceholder: String {
         switch goalType {
-        case .weight: return "225"
+        case .weight: return isEstimated1RM ? "315" : "225"
         case .reps: return "10"
         case .consistency: return "4"
         case .volume: return "50000"
@@ -332,6 +479,22 @@ struct CreateGoalView: View {
         return true
     }
 
+    private func fetchCurrentBest() {
+        guard let exercise = selectedExercise, goalType == .weight else { return }
+        isFetchingBest = true
+        Task {
+            do {
+                guard let userId = try? await supabase.auth.session.user.id else { return }
+                currentBest = try await GoalService().fetchCurrentBest(
+                    userId: userId,
+                    exerciseId: exercise.id,
+                    isEstimated1RM: isEstimated1RM
+                )
+            } catch {}
+            isFetchingBest = false
+        }
+    }
+
     private func createGoal() async {
         guard let value = Double(targetValue) else { return }
         isCreating = true
@@ -344,6 +507,8 @@ struct CreateGoalView: View {
                 exerciseId: selectedExercise?.id,
                 exerciseName: selectedExercise?.name,
                 targetValue: value,
+                startingValue: currentBest,
+                isEstimated1RM: isEstimated1RM,
                 unit: targetUnit,
                 targetDate: hasTargetDate ? targetDate : nil
             )
@@ -352,5 +517,11 @@ struct CreateGoalView: View {
         } catch {
             isCreating = false
         }
+    }
+
+    private func formatValue(_ value: Double) -> String {
+        value.truncatingRemainder(dividingBy: 1) == 0
+            ? String(format: "%.0f", value)
+            : String(format: "%.1f", value)
     }
 }
