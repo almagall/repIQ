@@ -189,15 +189,16 @@ final class ActiveWorkoutViewModel {
             let weightPct = 0.80 + progress * 0.20
             let setWeight = roundToIncrement(topWeight * weightPct, increment)
 
-            // RPE ramps from 6 to target RPE (typically 8)
-            let rpe = 6.0 + progress * (target.targetRPE - 6.0)
+            // RPE ramps from 6 to target RPE (typically 8), snapped to 0.5 increments
+            let rawRPE = 6.0 + progress * (target.targetRPE - 6.0)
+            let rpe = (rawRPE * 2).rounded() / 2
 
             return (setWeight, topReps, rpe)
         }
     }
 
     /// Computes the expected RPE for a given set position based on training mode.
-    /// - Hypertrophy: gently ascending RPE (+0.25 per set from base, capped at 9.0)
+    /// - Hypertrophy: ascending RPE in 0.5 increments per set, capped at 9.0
     /// - Strength: handled inline in perSetTarget for ramping pattern
     private static func expectedRPE(
         baseRPE: Double,
@@ -207,9 +208,9 @@ final class ActiveWorkoutViewModel {
     ) -> Double {
         switch trainingMode {
         case .hypertrophy:
-            return min(baseRPE + Double(setPosition) * 0.25, 9.0)
+            return min(baseRPE + Double(setPosition) * 0.5, 9.0)
         case .strength:
-            return baseRPE // strength RPE is managed per-set in perSetTarget
+            return baseRPE
         }
     }
 
