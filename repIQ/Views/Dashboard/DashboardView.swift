@@ -25,34 +25,46 @@ struct DashboardView: View {
                     // My Templates
                     templatesSection
 
-                    // Recent Workout
-                    RQCard {
-                        HStack {
-                            VStack(alignment: .leading, spacing: RQSpacing.xs) {
-                                Text("Recent Workout")
-                                    .font(RQTypography.label)
-                                    .textCase(.uppercase)
-                                    .tracking(1.5)
-                                    .foregroundColor(RQColors.textSecondary)
-                                if let session = viewModel.recentSession {
-                                    Text(session.completedAt?.relativeDisplay ?? "Completed")
-                                        .font(RQTypography.headline)
-                                        .foregroundColor(RQColors.textPrimary)
-                                    if let duration = session.durationSeconds {
-                                        Text("\(duration / 60) min")
+                    // Workout History
+                    NavigationLink {
+                        WorkoutHistoryView()
+                    } label: {
+                        RQCard {
+                            HStack {
+                                VStack(alignment: .leading, spacing: RQSpacing.xs) {
+                                    Text("Workout History")
+                                        .font(RQTypography.label)
+                                        .textCase(.uppercase)
+                                        .tracking(1.5)
+                                        .foregroundColor(RQColors.textSecondary)
+
+                                    if viewModel.totalSessionCount > 0 {
+                                        Text("\(viewModel.totalSessionCount) workout\(viewModel.totalSessionCount == 1 ? "" : "s") logged")
+                                            .font(RQTypography.numbers)
+                                            .foregroundColor(RQColors.textPrimary)
+
+                                        if let session = viewModel.recentSession {
+                                            Text("Last trained \(session.completedAt?.relativeDisplay ?? "")")
+                                                .font(RQTypography.caption)
+                                                .foregroundColor(RQColors.textTertiary)
+                                        }
+                                    } else {
+                                        Text("No workouts yet")
+                                            .font(RQTypography.numbers)
+                                            .foregroundColor(RQColors.textPrimary)
+                                        Text("Complete your first workout")
                                             .font(RQTypography.caption)
                                             .foregroundColor(RQColors.textTertiary)
                                     }
-                                } else {
-                                    Text("No workouts yet")
-                                        .font(RQTypography.headline)
-                                        .foregroundColor(RQColors.textPrimary)
                                 }
+                                Spacer()
+                                Image(systemName: "clock.arrow.circlepath")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(RQColors.accent)
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(RQColors.textTertiary)
                             }
-                            Spacer()
-                            Image(systemName: "clock.arrow.circlepath")
-                                .font(.system(size: 24))
-                                .foregroundColor(RQColors.textTertiary)
                         }
                     }
 
@@ -83,43 +95,53 @@ struct DashboardView: View {
 
                     // Active Goals
                     if !goalViewModel.activeGoals.isEmpty {
-                        RQCard {
-                            VStack(alignment: .leading, spacing: RQSpacing.md) {
-                                Text("Goals")
-                                    .font(RQTypography.label)
-                                    .textCase(.uppercase)
-                                    .tracking(1.5)
-                                    .foregroundColor(RQColors.textSecondary)
+                        NavigationLink {
+                            GoalSettingView()
+                        } label: {
+                            RQCard {
+                                VStack(alignment: .leading, spacing: RQSpacing.md) {
+                                    HStack {
+                                        Text("Goals")
+                                            .font(RQTypography.label)
+                                            .textCase(.uppercase)
+                                            .tracking(1.5)
+                                            .foregroundColor(RQColors.textSecondary)
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundColor(RQColors.textTertiary)
+                                    }
 
-                                ForEach(goalViewModel.activeGoals.prefix(3)) { goal in
-                                    HStack(spacing: RQSpacing.md) {
-                                        Image(systemName: goal.goalType.icon)
-                                            .font(.system(size: 14))
-                                            .foregroundColor(RQColors.accent)
-                                            .frame(width: 20)
+                                    ForEach(goalViewModel.activeGoals.prefix(3)) { goal in
+                                        HStack(spacing: RQSpacing.md) {
+                                            Image(systemName: goal.goalType.icon)
+                                                .font(.system(size: 14))
+                                                .foregroundColor(RQColors.accent)
+                                                .frame(width: 20)
 
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(goal.exerciseName ?? goal.goalType.displayName)
-                                                .font(RQTypography.caption)
-                                                .foregroundColor(RQColors.textPrimary)
-                                                .lineLimit(1)
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(goal.exerciseName ?? goal.goalType.displayName)
+                                                    .font(RQTypography.caption)
+                                                    .foregroundColor(RQColors.textPrimary)
+                                                    .lineLimit(1)
 
-                                            GeometryReader { geo in
-                                                ZStack(alignment: .leading) {
-                                                    Capsule()
-                                                        .fill(RQColors.surfaceTertiary)
-                                                        .frame(height: 4)
-                                                    Capsule()
-                                                        .fill(RQColors.accent)
-                                                        .frame(width: geo.size.width * goal.progress, height: 4)
+                                                GeometryReader { geo in
+                                                    ZStack(alignment: .leading) {
+                                                        Capsule()
+                                                            .fill(RQColors.surfaceTertiary)
+                                                            .frame(height: 4)
+                                                        Capsule()
+                                                            .fill(RQColors.accent)
+                                                            .frame(width: geo.size.width * goal.progress, height: 4)
+                                                    }
                                                 }
+                                                .frame(height: 4)
                                             }
-                                            .frame(height: 4)
-                                        }
 
-                                        Text("\(Int(goal.progress * 100))%")
-                                            .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                            .foregroundColor(RQColors.accent)
+                                            Text("\(Int(goal.progress * 100))%")
+                                                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                                .foregroundColor(RQColors.accent)
+                                        }
                                     }
                                 }
                             }

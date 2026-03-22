@@ -5,6 +5,7 @@ import Supabase
 final class DashboardViewModel {
     var recentSession: WorkoutSession?
     var weeklySetCount: Int = 0
+    var totalSessionCount: Int = 0
     var isLoading = false
     var templateCount: Int = 0
     var templates: [Template] = []
@@ -19,10 +20,13 @@ final class DashboardViewModel {
 
             async let sessions = workoutService.fetchRecentSessions(userId: userId, limit: 1)
             async let setCount = workoutService.fetchWeeklySetCount(userId: userId)
+            async let allSessions = workoutService.fetchAllSessions(userId: userId)
             async let templates = templateService.fetchTemplates(userId: userId)
 
             recentSession = try await sessions.first
             weeklySetCount = try await setCount
+            let loadedSessions = try await allSessions
+            totalSessionCount = loadedSessions.filter { $0.status == .completed }.count
             let loadedTemplates = try await templates
             self.templates = loadedTemplates
             templateCount = loadedTemplates.count
