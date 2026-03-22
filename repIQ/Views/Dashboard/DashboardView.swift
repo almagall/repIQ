@@ -68,25 +68,35 @@ struct DashboardView: View {
                         }
                     }
 
-                    // Active Goals
-                    if !goalViewModel.activeGoals.isEmpty {
-                        NavigationLink {
-                            GoalSettingView()
-                        } label: {
-                            RQCard {
-                                VStack(alignment: .leading, spacing: RQSpacing.md) {
-                                    HStack {
-                                        Text("Goals")
-                                            .font(RQTypography.label)
-                                            .textCase(.uppercase)
-                                            .tracking(1.5)
-                                            .foregroundColor(RQColors.textSecondary)
-                                        Spacer()
-                                        Image(systemName: "chevron.right")
-                                            .font(.system(size: 14, weight: .semibold))
-                                            .foregroundColor(RQColors.textTertiary)
-                                    }
+                    // Goals
+                    NavigationLink {
+                        GoalSettingView()
+                    } label: {
+                        RQCard {
+                            VStack(alignment: .leading, spacing: RQSpacing.md) {
+                                HStack {
+                                    Text("Goals")
+                                        .font(RQTypography.label)
+                                        .textCase(.uppercase)
+                                        .tracking(1.5)
+                                        .foregroundColor(RQColors.textSecondary)
+                                    Spacer()
+                                    Image(systemName: "target")
+                                        .font(.system(size: 24))
+                                        .foregroundColor(RQColors.accent)
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundColor(RQColors.textTertiary)
+                                }
 
+                                if goalViewModel.activeGoals.isEmpty {
+                                    Text("No goals yet")
+                                        .font(RQTypography.numbers)
+                                        .foregroundColor(RQColors.textPrimary)
+                                    Text("Set a goal to track your progress")
+                                        .font(RQTypography.caption)
+                                        .foregroundColor(RQColors.textTertiary)
+                                } else {
                                     ForEach(goalViewModel.activeGoals.prefix(3)) { goal in
                                         HStack(spacing: RQSpacing.md) {
                                             Image(systemName: goal.goalType.icon)
