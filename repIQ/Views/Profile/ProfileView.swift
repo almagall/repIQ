@@ -166,18 +166,6 @@ struct ProfileView: View {
                                 )
                             }
 
-                            Divider().background(RQColors.surfaceTertiary)
-
-                            // Export Data
-                            NavigationLink {
-                                ExportView()
-                            } label: {
-                                settingsRow(
-                                    icon: "square.and.arrow.up",
-                                    title: "Export Data",
-                                    value: ""
-                                )
-                            }
                         }
                     }
 
