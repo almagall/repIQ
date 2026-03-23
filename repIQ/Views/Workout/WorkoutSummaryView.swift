@@ -5,100 +5,25 @@ struct WorkoutSummaryView: View {
     let onDismiss: () -> Void
     @State private var shareImage: UIImage?
     @State private var showShareSheet = false
+    @State private var selectedTab = 0 // 0 = Summary, 1 = Report
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: RQSpacing.xl) {
-                    // Header
-                    VStack(spacing: RQSpacing.md) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 56))
-                            .foregroundColor(RQColors.success)
-
-                        Text("Workout Complete!")
-                            .font(RQTypography.title1)
-                            .foregroundColor(RQColors.textPrimary)
-                    }
-                    .padding(.top, RQSpacing.xl)
-
-                    // Stats row
-                    HStack(spacing: RQSpacing.lg) {
-                        statCard(
-                            label: "Duration",
-                            value: formattedDuration,
-                            icon: "clock"
-                        )
-                        statCard(
-                            label: "Sets",
-                            value: "\(summary.totalSets)",
-                            icon: "number"
-                        )
-                        statCard(
-                            label: "Volume",
-                            value: formattedVolume,
-                            icon: "scalemass"
-                        )
-                    }
-
-                    // Gamification: IQ Points + Streak
-                    if summary.iqPointsEarned > 0 || summary.currentStreak > 0 {
-                        gamificationSection
-                    }
-
-                    // New badges
-                    if !summary.newBadges.isEmpty {
-                        newBadgesSection
-                    }
-
-                    // PR celebrations (exclude volume — not actionable insight)
-                    let displayPRs = summary.newPRs.filter { $0.recordType != .volume }
-                    if !displayPRs.isEmpty {
-                        VStack(alignment: .leading, spacing: RQSpacing.md) {
-                            Text("New Personal Records")
-                                .font(RQTypography.label)
-                                .textCase(.uppercase)
-                                .tracking(1.5)
-                                .foregroundColor(RQColors.textSecondary)
-
-                            ForEach(displayPRs) { pr in
-                                prCard(pr)
-                            }
-                        }
-                    }
-
-                    // Exercise breakdown
-                    if !summary.exerciseSummaries.isEmpty {
-                        VStack(alignment: .leading, spacing: RQSpacing.md) {
-                            Text("Exercise Breakdown")
-                                .font(RQTypography.label)
-                                .textCase(.uppercase)
-                                .tracking(1.5)
-                                .foregroundColor(RQColors.textSecondary)
-
-                            ForEach(summary.exerciseSummaries) { exercise in
-                                exerciseCard(exercise)
-                            }
-                        }
-                    }
-
-                    // Next session progression
-                    if !summary.progressionDecisions.isEmpty {
-                        VStack(alignment: .leading, spacing: RQSpacing.md) {
-                            Text("Next Session")
-                                .font(RQTypography.label)
-                                .textCase(.uppercase)
-                                .tracking(1.5)
-                                .foregroundColor(RQColors.textSecondary)
-
-                            ForEach(summary.progressionDecisions) { progression in
-                                progressionCard(progression)
-                            }
-                        }
-                    }
+            VStack(spacing: 0) {
+                // Summary / Report toggle
+                Picker("View", selection: $selectedTab) {
+                    Text("Summary").tag(0)
+                    Text("Report").tag(1)
                 }
+                .pickerStyle(.segmented)
                 .padding(.horizontal, RQSpacing.screenHorizontal)
-                .padding(.bottom, RQSpacing.xxxl)
+                .padding(.vertical, RQSpacing.md)
+
+                if selectedTab == 0 {
+                    summaryView
+                } else {
+                    reportView
+                }
             }
             .background(RQColors.background)
             .navigationBarTitleDisplayMode(.inline)
@@ -129,11 +54,140 @@ struct WorkoutSummaryView: View {
         }
     }
 
+    // MARK: - Summary View (Shareable Card)
+
+    private var summaryView: some View {
+        ScrollView {
+            VStack(spacing: RQSpacing.lg) {
+                // Share card displayed inline
+                WorkoutShareCard(summary: summary)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .shadow(color: RQColors.accent.opacity(0.1), radius: 12, y: 4)
+
+                // Share button
+                Button {
+                    generateShareImage()
+                } label: {
+                    HStack(spacing: RQSpacing.sm) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 16))
+                        Text("Share Workout")
+                            .font(RQTypography.headline)
+                    }
+                    .foregroundColor(.black)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, RQSpacing.md)
+                    .background(RQColors.accent)
+                    .cornerRadius(RQRadius.medium)
+                }
+                .padding(.horizontal, RQSpacing.screenHorizontal)
+            }
+            .padding(.top, RQSpacing.md)
+            .padding(.bottom, RQSpacing.xxxl)
+        }
+    }
+
+    // MARK: - Report View (Detailed Breakdown)
+
+    private var reportView: some View {
+        ScrollView {
+            VStack(spacing: RQSpacing.xl) {
+                // Header
+                VStack(spacing: RQSpacing.md) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 56))
+                        .foregroundColor(RQColors.success)
+
+                    Text("Workout Complete!")
+                        .font(RQTypography.title1)
+                        .foregroundColor(RQColors.textPrimary)
+                }
+                .padding(.top, RQSpacing.xl)
+
+                // Stats row
+                HStack(spacing: RQSpacing.lg) {
+                    statCard(
+                        label: "Duration",
+                        value: formattedDuration,
+                        icon: "clock"
+                    )
+                    statCard(
+                        label: "Sets",
+                        value: "\(summary.totalSets)",
+                        icon: "number"
+                    )
+                    statCard(
+                        label: "Volume",
+                        value: formattedVolume,
+                        icon: "scalemass"
+                    )
+                }
+
+                // Gamification: IQ Points + Streak
+                if summary.iqPointsEarned > 0 || summary.currentStreak > 0 {
+                    gamificationSection
+                }
+
+                // New badges
+                if !summary.newBadges.isEmpty {
+                    newBadgesSection
+                }
+
+                // PR celebrations (exclude volume)
+                let displayPRs = summary.newPRs.filter { $0.recordType != .volume }
+                if !displayPRs.isEmpty {
+                    VStack(alignment: .leading, spacing: RQSpacing.md) {
+                        Text("New Personal Records")
+                            .font(RQTypography.label)
+                            .textCase(.uppercase)
+                            .tracking(1.5)
+                            .foregroundColor(RQColors.textSecondary)
+
+                        ForEach(displayPRs) { pr in
+                            prCard(pr)
+                        }
+                    }
+                }
+
+                // Exercise breakdown
+                if !summary.exerciseSummaries.isEmpty {
+                    VStack(alignment: .leading, spacing: RQSpacing.md) {
+                        Text("Exercise Breakdown")
+                            .font(RQTypography.label)
+                            .textCase(.uppercase)
+                            .tracking(1.5)
+                            .foregroundColor(RQColors.textSecondary)
+
+                        ForEach(summary.exerciseSummaries) { exercise in
+                            exerciseCard(exercise)
+                        }
+                    }
+                }
+
+                // Next session progression
+                if !summary.progressionDecisions.isEmpty {
+                    VStack(alignment: .leading, spacing: RQSpacing.md) {
+                        Text("Next Session")
+                            .font(RQTypography.label)
+                            .textCase(.uppercase)
+                            .tracking(1.5)
+                            .foregroundColor(RQColors.textSecondary)
+
+                        ForEach(summary.progressionDecisions) { progression in
+                            progressionCard(progression)
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, RQSpacing.screenHorizontal)
+            .padding(.bottom, RQSpacing.xxxl)
+        }
+    }
+
     // MARK: - Gamification
 
     private var gamificationSection: some View {
         HStack(spacing: RQSpacing.lg) {
-            // IQ Points earned
             if summary.iqPointsEarned > 0 {
                 RQCard {
                     VStack(spacing: RQSpacing.sm) {
@@ -153,7 +207,6 @@ struct WorkoutSummaryView: View {
                 }
             }
 
-            // Streak
             if summary.currentStreak > 0 {
                 RQCard {
                     VStack(spacing: RQSpacing.sm) {
@@ -249,7 +302,6 @@ struct WorkoutSummaryView: View {
     private func exerciseCard(_ exercise: WorkoutSummaryData.ExerciseSummary) -> some View {
         RQCard {
             HStack {
-                // Mode indicator bar
                 RoundedRectangle(cornerRadius: 1)
                     .fill(exercise.trainingMode == .hypertrophy ? RQColors.hypertrophy : RQColors.strength)
                     .frame(width: 3, height: 40)
@@ -317,12 +369,10 @@ struct WorkoutSummaryView: View {
     private func progressionCard(_ progression: ProgressionSummary) -> some View {
         RQCard {
             VStack(alignment: .leading, spacing: RQSpacing.sm) {
-                // Exercise name
                 Text(progression.exerciseName)
                     .font(RQTypography.body)
                     .foregroundColor(RQColors.textPrimary)
 
-                // Decision + target
                 HStack(spacing: RQSpacing.sm) {
                     Image(systemName: decisionIcon(progression.decision))
                         .font(.system(size: 12))
@@ -342,7 +392,6 @@ struct WorkoutSummaryView: View {
                         .foregroundColor(RQColors.textPrimary)
                 }
 
-                // Reasoning
                 Text(progression.reasoning)
                     .font(RQTypography.caption)
                     .foregroundColor(RQColors.textSecondary)

@@ -14,6 +14,15 @@ enum RecordType: String, Codable, CaseIterable, Sendable {
         case .estimated1rm: return "Est. 1RM"
         }
     }
+
+    var shortLabel: String {
+        switch self {
+        case .weight: return "WT"
+        case .reps: return "REP"
+        case .volume: return "VOL"
+        case .estimated1rm: return "1RM"
+        }
+    }
 }
 
 struct PersonalRecord: Codable, Identifiable, Sendable {
