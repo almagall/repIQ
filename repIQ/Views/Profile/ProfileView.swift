@@ -5,7 +5,6 @@ struct ProfileView: View {
     @State private var showWeightUnitPicker = false
     @State private var showRestTimerPicker = false
     @State private var username = ""
-    @State private var bio = ""
     @State private var isSavingSocial = false
 
     private let restTimerOptions = [60, 90, 120, 150, 180, 210, 240]
@@ -67,38 +66,13 @@ struct ProfileView: View {
                                     .cornerRadius(RQRadius.medium)
                             }
 
-                            // Bio
-                            VStack(alignment: .leading, spacing: RQSpacing.sm) {
-                                HStack {
-                                    Text("BIO")
-                                        .font(RQTypography.label)
-                                        .foregroundColor(RQColors.textTertiary)
-                                        .tracking(1.5)
-
-                                    Spacer()
-
-                                    Text("\(bio.count)/200")
-                                        .font(RQTypography.label)
-                                        .foregroundColor(bio.count > 200 ? RQColors.error : RQColors.textTertiary)
-                                }
-
-                                TextField("Tell others about yourself", text: $bio, axis: .vertical)
-                                    .font(RQTypography.body)
-                                    .foregroundColor(RQColors.textPrimary)
-                                    .lineLimit(3...5)
-                                    .padding(.horizontal, RQSpacing.md)
-                                    .padding(.vertical, RQSpacing.md)
-                                    .background(RQColors.surfaceTertiary)
-                                    .cornerRadius(RQRadius.medium)
-                            }
-
                             // Save
                             Button {
                                 isSavingSocial = true
                                 Task {
                                     await viewModel.updateUsernameAndBio(
                                         username: username.isEmpty ? nil : username,
-                                        bio: bio.isEmpty ? nil : bio
+                                        bio: nil
                                     )
                                     isSavingSocial = false
                                 }
@@ -212,7 +186,6 @@ struct ProfileView: View {
             .task {
                 await viewModel.loadProfile()
                 username = viewModel.profile?.username ?? ""
-                bio = viewModel.profile?.bio ?? ""
             }
             .confirmationDialog("Weight Unit", isPresented: $showWeightUnitPicker) {
                 Button("lbs") {
