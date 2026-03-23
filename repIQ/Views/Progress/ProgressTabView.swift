@@ -97,7 +97,6 @@ struct ProgressTabView: View {
             }
             .navigationDestination(isPresented: $showMonthlyReport) {
                 MonthlyWrappedView(viewModel: socialViewModel)
-                    .navigationTitle("Monthly Report Card")
             }
             .navigationDestination(for: UUID.self) { sessionId in
                 SessionDetailView(viewModel: viewModel, sessionId: sessionId)
