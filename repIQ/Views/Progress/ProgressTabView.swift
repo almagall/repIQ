@@ -73,12 +73,7 @@ struct ProgressTabView: View {
                             trainingQualitySection
                         }
 
-                        // 12. Training Frequency Heatmap
-                        if !viewModel.frequencyData.isEmpty {
-                            frequencyHeatmapSection
-                        }
-
-                        // Workout History moved to Home page
+                        // Training Frequency moved to Home page (Activity calendar)
                     }
                     .padding(.horizontal, RQSpacing.screenHorizontal)
                     .padding(.top, RQSpacing.lg)
@@ -932,75 +927,7 @@ struct ProgressTabView: View {
 
     // MARK: - 12. Training Frequency Heatmap
 
-    private var frequencyHeatmapSection: some View {
-        VStack(alignment: .leading, spacing: RQSpacing.md) {
-            sectionHeaderWithInfo("TRAINING FREQUENCY", topic: ProgressExplainer.trainingFrequency)
-
-            RQCard {
-                VStack(alignment: .leading, spacing: RQSpacing.sm) {
-                    // Day labels
-                    HStack(spacing: 0) {
-                        ForEach(Array(["M", "T", "W", "T", "F", "S", "S"].enumerated()), id: \.offset) { _, day in
-                            Text(day)
-                                .font(RQTypography.label)
-                                .foregroundColor(RQColors.textTertiary)
-                                .frame(maxWidth: .infinity)
-                        }
-                    }
-
-                    // Heatmap grid
-                    let weeks = organizeFrequencyByWeek()
-                    VStack(spacing: 3) {
-                        ForEach(Array(weeks.enumerated()), id: \.offset) { _, week in
-                            HStack(spacing: 3) {
-                                ForEach(0..<7, id: \.self) { dayIndex in
-                                    let count = week.count > dayIndex ? week[dayIndex] : 0
-                                    RoundedRectangle(cornerRadius: 2)
-                                        .fill(heatmapColor(count: count))
-                                        .aspectRatio(1, contentMode: .fit)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func organizeFrequencyByWeek() -> [[Int]] {
-        let calendar = Calendar.current
-        var weeks: [[Int]] = []
-        var currentWeek: [Int] = []
-
-        for entry in viewModel.frequencyData {
-            let weekday = calendar.component(.weekday, from: entry.date)
-            let mondayIndex = (weekday + 5) % 7
-
-            if mondayIndex == 0 && !currentWeek.isEmpty {
-                while currentWeek.count < 7 { currentWeek.append(0) }
-                weeks.append(currentWeek)
-                currentWeek = []
-            }
-
-            while currentWeek.count < mondayIndex { currentWeek.append(0) }
-            currentWeek.append(entry.count)
-        }
-
-        if !currentWeek.isEmpty {
-            while currentWeek.count < 7 { currentWeek.append(0) }
-            weeks.append(currentWeek)
-        }
-
-        return weeks
-    }
-
-    private func heatmapColor(count: Int) -> Color {
-        switch count {
-        case 0: return RQColors.surfaceTertiary
-        case 1: return RQColors.accent.opacity(0.4)
-        default: return RQColors.accent
-        }
-    }
+    // Training Frequency removed — Activity calendar available on Home page
 
     // MARK: - 13. Exercise Progress Entry
 
@@ -1024,6 +951,9 @@ struct ProgressTabView: View {
                     Image(systemName: "chart.xyaxis.line")
                         .font(.system(size: 20))
                         .foregroundColor(RQColors.accent)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(RQColors.textTertiary)
                 }
             }
         }
