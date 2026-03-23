@@ -96,8 +96,8 @@ struct WorkoutShareCard: View {
                         Spacer()
                     }
 
-                    ForEach(summary.exerciseSummaries.prefix(8)) { exercise in
-                        HStack {
+                    ForEach(summary.exerciseSummaries.prefix(10)) { exercise in
+                        HStack(spacing: 6) {
                             // Mode indicator dot
                             Circle()
                                 .fill(exercise.trainingMode == .hypertrophy ? RQColors.hypertrophy : RQColors.strength)
@@ -107,6 +107,21 @@ struct WorkoutShareCard: View {
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.white)
                                 .lineLimit(1)
+
+                            // PR badge if this exercise has a PR
+                            if let pr = exercisePR(for: exercise.name) {
+                                HStack(spacing: 2) {
+                                    Image(systemName: "trophy.fill")
+                                        .font(.system(size: 7))
+                                    Text(pr.recordType.shortLabel)
+                                        .font(.system(size: 8, weight: .bold))
+                                }
+                                .foregroundColor(RQColors.warning)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 2)
+                                .background(RQColors.warning.opacity(0.15))
+                                .clipShape(Capsule())
+                            }
 
                             Spacer()
 
@@ -118,8 +133,8 @@ struct WorkoutShareCard: View {
                         }
                     }
 
-                    if summary.exerciseSummaries.count > 8 {
-                        Text("+\(summary.exerciseSummaries.count - 8) more")
+                    if summary.exerciseSummaries.count > 10 {
+                        Text("+\(summary.exerciseSummaries.count - 10) more")
                             .font(.system(size: 11))
                             .foregroundColor(Color.white.opacity(0.3))
                     }
@@ -182,6 +197,12 @@ struct WorkoutShareCard: View {
         Rectangle()
             .fill(Color.white.opacity(0.1))
             .frame(width: 1, height: 36)
+    }
+
+    // MARK: - PR Lookup
+
+    private func exercisePR(for exerciseName: String) -> PRSummary? {
+        summary.newPRs.first { $0.exerciseName == exerciseName && $0.recordType != .volume }
     }
 
     // MARK: - Formatting
