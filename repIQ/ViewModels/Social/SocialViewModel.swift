@@ -255,10 +255,13 @@ final class SocialViewModel {
         guard let userId = try? await supabase.auth.session.user.id else { return }
         // Skip if already friends or already sent
         guard !friendIds.contains(friendId), !sentRequestIds.contains(friendId) else { return }
+        // Optimistically show "Sent" immediately
+        sentRequestIds.insert(friendId)
         do {
             try await socialService.sendFriendRequest(from: userId, to: friendId)
-            sentRequestIds.insert(friendId)
         } catch {
+            // Revert on failure
+            sentRequestIds.remove(friendId)
             errorMessage = "Failed to send friend request."
         }
     }
