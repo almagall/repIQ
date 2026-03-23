@@ -5,8 +5,13 @@ struct WorkoutHistoryView: View {
     @State private var sessions: [WorkoutSession] = []
     @State private var isLoading = true
     @State private var progressViewModel = ProgressDashboardViewModel()
+    @State private var isExportingCSV = false
+    @State private var csvData: String?
+    @State private var showCSVShare = false
+    @State private var exportError: String?
 
     private let workoutService = WorkoutService()
+    private let exportService = ExportService()
 
     var body: some View {
         Group {
@@ -49,6 +54,48 @@ struct WorkoutHistoryView: View {
         .refreshable {
             await loadSessions()
         }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    Task { await exportCSV() }
+                } label: {
+                    if isExportingCSV {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: RQColors.accent))
+                            .scaleEffect(0.8)
+                    } else {
+                        Image(systemName: "square.and.arrow.up")
+                            .foregroundColor(RQColors.accent)
+                    }
+                }
+                .disabled(isExportingCSV || sessions.isEmpty)
+            }
+        }
+        .sheet(isPresented: $showCSVShare) {
+            if let csvData {
+                let url = saveToTemp(data: Data(csvData.utf8), filename: "repiq-export.csv")
+                ShareSheet(items: [url])
+            }
+        }
+    }
+
+    private func exportCSV() async {
+        isExportingCSV = true
+        exportError = nil
+        do {
+            guard let userId = try? await supabase.auth.session.user.id else { return }
+            csvData = try await exportService.generateCSV(userId: userId)
+            showCSVShare = true
+        } catch {
+            exportError = "Failed to generate CSV."
+        }
+        isExportingCSV = false
+    }
+
+    private func saveToTemp(data: Data, filename: String) -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+        try? data.write(to: url)
+        return url
     }
 
     private func loadSessions() async {
