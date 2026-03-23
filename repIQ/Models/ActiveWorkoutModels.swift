@@ -88,6 +88,14 @@ struct ExerciseLogEntry: Identifiable {
     var isSubstituted: Bool { originalExerciseId != nil }
     var repCap: Int? // optional rep cap from template exercise config
 
+    /// Whether this bodyweight exercise has been toggled to track added weight (dip belt, vest, etc.)
+    var useAddedWeight: Bool = false
+
+    /// True when equipment is bodyweight and user hasn't opted into added weight tracking.
+    var isBodyweightOnly: Bool {
+        equipment == "bodyweight" && !useAddedWeight
+    }
+
     /// The superset group index, if this exercise is part of a superset.
     var supersetGroup: Int?
 

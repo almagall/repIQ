@@ -153,6 +153,25 @@ struct ExerciseLogView: View {
                             .foregroundColor(RQColors.accent)
                     }
                 }
+
+                // Add Weight toggle for bodyweight exercises
+                if exercise.equipment == "bodyweight" {
+                    Button {
+                        viewModel.toggleAddedWeight(exerciseIndex: exerciseIndex)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: exercise.useAddedWeight ? "minus.circle" : "plus.circle")
+                                .font(.system(size: 11))
+                            Text(exercise.useAddedWeight ? "Remove Weight" : "Add Weight")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .foregroundColor(RQColors.accent)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(RQColors.accent.opacity(0.1))
+                        .cornerRadius(RQRadius.small)
+                    }
+                }
             }
 
             Spacer()
@@ -412,10 +431,11 @@ struct ExerciseLogView: View {
     // MARK: - Column Headers
 
     private var columnHeaders: some View {
-        HStack(spacing: RQSpacing.sm) {
+        let isBodyweight = exercise?.isBodyweightOnly ?? false
+        return HStack(spacing: RQSpacing.sm) {
             Text("SET")
                 .frame(width: 26, alignment: .center)
-            Text("LBS")
+            Text(isBodyweight ? "BW" : "LBS")
                 .frame(width: 64, alignment: .center)
             Text("")
                 .frame(width: 8)
