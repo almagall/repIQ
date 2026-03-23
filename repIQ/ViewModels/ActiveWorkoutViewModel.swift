@@ -229,10 +229,14 @@ final class ActiveWorkoutViewModel {
             return (target.targetWeight, target.targetRepsLow, rpe)
 
         case .strength:
-            // Ascending RPE model (Barbell Medicine / 5/3/1 style):
-            // All sets use the same rep target. Weight increases each set.
-            // Last set is the top set (heaviest, highest RPE).
-            // Example with 4 sets: 82%×3 @6 → 88%×3 @7 → 94%×3 @7.5 → 100%×3 @8
+            // Ascending weight model (Barbell Medicine / 5/3/1 style):
+            // All sets use the same rep target. Weight ramps to a top set.
+            // Start percentage scales with set count so ramp feels natural:
+            //   2 sets: 87% → 100%
+            //   3 sets: 82% → 91% → 100%
+            //   4 sets: 80% → 87% → 93% → 100%
+            //   5 sets: 78% → 84% → 89% → 95% → 100%
+            //   6 sets: 77% → 82% → 86% → 91% → 95% → 100%
             let topWeight = target.targetWeight
             let topReps = target.targetRepsLow
             let lastIndex = max(totalSets - 1, 0)
@@ -241,9 +245,18 @@ final class ActiveWorkoutViewModel {
                 return (topWeight, topReps, target.targetRPE)
             }
 
-            // Linear ramp from ~80% to 100% of top weight
+            // Start percentage decreases as sets increase (more ramp room)
+            let startPct: Double
+            switch totalSets {
+            case 2: startPct = 0.87
+            case 3: startPct = 0.82
+            case 4: startPct = 0.80
+            case 5: startPct = 0.78
+            default: startPct = 0.77 // 6+
+            }
+
             let progress = Double(setPosition) / Double(lastIndex)
-            let weightPct = 0.80 + progress * 0.20
+            let weightPct = startPct + progress * (1.0 - startPct)
             let setWeight = roundToIncrement(topWeight * weightPct, increment)
 
             // RPE ramps from 6 to target RPE (typically 8), snapped to 0.5 increments
