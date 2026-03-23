@@ -1,11 +1,12 @@
 import SwiftUI
+import Supabase
 
 struct ExercisePickerProgressView: View {
     @State private var exercises: [Exercise] = []
     @State private var searchText = ""
     @State private var isLoading = false
 
-    private let exerciseService = ExerciseLibraryService()
+    private let goalService = GoalService()
 
     private var filteredExercises: [Exercise] {
         if searchText.isEmpty {
@@ -105,7 +106,8 @@ struct ExercisePickerProgressView: View {
     private func loadExercises() async {
         isLoading = true
         do {
-            exercises = try await exerciseService.fetchExercises()
+            guard let userId = try? await supabase.auth.session.user.id else { return }
+            exercises = try await goalService.fetchLoggedExercises(userId: userId)
         } catch {
             // Silently handle
         }
