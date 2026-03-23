@@ -62,7 +62,7 @@ struct PrivacySettingsView: View {
         .task {
             await viewModel.loadSocialData()
             if let profile = viewModel.socialProfile {
-                selectedPrivacy = profile.privacyLevel
+                selectedPrivacy = profile.privacyLevel ?? .friendsOnly
             }
         }
     }

@@ -103,7 +103,7 @@ struct NudgeService: Sendable {
                 ))
             } else if streak.currentStreak == 0 {
                 let activeFriends = friendProfiles.filter { profile in
-                    profile.currentStreak > 0
+                    (profile.currentStreak ?? 0) > 0
                 }
                 if !activeFriends.isEmpty {
                     nudges.append(CoachingNudge(
