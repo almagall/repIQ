@@ -35,6 +35,9 @@ struct ProgressTabView: View {
                         // 4. Weekly Volume Chart — primary trend
                         volumeChartSection
 
+                        // Exercise Progress — drill-down entry
+                        exerciseProgressButton
+
                         // 5. Smart Insights — prescriptive advice (high value)
                         if !viewModel.insights.isEmpty {
                             insightsSection
@@ -74,9 +77,6 @@ struct ProgressTabView: View {
                         if !viewModel.frequencyData.isEmpty {
                             frequencyHeatmapSection
                         }
-
-                        // 13. Exercise Progress — drill-down entry
-                        exerciseProgressButton
 
                         // Workout History moved to Home page
                     }
