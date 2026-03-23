@@ -78,8 +78,7 @@ struct ProgressTabView: View {
                         // 13. Exercise Progress — drill-down entry
                         exerciseProgressButton
 
-                        // 14. Workout History — reference
-                        workoutHistorySection
+                        // Workout History moved to Home page
                     }
                     .padding(.horizontal, RQSpacing.screenHorizontal)
                     .padding(.top, RQSpacing.lg)
@@ -1031,81 +1030,7 @@ struct ProgressTabView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - 14. Workout History
-
-    private var workoutHistorySection: some View {
-        VStack(alignment: .leading, spacing: RQSpacing.md) {
-            sectionHeader("WORKOUT HISTORY")
-
-            LazyVStack(spacing: RQSpacing.md) {
-                ForEach(viewModel.sessions) { session in
-                    NavigationLink(value: session.id) {
-                        sessionRow(session)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-    }
-
-    private func sessionRow(_ session: WorkoutSession) -> some View {
-        let date = session.completedAt ?? session.startedAt
-        let workout = viewModel.dayName(for: session)
-        let template = viewModel.templateName(for: session)
-
-        return RQCard {
-            HStack(spacing: RQSpacing.md) {
-                VStack(spacing: 2) {
-                    Text(dayOfMonth(date))
-                        .font(RQTypography.title3)
-                        .foregroundColor(RQColors.textPrimary)
-                    Text(monthAbbrev(date))
-                        .font(RQTypography.label)
-                        .textCase(.uppercase)
-                        .foregroundColor(RQColors.textSecondary)
-                }
-                .frame(width: 44)
-
-                RoundedRectangle(cornerRadius: 1)
-                    .fill(RQColors.surfaceTertiary)
-                    .frame(width: 1, height: 44)
-
-                VStack(alignment: .leading, spacing: RQSpacing.xxs) {
-                    Text(workout ?? dayOfWeek(date))
-                        .font(RQTypography.headline)
-                        .foregroundColor(RQColors.textPrimary)
-                        .lineLimit(1)
-
-                    HStack(spacing: RQSpacing.sm) {
-                        if let template {
-                            Text(template)
-                                .font(RQTypography.caption)
-                                .foregroundColor(RQColors.accent)
-                                .lineLimit(1)
-                        }
-
-                        if template != nil, session.durationSeconds != nil {
-                            Text("\u{00B7}")
-                                .font(RQTypography.caption)
-                                .foregroundColor(RQColors.textTertiary)
-                        }
-
-                        if let duration = session.durationSeconds {
-                            Label(formatDuration(duration), systemImage: "clock")
-                                .font(RQTypography.caption)
-                                .foregroundColor(RQColors.textTertiary)
-                        }
-                    }
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12))
-                    .foregroundColor(RQColors.textTertiary)
-            }
-        }
-    }
+    // Workout History removed — available via Home page
 
     // MARK: - Section Header Helpers
 
@@ -1201,30 +1126,4 @@ struct ProgressTabView: View {
             : String(format: "%.1f", weight)
     }
 
-    private func dayOfMonth(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "d"
-        return formatter.string(from: date)
-    }
-
-    private func monthAbbrev(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM"
-        return formatter.string(from: date)
-    }
-
-    private func dayOfWeek(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEEE"
-        return formatter.string(from: date)
-    }
-
-    private func formatDuration(_ seconds: Int) -> String {
-        let hours = seconds / 3600
-        let minutes = (seconds % 3600) / 60
-        if hours > 0 {
-            return "\(hours)h \(minutes)m"
-        }
-        return "\(minutes)m"
-    }
 }
