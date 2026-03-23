@@ -10,6 +10,7 @@ struct DashboardView: View {
     @State private var showNewTemplateOptions = false
     @State private var showCalendarView = false
     @State private var calendarMonth = Date()
+    @State private var socialViewModel = SocialViewModel()
 
     @Environment(WorkoutCoordinator.self) private var workoutCoordinator
 
@@ -145,6 +146,40 @@ struct DashboardView: View {
                             }
                         }
                     }
+
+                    // Achievements
+                    NavigationLink {
+                        AchievementsView(viewModel: socialViewModel)
+                    } label: {
+                        RQCard {
+                            HStack {
+                                VStack(alignment: .leading, spacing: RQSpacing.xs) {
+                                    Text("Achievements")
+                                        .font(RQTypography.label)
+                                        .textCase(.uppercase)
+                                        .tracking(1.5)
+                                        .foregroundColor(RQColors.textSecondary)
+
+                                    let unlocked = socialViewModel.achievements.reduce(0) { $0 + $1.tiers.filter(\.isUnlocked).count }
+                                    let total = socialViewModel.achievements.reduce(0) { $0 + $1.tiers.count }
+                                    Text("\(unlocked) of \(total) tiers unlocked")
+                                        .font(RQTypography.numbers)
+                                        .foregroundColor(RQColors.textPrimary)
+
+                                    Text("Track your milestones")
+                                        .font(RQTypography.caption)
+                                        .foregroundColor(RQColors.textTertiary)
+                                }
+                                Spacer()
+                                Image(systemName: "trophy.fill")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(RQColors.warning)
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(RQColors.textTertiary)
+                            }
+                        }
+                    }
                 }
                 .padding(.horizontal, RQSpacing.screenHorizontal)
                 .padding(.top, RQSpacing.lg)
@@ -157,11 +192,13 @@ struct DashboardView: View {
                 await viewModel.loadDashboard()
                 await goalViewModel.loadGoals()
                 await templateListViewModel.loadTemplates()
+                await socialViewModel.loadSocialData()
             }
             .refreshable {
                 await viewModel.loadDashboard()
                 await goalViewModel.loadGoals()
                 await templateListViewModel.loadTemplates()
+                await socialViewModel.loadSocialData()
             }
             .sheet(isPresented: $showTemplatePicker) {
                 templatePickerSheet

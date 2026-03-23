@@ -4,7 +4,8 @@ import Charts
 struct ProgressTabView: View {
     @State private var viewModel = ProgressDashboardViewModel()
     @State private var showExercisePicker = false
-    @State private var showShareSheet = false
+    @State private var showMonthlyReport = false
+    @State private var socialViewModel = SocialViewModel()
 
     var body: some View {
         NavigationStack {
@@ -85,12 +86,18 @@ struct ProgressTabView: View {
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    ShareLink(item: shareText) {
-                        Image(systemName: "square.and.arrow.up")
+                    Button {
+                        showMonthlyReport = true
+                    } label: {
+                        Image(systemName: "doc.text.magnifyingglass")
                             .font(.system(size: 14))
                             .foregroundColor(RQColors.accent)
                     }
                 }
+            }
+            .navigationDestination(isPresented: $showMonthlyReport) {
+                MonthlyWrappedView(viewModel: socialViewModel)
+                    .navigationTitle("Monthly Report Card")
             }
             .navigationDestination(for: UUID.self) { sessionId in
                 SessionDetailView(viewModel: viewModel, sessionId: sessionId)
@@ -100,6 +107,7 @@ struct ProgressTabView: View {
             }
             .task {
                 await viewModel.loadDashboard()
+                await socialViewModel.loadSocialData()
             }
             .refreshable {
                 await viewModel.loadDashboard()
@@ -109,35 +117,7 @@ struct ProgressTabView: View {
 
     // MARK: - Share Text
 
-    private var shareText: String {
-        var lines: [String] = ["repIQ — Training Summary"]
-        lines.append("")
-
-        if let streak = viewModel.streakData, streak.currentStreak > 0 {
-            lines.append("\u{1F525} \(streak.currentStreak)-day streak (best: \(streak.bestStreak))")
-        }
-
-        if let score = viewModel.consistencyScore {
-            lines.append("\u{1F3AF} Consistency: \(score.overall)/100 (\(score.grade.displayName))")
-        }
-
-        lines.append("\u{1F4AA} Weekly Volume: \(formatVolumeCompact(viewModel.weeklyVolume))")
-        lines.append("\u{1F3CB} Sessions This Week: \(viewModel.weeklySessionCount)")
-        lines.append("\u{1F3C6} Total PRs: \(viewModel.totalPRCount)")
-        lines.append("\u{2696} Total Volume: \(formatVolumeCompact(viewModel.totalVolume))")
-
-        if let balance = viewModel.pushPullBalance {
-            lines.append("\u{2194} Push/Pull: \(balance.ratioString)")
-        }
-
-        if let delta = viewModel.volumeDeltaPercent {
-            lines.append(String(format: "%@ Volume trend: %+.0f%% vs last week", delta >= 0 ? "\u{1F4C8}" : "\u{1F4C9}", delta))
-        }
-
-        lines.append("")
-        lines.append("Tracked with repIQ")
-        return lines.joined(separator: "\n")
-    }
+    // Share text removed — replaced with Monthly Report Card button
 
     // MARK: - 1. Streak Banner
 
