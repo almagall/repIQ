@@ -1325,6 +1325,13 @@ final class ActiveWorkoutViewModel {
         }
     }
 
+    // MARK: - Bodyweight Weight Toggle
+
+    func toggleAddedWeight(exerciseIndex: Int) {
+        guard exercises[safe: exerciseIndex] != nil else { return }
+        exercises[exerciseIndex].useAddedWeight.toggle()
+    }
+
     // MARK: - Timers
 
     private func startElapsedTimer() {

@@ -19,6 +19,16 @@ struct ProgressionService: Sendable {
             return nil
         }
 
+        // Bodyweight exercises use rep-only progression (no e1RM)
+        if equipment == "bodyweight" {
+            return calculateBodyweightTarget(
+                exerciseId: exerciseId,
+                trainingMode: trainingMode,
+                recentSessions: recentSessions,
+                repCap: repCap
+            )
+        }
+
         let repRange = trainingMode.repRange
         let effectiveUpperBound = min(repCap ?? repRange.upperBound, repRange.upperBound)
         let targetRPE = trainingMode.targetRPE
@@ -128,6 +138,93 @@ struct ProgressionService: Sendable {
             previousReps: medReps,
             previousRPE: avgRPE,
             estimatedOneRM: currentE1RM
+        )
+    }
+
+    // MARK: - Bodyweight Progression
+
+    /// Rep-only progression for bodyweight exercises.
+    /// Primary axis: increase reps each session. No weight manipulation.
+    /// When reps hit the ceiling (rep cap or top of range), suggests adding external weight.
+    private func calculateBodyweightTarget(
+        exerciseId: UUID,
+        trainingMode: TrainingMode,
+        recentSessions: [[WorkoutSet]],
+        repCap: Int?
+    ) -> ProgressionTarget? {
+        guard let latestSession = recentSessions.first else { return nil }
+
+        let latestWorkingSets = latestSession.filter { $0.setType == .working }
+        guard !latestWorkingSets.isEmpty else { return nil }
+
+        let repRange = trainingMode.repRange
+        let effectiveUpperBound = min(repCap ?? repRange.upperBound, repRange.upperBound)
+        let targetRPE = trainingMode.targetRPE
+
+        let medReps = medianInt(latestWorkingSets.map(\.reps))
+        let avgRPE = averageRPE(latestWorkingSets, default: targetRPE)
+        // Use weight from sets (could be added weight from dip belt etc.)
+        let medWeight = median(latestWorkingSets.map(\.weight))
+
+        let decision: ProgressionDecision
+        let tRepsLow: Int
+        let tRepsHigh: Int
+        let reasoning: String
+
+        if recentSessions.count < 2 {
+            // First session — maintain
+            decision = .maintain
+            tRepsLow = medReps
+            tRepsHigh = min(medReps, effectiveUpperBound)
+            reasoning = "First session tracked. Repeat to establish a baseline."
+
+        } else {
+            let prevWorkingSets = recentSessions[1].filter { $0.setType == .working }
+            let prevMedReps = prevWorkingSets.isEmpty ? medReps : medianInt(prevWorkingSets.map(\.reps))
+
+            if medReps >= effectiveUpperBound {
+                // Hit the rep ceiling — suggest adding weight
+                decision = .increaseWeight
+                tRepsLow = repRange.lowerBound
+                tRepsHigh = min(repRange.lowerBound + 2, effectiveUpperBound)
+                reasoning = "You've reached \(effectiveUpperBound) reps. Consider adding external weight to keep progressing in the strength range."
+
+            } else if medReps > prevMedReps {
+                // Reps trending up — increase reps
+                decision = .increaseReps
+                tRepsLow = min(medReps + 1, effectiveUpperBound)
+                tRepsHigh = min(medReps + 2, effectiveUpperBound)
+                reasoning = "Reps are improving. Keep pushing for more reps each session."
+
+            } else if medReps == prevMedReps {
+                // Reps flat — maintain and push
+                decision = .increaseReps
+                tRepsLow = min(medReps + 1, effectiveUpperBound)
+                tRepsHigh = min(medReps + 1, effectiveUpperBound)
+                reasoning = "Reps are holding steady. Aim for one more rep per set."
+
+            } else {
+                // Reps declining — deload (reduce volume)
+                decision = .deloadVolume
+                tRepsLow = max(medReps - 1, repRange.lowerBound)
+                tRepsHigh = medReps
+                reasoning = "Rep count has dropped. Consider reducing sets or taking a lighter session."
+            }
+        }
+
+        return ProgressionTarget(
+            exerciseId: exerciseId,
+            trainingMode: trainingMode,
+            targetWeight: medWeight, // 0 for pure bodyweight, or added weight if any
+            targetRepsLow: tRepsLow,
+            targetRepsHigh: tRepsHigh,
+            targetRPE: targetRPE,
+            decision: decision,
+            reasoning: reasoning,
+            previousWeight: medWeight,
+            previousReps: medReps,
+            previousRPE: avgRPE,
+            estimatedOneRM: 0 // Not applicable for bodyweight
         )
     }
 

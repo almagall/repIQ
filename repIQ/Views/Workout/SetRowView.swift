@@ -29,6 +29,10 @@ struct SetRowView: View {
         viewModel.exercises[safe: exerciseIndex]?.equipment ?? ""
     }
 
+    private var isBodyweightOnly: Bool {
+        viewModel.exercises[safe: exerciseIndex]?.isBodyweightOnly ?? false
+    }
+
     private var showPlateBreakdown: Bool {
         (equipment == "barbell" || equipment == "smith_machine") && (set?.weight ?? 0) > AppConstants.Defaults.barWeight
     }
@@ -58,10 +62,17 @@ struct SetRowView: View {
                             .fontWeight(.semibold)
                             .foregroundColor(RQColors.accent.opacity(0.6))
 
-                        Text("\(formatWeight(targetW)) × \(targetR)")
-                            .font(RQTypography.caption)
-                            .fontWeight(.semibold)
-                            .foregroundColor(RQColors.accent.opacity(0.7))
+                        if isBodyweightOnly {
+                            Text("\(targetR) reps")
+                                .font(RQTypography.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(RQColors.accent.opacity(0.7))
+                        } else {
+                            Text("\(formatWeight(targetW)) × \(targetR)")
+                                .font(RQTypography.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(RQColors.accent.opacity(0.7))
+                        }
 
                         Spacer()
                     }
@@ -75,9 +86,15 @@ struct SetRowView: View {
                             .font(RQTypography.caption)
                             .foregroundColor(RQColors.textTertiary)
 
-                        Text("\(formatWeight(prev.weight)) × \(prev.reps)")
-                            .font(RQTypography.caption)
-                            .foregroundColor(RQColors.textTertiary)
+                        if isBodyweightOnly {
+                            Text("\(prev.reps) reps")
+                                .font(RQTypography.caption)
+                                .foregroundColor(RQColors.textTertiary)
+                        } else {
+                            Text("\(formatWeight(prev.weight)) × \(prev.reps)")
+                                .font(RQTypography.caption)
+                                .foregroundColor(RQColors.textTertiary)
+                        }
 
                         if let rpe = prev.rpe {
                             Text("@\(formatRPE(rpe))")
@@ -122,26 +139,40 @@ struct SetRowView: View {
                         .background(set.isCompleted ? setTypeColor : setTypeColor.opacity(0.2))
                         .clipShape(Circle())
 
-                    // Weight input
-                    TextField(weightPlaceholder, text: $weightText)
-                        .font(RQTypography.numbersSmall)
-                        .foregroundColor(set.isCompleted ? RQColors.textSecondary : RQColors.textPrimary)
-                        .keyboardType(.decimalPad)
-                        .multilineTextAlignment(.center)
-                        .frame(width: 64, height: 36)
-                        .background(RQColors.surfaceTertiary)
-                        .cornerRadius(RQRadius.small)
-                        .focused($focusedField, equals: .weight)
-                        .disabled(set.isCompleted)
-                        .onChange(of: weightText) { _, newValue in
-                            if let weight = Double(newValue) {
-                                viewModel.updateWeight(exerciseIndex: exerciseIndex, setIndex: setIndex, weight: weight)
-                            }
-                        }
+                    if isBodyweightOnly {
+                        // Bodyweight label instead of weight input
+                        Text("BW")
+                            .font(RQTypography.numbersSmall)
+                            .foregroundColor(RQColors.textTertiary)
+                            .frame(width: 64, height: 36)
+                            .background(RQColors.surfaceTertiary.opacity(0.5))
+                            .cornerRadius(RQRadius.small)
 
-                    Text("×")
-                        .font(RQTypography.caption)
-                        .foregroundColor(RQColors.textTertiary)
+                        Text("×")
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.textTertiary)
+                    } else {
+                        // Weight input
+                        TextField(weightPlaceholder, text: $weightText)
+                            .font(RQTypography.numbersSmall)
+                            .foregroundColor(set.isCompleted ? RQColors.textSecondary : RQColors.textPrimary)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.center)
+                            .frame(width: 64, height: 36)
+                            .background(RQColors.surfaceTertiary)
+                            .cornerRadius(RQRadius.small)
+                            .focused($focusedField, equals: .weight)
+                            .disabled(set.isCompleted)
+                            .onChange(of: weightText) { _, newValue in
+                                if let weight = Double(newValue) {
+                                    viewModel.updateWeight(exerciseIndex: exerciseIndex, setIndex: setIndex, weight: weight)
+                                }
+                            }
+
+                        Text("×")
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.textTertiary)
+                    }
 
                     // Reps input
                     TextField(repsPlaceholder, text: $repsText)
@@ -331,9 +362,11 @@ struct SetRowView: View {
             return
         }
 
-        weightText = formatWeight(w)
+        if !isBodyweightOnly {
+            weightText = formatWeight(w)
+            viewModel.updateWeight(exerciseIndex: exerciseIndex, setIndex: setIndex, weight: w)
+        }
         repsText = "\(r)"
-        viewModel.updateWeight(exerciseIndex: exerciseIndex, setIndex: setIndex, weight: w)
         viewModel.updateReps(exerciseIndex: exerciseIndex, setIndex: setIndex, reps: r)
         if rpe > 0 {
             viewModel.updateRPE(exerciseIndex: exerciseIndex, setIndex: setIndex, rpe: rpe)
