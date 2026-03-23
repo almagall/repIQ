@@ -110,12 +110,31 @@ struct SocialService: Sendable {
             .execute()
             .value
 
-        // Deduplicate by friend's profile ID
+        // Combine and deduplicate by the actual friend's user ID (not our user ID)
         var seen = Set<UUID>()
-        return (sent + received).filter { friendship in
-            let friendId = friendship.friendProfile?.id ?? friendship.id
-            return seen.insert(friendId).inserted
+        var result: [Friendship] = []
+
+        for var friendship in sent + received {
+            // Determine the friend's actual user ID
+            let actualFriendId = friendship.userId == userId ? friendship.friendId : friendship.userId
+
+            // If profile join failed, fetch the profile directly
+            if friendship.friendProfile == nil {
+                let profile: Profile? = try? await supabase.from("profiles")
+                    .select()
+                    .eq("id", value: actualFriendId.uuidString)
+                    .single()
+                    .execute()
+                    .value
+                friendship.friendProfile = profile
+            }
+
+            if seen.insert(actualFriendId).inserted {
+                result.append(friendship)
+            }
         }
+
+        return result
     }
 
     /// Fetches pending friend requests received by the user (join sender's profile).
