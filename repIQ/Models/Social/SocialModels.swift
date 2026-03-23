@@ -66,18 +66,18 @@ struct SocialProfile: Codable, Identifiable, Sendable {
     let id: UUID
     var email: String
     var displayName: String?
-    var weightUnit: WeightUnit
-    var restTimerDefault: Int
+    var weightUnit: WeightUnit?
+    var restTimerDefault: Int?
     var createdAt: Date
     var updatedAt: Date
     var username: String?
     var bio: String?
     var avatarUrl: String?
-    var privacyLevel: PrivacyLevel
-    var leagueTier: LeagueTier
-    var totalIQ: Int
-    var currentStreak: Int
-    var longestStreak: Int
+    var privacyLevel: PrivacyLevel?
+    var leagueTier: LeagueTier?
+    var totalIQ: Int?
+    var currentStreak: Int?
+    var longestStreak: Int?
     var lastWorkoutDate: Date?
     var trainingStyle: String?
     var experienceLevel: String?
