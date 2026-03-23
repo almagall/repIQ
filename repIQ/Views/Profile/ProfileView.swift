@@ -169,30 +169,6 @@ struct ProfileView: View {
                         }
                     }
 
-                    // Goals
-                    NavigationLink {
-                        GoalSettingView()
-                    } label: {
-                        RQCard {
-                            HStack {
-                                Image(systemName: "target")
-                                    .font(.system(size: 16))
-                                    .foregroundColor(RQColors.accent)
-                                    .frame(width: 24)
-
-                                Text("My Goals")
-                                    .font(RQTypography.body)
-                                    .foregroundColor(RQColors.textPrimary)
-
-                                Spacer()
-
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(RQColors.textTertiary)
-                            }
-                        }
-                    }
-
                     // Sign Out
                     RQButton(title: "Sign Out", style: .destructive) {
                         Task { await viewModel.signOut() }
