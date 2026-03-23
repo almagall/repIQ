@@ -130,6 +130,7 @@ struct WorkoutSummaryData: Identifiable {
 
     // Context for sharing
     var workoutName: String = ""
+    var dayName: String = ""
     var workoutDate: Date = Date()
 
     init(

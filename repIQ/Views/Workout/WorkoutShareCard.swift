@@ -1,202 +1,193 @@
 import SwiftUI
 
-/// A branded card rendered off-screen for sharing to Instagram Stories / social media.
-/// Designed at 1080×1920 aspect ratio (9:16) with dark theme.
+/// A branded card rendered for sharing to Instagram Stories / social media.
+/// Uses the app's design system (RQColors, RQTypography, RQCard borders).
+/// Designed at 9:16 aspect ratio with the app's dark theme.
 struct WorkoutShareCard: View {
     let summary: WorkoutSummaryData
 
     private let cardWidth: CGFloat = 390
-    private let cardHeight: CGFloat = 693 // ~9:16 aspect
+    private let cardHeight: CGFloat = 693
 
     var body: some View {
         VStack(spacing: 0) {
-            // Top gradient accent bar
+            // Top accent line
             Rectangle()
-                .fill(
-                    LinearGradient(
-                        colors: [RQColors.accent, RQColors.accent.opacity(0.6)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .frame(height: 4)
+                .fill(RQColors.accent)
+                .frame(height: 3)
 
-            VStack(spacing: 24) {
-                // Header: App branding + workout name
-                VStack(spacing: 8) {
-                    Text("repIQ")
-                        .font(.system(size: 14, weight: .black, design: .rounded))
-                        .tracking(3)
-                        .foregroundColor(RQColors.accent)
-
-                    if !summary.workoutName.isEmpty {
-                        Text(summary.workoutName)
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundColor(.white)
+            VStack(spacing: RQSpacing.lg) {
+                // Header: Day name + Date
+                VStack(spacing: RQSpacing.sm) {
+                    let displayName = summary.dayName.isEmpty ? summary.workoutName : summary.dayName
+                    if !displayName.isEmpty {
+                        Text(displayName)
+                            .font(RQTypography.title2)
+                            .foregroundColor(RQColors.textPrimary)
                             .multilineTextAlignment(.center)
                             .lineLimit(2)
                     }
 
                     Text(formattedDate)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(Color.white.opacity(0.5))
+                        .font(RQTypography.caption)
+                        .foregroundColor(RQColors.textSecondary)
                 }
-                .padding(.top, 28)
+                .padding(.top, RQSpacing.xl)
 
-                // Stats row
-                HStack(spacing: 0) {
-                    shareStatPill(value: formattedDuration, label: "Duration", icon: "clock")
-                    shareDivider
-                    shareStatPill(value: "\(summary.totalSets)", label: "Sets", icon: "number")
-                    shareDivider
-                    shareStatPill(value: formattedVolume, label: "Volume", icon: "scalemass")
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 16)
-                .background(Color.white.opacity(0.06))
-                .cornerRadius(12)
-
-                // PRs (if any)
-                let displayPRs = summary.newPRs.filter { $0.recordType != .volume }
-                if !displayPRs.isEmpty {
-                    VStack(spacing: 8) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "trophy.fill")
-                                .font(.system(size: 11))
-                                .foregroundColor(RQColors.warning)
-                            Text("PERSONAL RECORDS")
-                                .font(.system(size: 10, weight: .bold))
-                                .tracking(1.5)
-                                .foregroundColor(RQColors.warning)
-                        }
-
-                        ForEach(displayPRs.prefix(3)) { pr in
-                            HStack {
-                                Text(pr.exerciseName)
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundColor(.white)
-                                    .lineLimit(1)
-                                Spacer()
-                                Text(formatPRValue(pr))
-                                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                                    .foregroundColor(RQColors.warning)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 4)
+                // Stats row — bordered cards matching app theme
+                HStack(spacing: RQSpacing.md) {
+                    shareStatCard(value: formattedDuration, label: "DURATION", icon: "clock")
+                    shareStatCard(value: "\(summary.totalSets)", label: "SETS", icon: "number")
+                    shareStatCard(value: formattedVolume, label: "VOLUME", icon: "scalemass")
                 }
 
-                // Exercise list
-                VStack(spacing: 6) {
-                    HStack {
-                        Text("EXERCISES")
-                            .font(.system(size: 10, weight: .bold))
-                            .tracking(1.5)
-                            .foregroundColor(Color.white.opacity(0.4))
-                        Spacer()
-                    }
-
-                    ForEach(summary.exerciseSummaries.prefix(10)) { exercise in
-                        HStack(spacing: 6) {
-                            // Mode indicator dot
-                            Circle()
-                                .fill(exercise.trainingMode == .hypertrophy ? RQColors.hypertrophy : RQColors.strength)
-                                .frame(width: 6, height: 6)
-
-                            Text(exercise.name)
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.white)
-                                .lineLimit(1)
-
-                            // PR badge if this exercise has a PR
-                            if let pr = exercisePR(for: exercise.name) {
-                                HStack(spacing: 2) {
-                                    Image(systemName: "trophy.fill")
-                                        .font(.system(size: 7))
-                                    Text(pr.recordType.shortLabel)
-                                        .font(.system(size: 8, weight: .bold))
-                                }
-                                .foregroundColor(RQColors.warning)
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 2)
-                                .background(RQColors.warning.opacity(0.15))
-                                .clipShape(Capsule())
-                            }
-
-                            Spacer()
-
-                            if exercise.topWeight > 0 {
-                                Text("\(formatWeight(exercise.topWeight)) x \(exercise.topReps)")
-                                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                                    .foregroundColor(Color.white.opacity(0.6))
-                            }
-                        }
-                    }
-
-                    if summary.exerciseSummaries.count > 10 {
-                        Text("+\(summary.exerciseSummaries.count - 10) more")
-                            .font(.system(size: 11))
-                            .foregroundColor(Color.white.opacity(0.3))
-                    }
-                }
-                .padding(.horizontal, 4)
-
-                Spacer()
-
-                // Streak badge (if active)
+                // Streak (if active)
                 if summary.currentStreak > 0 {
-                    HStack(spacing: 6) {
+                    HStack(spacing: RQSpacing.sm) {
                         Image(systemName: "flame.fill")
                             .font(.system(size: 12))
                             .foregroundColor(RQColors.warning)
                         Text("\(summary.currentStreak) day streak")
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(RQTypography.caption)
+                            .fontWeight(.semibold)
                             .foregroundColor(RQColors.warning)
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(RQColors.warning.opacity(0.12))
+                    .padding(.horizontal, RQSpacing.md)
+                    .padding(.vertical, RQSpacing.sm)
+                    .background(RQColors.warning.opacity(0.1))
                     .clipShape(Capsule())
                 }
 
-                // Footer
-                Text("Track your gains with repIQ")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(Color.white.opacity(0.25))
-                    .padding(.bottom, 20)
+                // Exercise list with heaviest set + PR badges
+                VStack(spacing: RQSpacing.sm) {
+                    HStack {
+                        Text("EXERCISES")
+                            .font(RQTypography.label)
+                            .tracking(1.5)
+                            .foregroundColor(RQColors.textTertiary)
+                        Spacer()
+                        Text("BEST SET")
+                            .font(RQTypography.label)
+                            .tracking(1.5)
+                            .foregroundColor(RQColors.textTertiary)
+                    }
+
+                    ForEach(summary.exerciseSummaries.prefix(10)) { exercise in
+                        exerciseRow(exercise)
+                    }
+
+                    if summary.exerciseSummaries.count > 10 {
+                        Text("+\(summary.exerciseSummaries.count - 10) more")
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.textTertiary)
+                    }
+                }
+
+                Spacer()
+
+                // Footer: repIQ branding
+                VStack(spacing: RQSpacing.xs) {
+                    Text("repIQ")
+                        .font(.system(size: 16, weight: .black, design: .monospaced))
+                        .tracking(4)
+                        .foregroundColor(RQColors.accent)
+
+                    Text("Train smarter")
+                        .font(RQTypography.caption)
+                        .foregroundColor(RQColors.textTertiary)
+                }
+                .padding(.bottom, RQSpacing.xl)
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, RQSpacing.screenHorizontal)
         }
         .frame(width: cardWidth, height: cardHeight)
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color(red: 0.08, green: 0.08, blue: 0.10))
+            RoundedRectangle(cornerRadius: RQSpacing.cardCornerRadius)
+                .fill(RQColors.background)
+                .overlay(
+                    RoundedRectangle(cornerRadius: RQSpacing.cardCornerRadius)
+                        .stroke(RQColors.textTertiary, lineWidth: 1)
+                )
         )
     }
 
     // MARK: - Components
 
-    private func shareStatPill(value: String, label: String, icon: String) -> some View {
-        VStack(spacing: 4) {
+    private func shareStatCard(value: String, label: String, icon: String) -> some View {
+        VStack(spacing: RQSpacing.xs) {
             Image(systemName: icon)
                 .font(.system(size: 14))
                 .foregroundColor(RQColors.accent)
+
             Text(value)
-                .font(.system(size: 16, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
+                .font(RQTypography.numbersSmall)
+                .foregroundColor(RQColors.textPrimary)
+
             Text(label)
-                .font(.system(size: 9, weight: .semibold))
+                .font(RQTypography.label)
                 .tracking(1)
-                .foregroundColor(Color.white.opacity(0.4))
-                .textCase(.uppercase)
+                .foregroundColor(RQColors.textSecondary)
         }
         .frame(maxWidth: .infinity)
+        .padding(.vertical, RQSpacing.md)
+        .background(Color.clear)
+        .cornerRadius(RQSpacing.cardCornerRadius)
+        .overlay(
+            RoundedRectangle(cornerRadius: RQSpacing.cardCornerRadius)
+                .stroke(RQColors.textTertiary, lineWidth: 1)
+        )
     }
 
-    private var shareDivider: some View {
-        Rectangle()
-            .fill(Color.white.opacity(0.1))
-            .frame(width: 1, height: 36)
+    private func exerciseRow(_ exercise: WorkoutSummaryData.ExerciseSummary) -> some View {
+        HStack(spacing: RQSpacing.sm) {
+            // Training mode bar
+            RoundedRectangle(cornerRadius: 1)
+                .fill(exercise.trainingMode == .hypertrophy ? RQColors.hypertrophy : RQColors.strength)
+                .frame(width: 3, height: 28)
+
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: RQSpacing.xs) {
+                    Text(exercise.name)
+                        .font(RQTypography.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(RQColors.textPrimary)
+                        .lineLimit(1)
+
+                    // PR badge
+                    if let pr = exercisePR(for: exercise.name) {
+                        HStack(spacing: 2) {
+                            Image(systemName: "trophy.fill")
+                                .font(.system(size: 7))
+                            Text(pr.recordType.shortLabel)
+                                .font(.system(size: 7, weight: .black, design: .monospaced))
+                        }
+                        .foregroundColor(RQColors.warning)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(RQColors.warning.opacity(0.12))
+                        .clipShape(Capsule())
+                    }
+                }
+
+                Text("\(exercise.setsCompleted) sets")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundColor(RQColors.textTertiary)
+            }
+
+            Spacer()
+
+            // Heaviest set
+            if exercise.topWeight > 0 {
+                Text("\(formatWeight(exercise.topWeight)) x \(exercise.topReps)")
+                    .font(RQTypography.numbersSmall)
+                    .foregroundColor(RQColors.textSecondary)
+            } else if exercise.topReps > 0 {
+                Text("BW x \(exercise.topReps)")
+                    .font(RQTypography.numbersSmall)
+                    .foregroundColor(RQColors.textSecondary)
+            }
+        }
+        .padding(.vertical, 2)
     }
 
     // MARK: - PR Lookup
@@ -231,14 +222,5 @@ struct WorkoutShareCard: View {
         weight.truncatingRemainder(dividingBy: 1) == 0
             ? String(format: "%.0f", weight)
             : String(format: "%.1f", weight)
-    }
-
-    private func formatPRValue(_ pr: PRSummary) -> String {
-        switch pr.recordType {
-        case .weight: return "\(formatWeight(pr.value)) lbs"
-        case .reps: return "\(Int(pr.value)) reps"
-        case .estimated1rm: return "\(formatWeight(pr.value)) lbs e1RM"
-        case .volume: return String(format: "%.0f lbs", pr.value)
-        }
     }
 }

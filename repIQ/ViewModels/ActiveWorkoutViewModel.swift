@@ -702,6 +702,7 @@ final class ActiveWorkoutViewModel {
                 newBadges: newBadges
             )
             summary.workoutName = dayName.isEmpty ? templateName : "\(templateName) — \(dayName)"
+            summary.dayName = dayName
             summary.workoutDate = startTime
             workoutSummary = summary
 
