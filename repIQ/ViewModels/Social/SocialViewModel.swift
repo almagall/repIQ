@@ -99,14 +99,15 @@ final class SocialViewModel {
         errorMessage = nil
 
         do {
-            // Fetch profile and friends first (needed for feed)
-            async let profileTask = socialService.fetchSocialProfile(userId: userId)
+            // Fetch profile separately — don't let it block friends/requests
+            socialProfile = try? await socialService.fetchSocialProfile(userId: userId)
+
+            // Fetch friends and pending requests (these are critical)
             async let friendsTask = socialService.fetchFriends(userId: userId)
             async let pendingTask = socialService.fetchPendingRequests(userId: userId)
 
-            socialProfile = try await profileTask
-            friends = try await friendsTask
-            pendingRequests = try await pendingTask
+            friends = (try? await friendsTask) ?? []
+            pendingRequests = (try? await pendingTask) ?? []
 
             // Load sent request IDs so we can show "Sent" in search results
             let sentRequests = (try? await socialService.fetchSentRequests(userId: userId)) ?? []

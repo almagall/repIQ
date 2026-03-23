@@ -18,9 +18,9 @@ struct Profile: Codable, Identifiable, Sendable {
     var displayName: String?
     var username: String?
     var bio: String?
-    var weightUnit: WeightUnit
-    var restTimerDefault: Int
-    var hasCompletedOnboarding: Bool
+    var weightUnit: WeightUnit?
+    var restTimerDefault: Int?
+    var hasCompletedOnboarding: Bool?
     var experienceLevel: String?
     var trainingGoal: String?
     var createdAt: Date
@@ -37,4 +37,9 @@ struct Profile: Codable, Identifiable, Sendable {
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
+
+    /// Safe accessor with default fallback
+    var safeWeightUnit: WeightUnit { weightUnit ?? .lbs }
+    var safeRestTimer: Int { restTimerDefault ?? 120 }
+    var safeHasCompletedOnboarding: Bool { hasCompletedOnboarding ?? false }
 }

@@ -112,7 +112,7 @@ struct ProfileView: View {
                                 settingsRow(
                                     icon: "scalemass",
                                     title: "Weight Unit",
-                                    value: viewModel.profile?.weightUnit.displayName ?? "lbs"
+                                    value: viewModel.profile?.safeWeightUnit.displayName ?? "lbs"
                                 )
                             }
 
