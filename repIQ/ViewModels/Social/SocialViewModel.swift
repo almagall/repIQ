@@ -252,7 +252,7 @@ final class SocialViewModel {
 
     /// Sends a friend request (guards against duplicates).
     func sendFriendRequest(to friendId: UUID) async {
-        guard let userId = currentUserId else { return }
+        guard let userId = try? await supabase.auth.session.user.id else { return }
         // Skip if already friends or already sent
         guard !friendIds.contains(friendId), !sentRequestIds.contains(friendId) else { return }
         do {
@@ -390,7 +390,8 @@ final class SocialViewModel {
 
     /// Searches for users.
     func searchUsers(query: String) async -> [SocialProfile] {
-        guard let userId = currentUserId else { return [] }
+        // Use auth session directly — don't depend on socialProfile being loaded
+        guard let userId = try? await supabase.auth.session.user.id else { return [] }
         do {
             return try await socialService.searchUsers(query: query, currentUserId: userId)
         } catch {
