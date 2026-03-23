@@ -134,10 +134,6 @@ struct TemplateDetailView: View {
                                     }
                                 }
                                 Spacer()
-
-                                // Mini sparkline chart
-                                ExerciseHistoryChart(exerciseId: dayExercise.exerciseId)
-                                    .frame(width: 60, height: 28)
                             }
                         }
                     }
