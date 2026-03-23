@@ -20,7 +20,8 @@ struct ActiveWorkoutView: View {
 
                 // PR celebration overlay
                 if let celebration = viewModel.prCelebration {
-                    Color.black.opacity(0.6)
+                    Rectangle()
+                        .fill(.ultraThinMaterial)
                         .ignoresSafeArea()
                         .transition(.opacity)
                         .onTapGesture {
