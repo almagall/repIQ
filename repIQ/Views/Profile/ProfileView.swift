@@ -30,9 +30,11 @@ struct ProfileView: View {
                                 Text(viewModel.profile?.displayName ?? "Athlete")
                                     .font(RQTypography.headline)
                                     .foregroundColor(RQColors.textPrimary)
-                                Text(viewModel.profile?.email ?? "")
-                                    .font(RQTypography.subheadline)
-                                    .foregroundColor(RQColors.textSecondary)
+                                if let username = viewModel.profile?.username, !username.isEmpty {
+                                    Text("@\(username)")
+                                        .font(RQTypography.subheadline)
+                                        .foregroundColor(RQColors.textSecondary)
+                                }
                             }
                             Spacer()
                         }
@@ -166,6 +168,18 @@ struct ProfileView: View {
                                 )
                             }
 
+                            Divider().background(RQColors.surfaceTertiary)
+
+                            // Account
+                            NavigationLink {
+                                AccountView(profile: viewModel.profile)
+                            } label: {
+                                settingsRow(
+                                    icon: "person.crop.circle",
+                                    title: "Account",
+                                    value: ""
+                                )
+                            }
                         }
                     }
 
