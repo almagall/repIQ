@@ -32,11 +32,11 @@ struct ProgressTabView: View {
                         // 3. Overview Stats Grid — quick health check
                         overviewStatsGrid
 
-                        // 4. Weekly Volume Chart — primary trend
-                        volumeChartSection
-
                         // Exercise Progress — drill-down entry
                         exerciseProgressButton
+
+                        // 4. Weekly Volume Chart — primary trend
+                        volumeChartSection
 
                         // 5. Smart Insights — prescriptive advice (high value)
                         if !viewModel.insights.isEmpty {
