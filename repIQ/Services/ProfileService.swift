@@ -15,8 +15,8 @@ struct ProfileService: Sendable {
         try await supabase.from("profiles")
             .update([
                 "display_name": profile.displayName ?? "",
-                "weight_unit": profile.weightUnit.rawValue,
-                "rest_timer_default": "\(profile.restTimerDefault)"
+                "weight_unit": profile.safeWeightUnit.rawValue,
+                "rest_timer_default": "\(profile.safeRestTimer)"
             ])
             .eq("id", value: profile.id.uuidString)
             .execute()
@@ -72,6 +72,6 @@ struct ProfileService: Sendable {
             .single()
             .execute()
             .value
-        return profile.hasCompletedOnboarding
+        return profile.safeHasCompletedOnboarding
     }
 }
