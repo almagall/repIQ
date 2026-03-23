@@ -6,6 +6,7 @@ struct SessionDetailView: View {
 
     @State private var isEditing = false
     @State private var editedSets: [UUID: EditableSet] = [:]
+    @State private var editedDate: Date = Date()
     @State private var isSaving = false
 
     private let workoutService = WorkoutService()
@@ -24,6 +25,24 @@ struct SessionDetailView: View {
                     .frame(maxWidth: .infinity, minHeight: 300)
             } else if let detail = viewModel.sessionDetail {
                 VStack(spacing: RQSpacing.xl) {
+                    // Workout date (editable in edit mode)
+                    if isEditing {
+                        RQCard {
+                            VStack(alignment: .leading, spacing: RQSpacing.md) {
+                                Text("Workout Date")
+                                    .font(RQTypography.label)
+                                    .textCase(.uppercase)
+                                    .tracking(1.5)
+                                    .foregroundColor(RQColors.textSecondary)
+
+                                DatePicker("", selection: $editedDate, in: ...Date(), displayedComponents: [.date, .hourAndMinute])
+                                    .datePickerStyle(.compact)
+                                    .tint(RQColors.accent)
+                                    .labelsHidden()
+                            }
+                        }
+                    }
+
                     // Stats row
                     HStack(spacing: RQSpacing.lg) {
                         statCard(
@@ -117,6 +136,7 @@ struct SessionDetailView: View {
     private func enterEditMode() {
         guard let detail = viewModel.sessionDetail else { return }
         editedSets = [:]
+        editedDate = detail.session.completedAt ?? detail.session.startedAt
         for set in detail.sets {
             editedSets[set.id] = EditableSet(
                 weight: formatWeight(set.weight),
@@ -129,6 +149,15 @@ struct SessionDetailView: View {
 
     private func saveEdits() async {
         isSaving = true
+
+        // Save date change
+        do {
+            try await workoutService.updateSessionDate(sessionId: sessionId, completedAt: editedDate)
+        } catch {
+            // Continue with set saves
+        }
+
+        // Save set changes
         for (setId, edited) in editedSets {
             let weight = Double(edited.weight) ?? 0
             let reps = Int(edited.reps) ?? 0

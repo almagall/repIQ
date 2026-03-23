@@ -271,6 +271,17 @@ struct WorkoutService: Sendable {
             .execute()
     }
 
+    /// Updates the completed_at date of a session.
+    func updateSessionDate(sessionId: UUID, completedAt: Date) async throws {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        try await supabase.from("workout_sessions")
+            .update(["completed_at": formatter.string(from: completedAt)])
+            .eq("id", value: sessionId.uuidString)
+            .execute()
+    }
+
     /// Deletes a set by ID.
     func deleteSet(id: UUID) async throws {
         try await supabase.from("workout_sets")
