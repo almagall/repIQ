@@ -170,6 +170,19 @@ struct ProfileView: View {
 
                             Divider().background(RQColors.surfaceTertiary)
 
+                            // Privacy
+                            NavigationLink {
+                                PrivacySettingsView()
+                            } label: {
+                                settingsRow(
+                                    icon: "lock.shield",
+                                    title: "Privacy",
+                                    value: ""
+                                )
+                            }
+
+                            Divider().background(RQColors.surfaceTertiary)
+
                             // Account
                             NavigationLink {
                                 AccountView(profile: viewModel.profile)

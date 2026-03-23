@@ -78,19 +78,15 @@ struct SocialTabView: View {
                                 }
                         }
 
-                        // Profile avatar
-                        NavigationLink {
-                            SocialProfileView(viewModel: viewModel)
-                        } label: {
-                            Circle()
-                                .fill(RQColors.accent.opacity(0.2))
-                                .frame(width: 28, height: 28)
-                                .overlay(
-                                    Text(String((viewModel.socialProfile?.displayName ?? "?").prefix(1)).uppercased())
-                                        .font(.system(size: 12, weight: .bold))
-                                        .foregroundColor(RQColors.accent)
-                                )
-                        }
+                        // Profile avatar (navigates to Profile tab)
+                        Circle()
+                            .fill(RQColors.accent.opacity(0.2))
+                            .frame(width: 28, height: 28)
+                            .overlay(
+                                Text(String((viewModel.socialProfile?.displayName ?? "?").prefix(1)).uppercased())
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(RQColors.accent)
+                            )
                     }
                 }
 
