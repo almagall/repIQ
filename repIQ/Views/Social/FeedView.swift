@@ -123,13 +123,56 @@ struct FeedView: View {
             workoutCompletedContent(item)
 
         case .prAchieved:
-            HStack(spacing: RQSpacing.sm) {
-                Image(systemName: "star.fill")
-                    .foregroundColor(RQColors.warning)
-                Text("Hit a new personal record!")
-                    .font(RQTypography.body)
-                    .foregroundColor(RQColors.textPrimary)
-                    .fontWeight(.semibold)
+            VStack(alignment: .leading, spacing: RQSpacing.sm) {
+                HStack(spacing: RQSpacing.sm) {
+                    Image(systemName: "star.fill")
+                        .foregroundColor(RQColors.warning)
+                    let count = item.data.prCount ?? 0
+                    Text(count > 1 ? "Hit \(count) new personal records!" : "Hit a new personal record!")
+                        .font(RQTypography.body)
+                        .foregroundColor(RQColors.textPrimary)
+                        .fontWeight(.semibold)
+                }
+
+                if let prDetails = item.data.prDetails, !prDetails.isEmpty {
+                    VStack(spacing: 0) {
+                        ForEach(Array(prDetails.enumerated()), id: \.offset) { index, pr in
+                            HStack(spacing: RQSpacing.sm) {
+                                Image(systemName: "trophy.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(RQColors.warning)
+                                    .frame(width: 18)
+
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(pr.exerciseName)
+                                        .font(RQTypography.caption)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(RQColors.textPrimary)
+
+                                    Text(pr.displayType)
+                                        .font(.system(size: 10, weight: .medium, design: .rounded))
+                                        .foregroundColor(RQColors.textTertiary)
+                                }
+
+                                Spacer()
+
+                                Text(pr.displayValue)
+                                    .font(RQTypography.numbersSmall)
+                                    .foregroundColor(RQColors.accent)
+                            }
+                            .padding(.vertical, RQSpacing.xs)
+
+                            if index < prDetails.count - 1 {
+                                Divider()
+                                    .background(RQColors.surfaceTertiary)
+                                    .padding(.leading, 30)
+                            }
+                        }
+                    }
+                    .padding(RQSpacing.sm)
+                    .background(RQColors.surfaceTertiary.opacity(0.5))
+                    .cornerRadius(RQRadius.small)
+                }
             }
 
         case .streakMilestone:

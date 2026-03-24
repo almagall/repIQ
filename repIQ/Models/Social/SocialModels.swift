@@ -150,6 +150,39 @@ enum FeedItemType: String, Codable, Sendable {
 
 // MARK: - Feed Item Data
 
+struct FeedPRDetail: Codable, Sendable {
+    var exerciseName: String
+    var recordType: String  // "weight", "reps", "estimated1RM"
+    var value: Double
+
+    enum CodingKeys: String, CodingKey {
+        case exerciseName = "exercise_name"
+        case recordType = "record_type"
+        case value
+    }
+
+    var displayType: String {
+        switch recordType {
+        case "weight": return "Weight PR"
+        case "reps": return "Reps PR"
+        case "estimated1RM": return "Est. 1RM PR"
+        default: return "PR"
+        }
+    }
+
+    var displayValue: String {
+        switch recordType {
+        case "weight", "estimated1RM":
+            return value.truncatingRemainder(dividingBy: 1) == 0
+                ? "\(Int(value)) lbs" : String(format: "%.1f lbs", value)
+        case "reps":
+            return "\(Int(value)) reps"
+        default:
+            return "\(Int(value))"
+        }
+    }
+}
+
 struct FeedItemData: Codable, Sendable {
     var duration: Int?
     var totalSets: Int?
@@ -158,6 +191,7 @@ struct FeedItemData: Codable, Sendable {
     var prCount: Int?
     var exerciseNames: [String]?
     var workoutDayName: String?
+    var prDetails: [FeedPRDetail]?
     var streakDays: Int?
     var badgeName: String?
     var leagueTier: String?
@@ -171,6 +205,7 @@ struct FeedItemData: Codable, Sendable {
         case prCount = "pr_count"
         case exerciseNames = "exercise_names"
         case workoutDayName = "workout_day_name"
+        case prDetails = "pr_details"
         case streakDays = "streak_days"
         case badgeName = "badge_name"
         case leagueTier = "league_tier"
