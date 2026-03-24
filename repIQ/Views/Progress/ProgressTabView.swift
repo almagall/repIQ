@@ -262,7 +262,7 @@ struct ProgressTabView: View {
                 color: RQColors.accent
             )
             overviewStatCard(
-                label: "SESSIONS",
+                label: "THIS WEEK",
                 value: "\(viewModel.weeklySessionCount)",
                 icon: "figure.strengthtraining.traditional",
                 color: RQColors.accent
