@@ -30,40 +30,35 @@ struct FeedService: Sendable {
             .execute()
     }
 
-    /// Fetches feed items from the user's friends (and self) with profiles, reactions, and comments.
+    /// Fetches feed items from the user's friends (and self), then batch-fetches profiles.
     func fetchFeed(userId: UUID, friendIds: [UUID], limit: Int = 50) async throws -> [FeedItem] {
         let allIds = ([userId] + friendIds).map(\.uuidString)
 
-        // First try full query with nested joins
-        if let items: [FeedItem] = try? await supabase.from("feed_items")
-            .select("*, profiles(*), feed_reactions(*, profiles(*)), feed_comments(*, profiles(*))")
-            .in("user_id", values: allIds)
-            .order("created_at", ascending: false)
-            .limit(limit)
-            .execute()
-            .value {
-            return items
-        }
-
-        // Fallback: simpler query without nested reaction/comment profiles
-        if let items: [FeedItem] = try? await supabase.from("feed_items")
-            .select("*, profiles(*), feed_reactions(*), feed_comments(*)")
-            .in("user_id", values: allIds)
-            .order("created_at", ascending: false)
-            .limit(limit)
-            .execute()
-            .value {
-            return items
-        }
-
-        // Final fallback: just feed items with user profile, no reactions/comments
-        let items: [FeedItem] = try await supabase.from("feed_items")
-            .select("*, profiles(*)")
+        // Fetch feed items without profile joins (feed_items.user_id FK points to
+        // auth.users, not profiles, so PostgREST can't join profiles directly)
+        var items: [FeedItem] = try await supabase.from("feed_items")
+            .select("*")
             .in("user_id", values: allIds)
             .order("created_at", ascending: false)
             .limit(limit)
             .execute()
             .value
+
+        // Batch-fetch profiles for all user_ids in the feed
+        let userIds = Array(Set(items.map(\.userId)))
+        if !userIds.isEmpty {
+            let profiles: [Profile] = (try? await supabase.from("profiles")
+                .select()
+                .in("id", values: userIds.map(\.uuidString))
+                .execute()
+                .value) ?? []
+
+            let profileMap = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0) })
+
+            for i in items.indices {
+                items[i].userProfile = profileMap[items[i].userId]
+            }
+        }
 
         return items
     }
