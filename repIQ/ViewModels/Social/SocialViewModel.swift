@@ -122,7 +122,6 @@ final class SocialViewModel {
             let fIds = friendIds
             let tier = currentTier
 
-            async let feedTask = feedService.fetchFeed(userId: userId, friendIds: fIds)
             async let partnersTask = socialService.fetchTrainingPartners(userId: userId)
             async let leaderboardTask = socialService.fetchLeaderboard(tier: tier)
             async let badgesTask = gamificationService.fetchUserBadges(userId: userId)
@@ -130,13 +129,15 @@ final class SocialViewModel {
             async let challengesTask = challengeService.fetchChallenges(userId: userId)
             async let clubsTask = challengeService.fetchUserClubs(userId: userId)
 
-            feedItems = try await feedTask
-            trainingPartners = try await partnersTask
-            leaderboard = try await leaderboardTask
-            earnedBadges = try await badgesTask
-            allBadges = try await allBadgesTask
-            activeChallenges = try await challengesTask
-            userClubs = try await clubsTask
+            // Feed loaded separately so a decode failure doesn't block everything
+            feedItems = (try? await feedService.fetchFeed(userId: userId, friendIds: fIds)) ?? []
+
+            trainingPartners = (try? await partnersTask) ?? []
+            leaderboard = (try? await leaderboardTask) ?? []
+            earnedBadges = (try? await badgesTask) ?? []
+            allBadges = (try? await allBadgesTask) ?? []
+            activeChallenges = (try? await challengesTask) ?? []
+            userClubs = (try? await clubsTask) ?? []
 
             // Compute achievements from progress data
             let progressData = try? await gamificationService.fetchMilestoneProgressData(userId: userId)
