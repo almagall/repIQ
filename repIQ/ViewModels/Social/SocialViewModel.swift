@@ -40,13 +40,17 @@ final class SocialViewModel {
 
     // MARK: - Computed
 
+    /// Cached auth user ID — set during loadSocialData, independent of socialProfile
+    var authUserId: UUID?
+
     var currentUserId: UUID? {
-        socialProfile?.id
+        authUserId ?? socialProfile?.id
     }
 
     var friendIds: [UUID] {
-        friends.compactMap { friendship in
-            if friendship.userId == currentUserId {
+        guard let myId = currentUserId else { return [] }
+        return friends.compactMap { friendship in
+            if friendship.userId == myId {
                 return friendship.friendId
             } else {
                 return friendship.userId
@@ -95,6 +99,7 @@ final class SocialViewModel {
     /// Loads all social data in parallel.
     func loadSocialData() async {
         guard let userId = try? await supabase.auth.session.user.id else { return }
+        authUserId = userId
         isLoading = true
         errorMessage = nil
 
