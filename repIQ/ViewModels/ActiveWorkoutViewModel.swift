@@ -633,7 +633,16 @@ final class ActiveWorkoutViewModel {
 
             // Create PR feed items
             if !allNewPRs.isEmpty {
-                let prFeedData = FeedItemData(prCount: allNewPRs.count)
+                let prFeedData = FeedItemData(
+                    prCount: allNewPRs.count,
+                    prDetails: allNewPRs.map { pr in
+                        FeedPRDetail(
+                            exerciseName: pr.exerciseName,
+                            recordType: pr.recordType.rawValue,
+                            value: pr.value
+                        )
+                    }
+                )
                 try? await feedService.createFeedItem(
                     userId: userId,
                     sessionId: sessionId,
