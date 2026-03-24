@@ -49,12 +49,7 @@ struct ProgressTabView: View {
                             recentPRsSection
                         }
 
-                        // 7. Milestones — gamification, next goals
-                        if !viewModel.milestones.isEmpty {
-                            milestonesSection
-                        }
-
-                        // 8. Push/Pull Balance
+                        // 7. Push/Pull Balance
                         if let balance = viewModel.pushPullBalance, balance.pushVolume > 0 || balance.pullVolume > 0 {
                             pushPullSection
                         }
@@ -467,87 +462,7 @@ struct ProgressTabView: View {
         .frame(width: 130)
     }
 
-    // MARK: - 7. Milestones
-
-    private var milestonesSection: some View {
-        VStack(alignment: .leading, spacing: RQSpacing.md) {
-            HStack {
-                sectionHeaderWithInfo("MILESTONES", topic: ProgressExplainer.milestones)
-                Spacer()
-                let achieved = viewModel.achievedMilestones.count
-                let total = viewModel.milestones.count
-                Text("\(achieved)/\(total)")
-                    .font(RQTypography.label)
-                    .foregroundColor(RQColors.textTertiary)
-            }
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: RQSpacing.md) {
-                    // Show next milestones first (most motivating), then achieved
-                    ForEach(viewModel.nextMilestones) { milestone in
-                        milestoneCard(milestone)
-                    }
-                    ForEach(viewModel.achievedMilestones.prefix(5)) { milestone in
-                        milestoneCard(milestone)
-                    }
-                }
-            }
-        }
-    }
-
-    private func milestoneCard(_ milestone: MilestoneDefinition) -> some View {
-        VStack(spacing: RQSpacing.sm) {
-            // Progress ring with icon
-            ZStack {
-                Circle()
-                    .stroke(RQColors.surfaceTertiary, lineWidth: 3)
-                    .frame(width: 48, height: 48)
-
-                Circle()
-                    .trim(from: 0, to: milestone.progress)
-                    .stroke(
-                        milestone.isAchieved ? RQColors.accent : RQColors.textTertiary,
-                        style: StrokeStyle(lineWidth: 3, lineCap: .round)
-                    )
-                    .frame(width: 48, height: 48)
-                    .rotationEffect(.degrees(-90))
-
-                Image(systemName: milestone.isAchieved ? "checkmark" : milestone.icon)
-                    .font(.system(size: 16, weight: milestone.isAchieved ? .bold : .regular))
-                    .foregroundColor(milestone.isAchieved ? RQColors.accent : RQColors.textTertiary)
-            }
-
-            Text(milestone.title)
-                .font(RQTypography.caption)
-                .foregroundColor(milestone.isAchieved ? RQColors.textPrimary : RQColors.textSecondary)
-                .lineLimit(1)
-
-            if milestone.isAchieved {
-                Text("ACHIEVED")
-                    .font(RQTypography.label)
-                    .tracking(0.5)
-                    .foregroundColor(RQColors.accent)
-            } else {
-                Text("\(Int(milestone.progress * 100))%")
-                    .font(RQTypography.label)
-                    .foregroundColor(RQColors.textTertiary)
-            }
-        }
-        .frame(width: 90)
-        .padding(.vertical, RQSpacing.sm)
-        .padding(.horizontal, RQSpacing.xs)
-        .background(Color.clear)
-        .cornerRadius(RQSpacing.cardCornerRadius)
-        .overlay(
-            RoundedRectangle(cornerRadius: RQSpacing.cardCornerRadius)
-                .stroke(
-                    milestone.isAchieved ? RQColors.accent.opacity(0.5) : RQColors.textTertiary,
-                    lineWidth: milestone.isAchieved ? 1 : 0.5
-                )
-        )
-    }
-
-    // MARK: - 8. Push/Pull Balance
+    // MARK: - 7. Push/Pull Balance
 
     private var pushPullSection: some View {
         VStack(alignment: .leading, spacing: RQSpacing.md) {

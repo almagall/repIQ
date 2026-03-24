@@ -92,13 +92,6 @@ struct SocialTabView: View {
             .sheet(isPresented: $showAddFriends) {
                 AddFriendsSheet(viewModel: viewModel)
             }
-            .overlay {
-                if let achievement = viewModel.celebrationAchievement {
-                    AchievementCelebrationOverlay(achievement: achievement) {
-                        viewModel.celebrationAchievement = nil
-                    }
-                }
-            }
         }
     }
 
