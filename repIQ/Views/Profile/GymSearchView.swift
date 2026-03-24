@@ -8,6 +8,7 @@ struct GymSearchView: View {
     @State private var searchResults: [MKMapItem] = []
     @State private var isSearching = false
     @State private var currentGymName: String?
+    @State private var currentGymAddress: String?
     @State private var currentGymPlaceId: String?
     @State private var isSaving = false
     @State private var showRemoveConfirmation = false
@@ -32,6 +33,13 @@ struct GymSearchView: View {
                             Text(gymName)
                                 .font(RQTypography.headline)
                                 .foregroundColor(RQColors.textPrimary)
+
+                            if let address = currentGymAddress, !address.isEmpty {
+                                Text(address)
+                                    .font(RQTypography.caption)
+                                    .foregroundColor(RQColors.textTertiary)
+                                    .lineLimit(1)
+                            }
                         }
 
                         Spacer()
@@ -231,7 +239,7 @@ struct GymSearchView: View {
     private func selectGym(_ item: MKMapItem) async {
         isSaving = true
         let name = item.name ?? "Unknown Gym"
-        // Use a combination of name + coordinates as a stable identifier
+        let address = formatAddress(item) ?? ""
         let placeId = "\(name)_\(item.placemark.coordinate.latitude)_\(item.placemark.coordinate.longitude)"
 
         do {
@@ -239,11 +247,13 @@ struct GymSearchView: View {
             try await GymService().updateGym(
                 userId: userId,
                 name: name,
+                address: address,
                 placeId: placeId,
                 latitude: item.placemark.coordinate.latitude,
                 longitude: item.placemark.coordinate.longitude
             )
             currentGymName = name
+            currentGymAddress = address
             currentGymPlaceId = placeId
             searchText = ""
             searchResults = []
@@ -263,9 +273,11 @@ struct GymSearchView: View {
     private func loadCurrentGym() async {
         struct GymFields: Decodable {
             let gymName: String?
+            let gymAddress: String?
             let gymPlaceId: String?
             enum CodingKeys: String, CodingKey {
                 case gymName = "gym_name"
+                case gymAddress = "gym_address"
                 case gymPlaceId = "gym_place_id"
             }
         }
@@ -273,12 +285,13 @@ struct GymSearchView: View {
         do {
             guard let userId = try? await supabase.auth.session.user.id else { return }
             let fields: GymFields = try await supabase.from("profiles")
-                .select("gym_name, gym_place_id")
+                .select("gym_name, gym_address, gym_place_id")
                 .eq("id", value: userId.uuidString)
                 .single()
                 .execute()
                 .value
             currentGymName = fields.gymName
+            currentGymAddress = fields.gymAddress
             currentGymPlaceId = fields.gymPlaceId
         } catch {}
     }

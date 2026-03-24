@@ -4,10 +4,11 @@ import Supabase
 struct GymService: Sendable {
 
     /// Saves the user's gym selection to their profile.
-    func updateGym(userId: UUID, name: String, placeId: String, latitude: Double, longitude: Double) async throws {
+    func updateGym(userId: UUID, name: String, address: String, placeId: String, latitude: Double, longitude: Double) async throws {
         try await supabase.from("profiles")
             .update([
                 "gym_name": name,
+                "gym_address": address,
                 "gym_place_id": placeId,
                 "gym_latitude": "\(latitude)",
                 "gym_longitude": "\(longitude)"
@@ -20,6 +21,7 @@ struct GymService: Sendable {
     func removeGym(userId: UUID) async throws {
         struct NullPayload: Encodable {
             let gym_name: String? = nil
+            let gym_address: String? = nil
             let gym_place_id: String? = nil
             let gym_latitude: String? = nil
             let gym_longitude: String? = nil
@@ -27,13 +29,14 @@ struct GymService: Sendable {
             func encode(to encoder: Encoder) throws {
                 var container = encoder.container(keyedBy: CodingKeys.self)
                 try container.encodeNil(forKey: .gym_name)
+                try container.encodeNil(forKey: .gym_address)
                 try container.encodeNil(forKey: .gym_place_id)
                 try container.encodeNil(forKey: .gym_latitude)
                 try container.encodeNil(forKey: .gym_longitude)
             }
 
             enum CodingKeys: String, CodingKey {
-                case gym_name, gym_place_id, gym_latitude, gym_longitude
+                case gym_name, gym_address, gym_place_id, gym_latitude, gym_longitude
             }
         }
 

@@ -8,6 +8,7 @@ struct ProfileView: View {
     @State private var username = ""
     @State private var isSavingSocial = false
     @State private var gymName: String?
+    @State private var gymAddress: String?
 
     private let restTimerOptions = [60, 90, 120, 150, 180, 210, 240]
 
@@ -43,9 +44,17 @@ struct ProfileView: View {
                                         Image(systemName: "building.2.fill")
                                             .font(.system(size: 10))
                                             .foregroundColor(RQColors.textTertiary)
-                                        Text(gym)
-                                            .font(RQTypography.caption)
-                                            .foregroundColor(RQColors.textTertiary)
+                                        VStack(alignment: .leading, spacing: 1) {
+                                            Text(gym)
+                                                .font(RQTypography.caption)
+                                                .foregroundColor(RQColors.textTertiary)
+                                            if let address = gymAddress, !address.isEmpty {
+                                                Text(address)
+                                                    .font(.system(size: 10))
+                                                    .foregroundColor(RQColors.textTertiary.opacity(0.7))
+                                                    .lineLimit(1)
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -156,19 +165,24 @@ struct ProfileView: View {
             .task {
                 await viewModel.loadProfile()
                 username = viewModel.profile?.username ?? ""
-                // Load gym name directly
+                // Load gym info directly
                 if let userId = try? await supabase.auth.session.user.id {
-                    struct GymField: Decodable {
+                    struct GymFields: Decodable {
                         let gymName: String?
-                        enum CodingKeys: String, CodingKey { case gymName = "gym_name" }
+                        let gymAddress: String?
+                        enum CodingKeys: String, CodingKey {
+                            case gymName = "gym_name"
+                            case gymAddress = "gym_address"
+                        }
                     }
-                    let field: GymField? = try? await supabase.from("profiles")
-                        .select("gym_name")
+                    let fields: GymFields? = try? await supabase.from("profiles")
+                        .select("gym_name, gym_address")
                         .eq("id", value: userId.uuidString)
                         .single()
                         .execute()
                         .value
-                    gymName = field?.gymName
+                    gymName = fields?.gymName
+                    gymAddress = fields?.gymAddress
                 }
             }
             .confirmationDialog("Weight Unit", isPresented: $showWeightUnitPicker) {
