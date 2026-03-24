@@ -14,7 +14,6 @@ struct FriendsView: View {
     enum FriendsTab: String, CaseIterable {
         case friends = "Friends"
         case requests = "Requests"
-        case search = "Find"
     }
 
     var body: some View {
@@ -30,8 +29,6 @@ struct FriendsView: View {
                         friendsList
                     case .requests:
                         requestsList
-                    case .search:
-                        searchSection
                     }
                 }
                 .padding(.horizontal, RQSpacing.screenHorizontal)
