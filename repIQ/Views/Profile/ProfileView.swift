@@ -1,4 +1,5 @@
 import SwiftUI
+import Supabase
 
 struct ProfileView: View {
     @State private var viewModel = ProfileViewModel()
@@ -6,6 +7,7 @@ struct ProfileView: View {
     @State private var showRestTimerPicker = false
     @State private var username = ""
     @State private var isSavingSocial = false
+    @State private var gymName: String?
 
     private let restTimerOptions = [60, 90, 120, 150, 180, 210, 240]
 
@@ -34,6 +36,17 @@ struct ProfileView: View {
                                     Text(viewModel.profile?.displayName ?? "User")
                                         .font(RQTypography.headline)
                                         .foregroundColor(RQColors.textPrimary)
+                                }
+
+                                if let gym = gymName, !gym.isEmpty {
+                                    HStack(spacing: RQSpacing.xs) {
+                                        Image(systemName: "building.2.fill")
+                                            .font(.system(size: 10))
+                                            .foregroundColor(RQColors.textTertiary)
+                                        Text(gym)
+                                            .font(RQTypography.caption)
+                                            .foregroundColor(RQColors.textTertiary)
+                                    }
                                 }
                             }
                             Spacer()
@@ -143,6 +156,16 @@ struct ProfileView: View {
             .task {
                 await viewModel.loadProfile()
                 username = viewModel.profile?.username ?? ""
+                // Load gym name from social profile
+                if let userId = try? await supabase.auth.session.user.id {
+                    let profile: SocialProfile? = try? await supabase.from("profiles")
+                        .select()
+                        .eq("id", value: userId.uuidString)
+                        .single()
+                        .execute()
+                        .value
+                    gymName = profile?.gymName
+                }
             }
             .confirmationDialog("Weight Unit", isPresented: $showWeightUnitPicker) {
                 Button("lbs") {
