@@ -438,7 +438,7 @@ struct FeedView: View {
             Text("No activity yet")
                 .font(RQTypography.headline)
                 .foregroundColor(RQColors.textSecondary)
-            Text("Add friends to see their workouts, PRs, and milestones here.")
+            Text("Add friends to see their workouts and PRs here.")
                 .font(RQTypography.footnote)
                 .foregroundColor(RQColors.textTertiary)
                 .multilineTextAlignment(.center)

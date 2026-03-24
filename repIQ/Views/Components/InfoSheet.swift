@@ -284,18 +284,6 @@ enum ProgressExplainer {
         howToUse: "Scan for gaps and patterns. If you see consistent blank stretches, consider scheduling workouts at the same time each day to build a habit. An occasional rest day is good — extended gaps may slow your progress."
     )
 
-    static let milestones = Topic(
-        title: "Milestones",
-        icon: "trophy.fill",
-        explanation: "Milestones are achievement markers that celebrate your training journey. They're based on objective metrics like total sessions, volume lifted, streaks, and PRs.",
-        keyPoints: [
-            "Five categories: Sessions, Volume, Streaks, Personal Records, and Exercises.",
-            "Focus on the 'next up' milestones — the ones closest to completion.",
-            "Each milestone represents a meaningful training accomplishment.",
-        ],
-        howToUse: "Use milestones as micro-goals to stay motivated. The progress ring shows how close you are. Don't obsess over them — they'll come naturally with consistent training."
-    )
-
     // MARK: - Phase Then Topics
 
     static let pushPullBalance = Topic(
