@@ -60,18 +60,6 @@ struct SocialTabView: View {
                             Image(systemName: "person.badge.plus")
                                 .font(.system(size: 16))
                                 .foregroundColor(RQColors.accent)
-                                .overlay(alignment: .topTrailing) {
-                                    if !viewModel.pendingRequests.isEmpty {
-                                        Text("\(viewModel.pendingRequests.count)")
-                                            .font(.system(size: 9, weight: .bold))
-                                            .foregroundColor(.white)
-                                            .padding(.horizontal, 4)
-                                            .padding(.vertical, 1)
-                                            .background(RQColors.error)
-                                            .clipShape(Capsule())
-                                            .offset(x: 6, y: -8)
-                                    }
-                                }
                         }
 
                         // Profile avatar removed — profile accessible via Profile tab
@@ -167,8 +155,21 @@ struct SocialTabView: View {
                     }
                 } label: {
                     VStack(spacing: 4) {
-                        Image(systemName: section.icon)
-                            .font(.system(size: 14))
+                        ZStack(alignment: .topTrailing) {
+                            Image(systemName: section.icon)
+                                .font(.system(size: 14))
+
+                            if section == .friends && !viewModel.pendingRequests.isEmpty {
+                                Text("\(viewModel.pendingRequests.count)")
+                                    .font(.system(size: 8, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 3)
+                                    .padding(.vertical, 1)
+                                    .background(RQColors.error)
+                                    .clipShape(Capsule())
+                                    .offset(x: 8, y: -6)
+                            }
+                        }
 
                         Text(section.rawValue)
                             .font(.system(size: 10, weight: .semibold))
