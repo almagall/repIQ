@@ -11,10 +11,10 @@ struct FeedView: View {
             LazyVStack(spacing: RQSpacing.lg) {
                 if viewModel.isLoading && viewModel.feedItems.isEmpty {
                     loadingState
-                } else if viewModel.feedItems.isEmpty {
+                } else if friendFeedItems.isEmpty {
                     emptyState
                 } else {
-                    ForEach(viewModel.feedItems) { item in
+                    ForEach(friendFeedItems) { item in
                         feedItemCard(item)
                     }
                 }
@@ -120,16 +120,40 @@ struct FeedView: View {
     private func feedItemContent(_ item: FeedItem) -> some View {
         switch item.itemType {
         case .workoutCompleted:
-            if let exercises = item.data.exerciseNames, !exercises.isEmpty {
-                let exerciseText = exercises.prefix(3).joined(separator: ", ")
-                let suffix = exercises.count > 3 ? " +\(exercises.count - 3) more" : ""
-                Text("Completed a workout: \(exerciseText)\(suffix)")
-                    .font(RQTypography.body)
-                    .foregroundColor(RQColors.textSecondary)
-            } else {
-                Text("Completed a workout")
-                    .font(RQTypography.body)
-                    .foregroundColor(RQColors.textSecondary)
+            VStack(alignment: .leading, spacing: RQSpacing.xs) {
+                if let dayName = item.data.workoutDayName, !dayName.isEmpty {
+                    Text("Completed \(dayName)")
+                        .font(RQTypography.body)
+                        .foregroundColor(RQColors.textSecondary)
+                } else {
+                    Text("Completed a workout")
+                        .font(RQTypography.body)
+                        .foregroundColor(RQColors.textSecondary)
+                }
+
+                // Expandable exercise list
+                if let exercises = item.data.exerciseNames, !exercises.isEmpty {
+                    DisclosureGroup {
+                        VStack(alignment: .leading, spacing: RQSpacing.xxs) {
+                            ForEach(exercises, id: \.self) { name in
+                                HStack(spacing: RQSpacing.xs) {
+                                    Circle()
+                                        .fill(RQColors.accent)
+                                        .frame(width: 4, height: 4)
+                                    Text(name)
+                                        .font(RQTypography.caption)
+                                        .foregroundColor(RQColors.textTertiary)
+                                }
+                            }
+                        }
+                        .padding(.top, RQSpacing.xxs)
+                    } label: {
+                        Text("\(exercises.count) exercise\(exercises.count == 1 ? "" : "s")")
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.accent)
+                    }
+                    .tint(RQColors.accent)
+                }
             }
 
         case .prAchieved:
@@ -350,15 +374,23 @@ struct FeedView: View {
 
     // MARK: - Helpers
 
+    /// Feed items from friends only (excludes current user's own items)
+    private var friendFeedItems: [FeedItem] {
+        viewModel.feedItems.filter { $0.userId != viewModel.currentUserId }
+    }
+
     private func displayName(for item: FeedItem) -> String {
-        if item.userId == viewModel.currentUserId {
-            return "You"
+        if let username = item.userProfile?.username, !username.isEmpty {
+            return username
         }
-        return item.userProfile?.displayName ?? "User"
+        if let displayName = item.userProfile?.displayName, !displayName.isEmpty {
+            return displayName
+        }
+        return "User"
     }
 
     private func avatarInitial(for item: FeedItem) -> String {
-        let name = item.userProfile?.displayName ?? "?"
+        let name = displayName(for: item)
         return String(name.prefix(1)).uppercased()
     }
 

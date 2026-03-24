@@ -157,6 +157,7 @@ struct FeedItemData: Codable, Sendable {
     var exerciseCount: Int?
     var prCount: Int?
     var exerciseNames: [String]?
+    var workoutDayName: String?
     var streakDays: Int?
     var badgeName: String?
     var leagueTier: String?
@@ -169,6 +170,7 @@ struct FeedItemData: Codable, Sendable {
         case exerciseCount = "exercise_count"
         case prCount = "pr_count"
         case exerciseNames = "exercise_names"
+        case workoutDayName = "workout_day_name"
         case streakDays = "streak_days"
         case badgeName = "badge_name"
         case leagueTier = "league_tier"

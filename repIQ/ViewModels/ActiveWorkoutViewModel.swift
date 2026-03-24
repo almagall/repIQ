@@ -621,7 +621,8 @@ final class ActiveWorkoutViewModel {
                 totalVolume: totalVolume,
                 exerciseCount: exerciseSummaries.count,
                 prCount: allNewPRs.isEmpty ? nil : allNewPRs.count,
-                exerciseNames: exerciseSummaries.map(\.name)
+                exerciseNames: exerciseSummaries.map(\.name),
+                workoutDayName: dayName.isEmpty ? nil : dayName
             )
             try? await feedService.createFeedItem(
                 userId: userId,
