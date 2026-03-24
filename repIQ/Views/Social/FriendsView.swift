@@ -11,7 +11,6 @@ struct FriendsView: View {
     enum FriendsTab: String, CaseIterable {
         case friends = "Friends"
         case requests = "Requests"
-        case partners = "Partners"
         case search = "Find"
     }
 
@@ -28,8 +27,6 @@ struct FriendsView: View {
                         friendsList
                     case .requests:
                         requestsList
-                    case .partners:
-                        partnersList
                     case .search:
                         searchSection
                     }
@@ -108,16 +105,6 @@ struct FriendsView: View {
                         .foregroundColor(RQColors.textTertiary)
                 }
 
-                if friendship.safeIsTrainingPartner {
-                    HStack(spacing: RQSpacing.xxs) {
-                        Image(systemName: "figure.2.and.child.holdinghands")
-                            .font(.system(size: 10))
-                        Text("Training Partner")
-                            .font(RQTypography.label)
-                            .textCase(.uppercase)
-                    }
-                    .foregroundColor(RQColors.accent)
-                }
             }
 
             Spacer()
@@ -221,87 +208,10 @@ struct FriendsView: View {
 
     // MARK: - Partners List
 
-    @ViewBuilder
-    private var partnersList: some View {
-        if viewModel.trainingPartners.isEmpty {
-            emptyState(
-                icon: "figure.2.and.child.holdinghands",
-                title: "No training partners",
-                message: "Designate up to 5 close friends as training partners for accountability and partner streaks."
-            )
-        } else {
-            ForEach(viewModel.trainingPartners) { partner in
-                HStack(spacing: RQSpacing.md) {
-                    profileAvatar(name: friendDisplayName(partner), size: 44)
-
-                    VStack(alignment: .leading, spacing: RQSpacing.xxs) {
-                        Text(friendDisplayName(partner))
-                            .font(RQTypography.headline)
-                            .foregroundColor(RQColors.textPrimary)
-
-                        if partner.safePartnerStreak > 0 {
-                            HStack(spacing: RQSpacing.xxs) {
-                                Image(systemName: "flame.fill")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(RQColors.warning)
-                                Text("\(partner.safePartnerStreak) day partner streak")
-                                    .font(RQTypography.caption)
-                                    .foregroundColor(RQColors.warning)
-                            }
-                        }
-                    }
-
-                    Spacer()
-
-                    Image(systemName: "figure.2.and.child.holdinghands")
-                        .font(.system(size: 16))
-                        .foregroundColor(RQColors.accent)
-                }
-                .padding(RQSpacing.cardPadding)
-                .background(RQColors.surfacePrimary)
-                .cornerRadius(RQRadius.medium)
-            }
-        }
-    }
-
     // MARK: - Search
 
     private var searchSection: some View {
         VStack(spacing: RQSpacing.lg) {
-            // Smart matchmaking banner
-            NavigationLink {
-                MatchmakingView(viewModel: viewModel)
-            } label: {
-                HStack(spacing: RQSpacing.md) {
-                    Image(systemName: "person.2.wave.2.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(RQColors.accent)
-                        .frame(width: 40)
-
-                    VStack(alignment: .leading, spacing: RQSpacing.xxs) {
-                        Text("Find Training Partners")
-                            .font(RQTypography.headline)
-                            .foregroundColor(RQColors.textPrimary)
-                        Text("Smart matchmaking based on your training style")
-                            .font(RQTypography.caption)
-                            .foregroundColor(RQColors.textTertiary)
-                    }
-
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12))
-                        .foregroundColor(RQColors.textTertiary)
-                }
-                .padding(RQSpacing.cardPadding)
-                .background(RQColors.accent.opacity(0.08))
-                .cornerRadius(RQRadius.medium)
-                .overlay(
-                    RoundedRectangle(cornerRadius: RQRadius.medium)
-                        .stroke(RQColors.accent.opacity(0.2), lineWidth: 1)
-                )
-            }
-
             // Search bar
             HStack(spacing: RQSpacing.sm) {
                 Image(systemName: "magnifyingglass")
