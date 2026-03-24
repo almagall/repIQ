@@ -446,4 +446,20 @@ enum ProgressExplainer {
         ],
         howToUse: "If you train with 3-5 reps and regularly test heavy singles, use Actual Weight. If you train with 8-12 reps and rarely max out, Estimated 1RM gives you a better picture of your true strength progression."
     )
+
+    // MARK: - RPE Scale
+
+    static let rpeScale = Topic(
+        title: "RPE (Rate of Perceived Exertion)",
+        icon: "gauge.with.needle.fill",
+        explanation: "RPE measures how hard a set felt on a scale of 1-10. It helps the app understand your effort level and adjust future targets accordingly.",
+        keyPoints: [
+            "RPE 6: Could do 4+ more reps. Warm-up effort.",
+            "RPE 7: Could do 3 more reps. Moderate effort, good for volume work.",
+            "RPE 8: Could do 2 more reps. Challenging but controlled. Ideal for most training.",
+            "RPE 9: Could do 1 more rep. Very hard. Near-max effort.",
+            "RPE 10: Maximum effort. Could not do another rep.",
+        ],
+        howToUse: "After completing a set, tap the RPE badge and select how hard it felt. For most hypertrophy training, aim for RPE 7-8. For strength work, RPE 8-9. You do not need to set RPE on every set, but it helps the progression engine make better recommendations."
+    )
 }

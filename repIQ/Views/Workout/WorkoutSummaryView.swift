@@ -128,6 +128,11 @@ struct WorkoutSummaryView: View {
                     gamificationSection
                 }
 
+                // First workout baseline message (streak of 1 = first ever workout)
+                if summary.currentStreak == 1 {
+                    baselineRecordedCard
+                }
+
                 // PR celebrations (exclude volume)
                 let displayPRs = summary.newPRs.filter { $0.recordType != .volume }
                 if !displayPRs.isEmpty {
@@ -197,6 +202,29 @@ struct WorkoutSummaryView: View {
                     .foregroundColor(RQColors.textSecondary)
             }
             .frame(maxWidth: .infinity)
+        }
+    }
+
+    // MARK: - Baseline Recorded
+
+    private var baselineRecordedCard: some View {
+        RQCard {
+            HStack(alignment: .top, spacing: RQSpacing.md) {
+                Image(systemName: "chart.line.uptrend.xyaxis.circle.fill")
+                    .font(.system(size: 24))
+                    .foregroundColor(RQColors.accent)
+
+                VStack(alignment: .leading, spacing: RQSpacing.xs) {
+                    Text("Baseline Recorded")
+                        .font(RQTypography.headline)
+                        .foregroundColor(RQColors.accent)
+
+                    let exerciseCount = summary.exerciseSummaries.count
+                    Text("The app now knows your starting point for \(exerciseCount) exercise\(exerciseCount == 1 ? "" : "s"). Next time, you will see personalized targets based on today's performance.")
+                        .font(RQTypography.caption)
+                        .foregroundColor(RQColors.textSecondary)
+                }
+            }
         }
     }
 

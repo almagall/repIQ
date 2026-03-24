@@ -47,6 +47,11 @@ struct ExerciseLogView: View {
                         deloadBanner(reasoning: target.reasoning)
                     }
 
+                    // First-time exercise baseline banner
+                    if exercise.progressionTarget == nil {
+                        baselineBanner(exercise)
+                    }
+
                     Divider().background(RQColors.surfaceTertiary)
 
                     // Grouped set sections
@@ -443,8 +448,11 @@ struct ExerciseLogView: View {
                 .frame(width: 48, alignment: .center)
             Text("")
                 .frame(width: 8)
-            Text("RPE")
-                .frame(width: 56, alignment: .center)
+            HStack(spacing: 2) {
+                Text("RPE")
+                InfoButton(topic: ProgressExplainer.rpeScale)
+            }
+            .frame(width: 56, alignment: .center)
             Spacer()
         }
         .font(RQTypography.caption)
@@ -605,6 +613,41 @@ struct ExerciseLogView: View {
         }
         .padding(RQSpacing.md)
         .background(RQColors.error.opacity(0.08))
+        .cornerRadius(RQRadius.medium)
+    }
+
+    private func baselineBanner(_ exercise: ExerciseLogEntry) -> some View {
+        let isBodyweight = exercise.equipment == "bodyweight"
+        let isBarbell = exercise.equipment == "barbell" || exercise.equipment == "smith_machine"
+
+        return HStack(alignment: .top, spacing: RQSpacing.sm) {
+            Image(systemName: "lightbulb.fill")
+                .font(.system(size: 18))
+                .foregroundColor(RQColors.accent)
+
+            VStack(alignment: .leading, spacing: RQSpacing.xs) {
+                Text("First Time Logging")
+                    .font(RQTypography.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(RQColors.accent)
+
+                if isBodyweight {
+                    Text("Log your bodyweight reps. The app will track your progress and suggest when to add weight or increase reps.")
+                        .font(RQTypography.caption)
+                        .foregroundColor(RQColors.textSecondary)
+                } else if isBarbell {
+                    Text("Start with a comfortable weight you can control with good form. Your first few sessions build a baseline for smart targets.")
+                        .font(RQTypography.caption)
+                        .foregroundColor(RQColors.textSecondary)
+                } else {
+                    Text("Pick a weight that feels manageable and focus on form. The app will use today's data to generate your targets next session.")
+                        .font(RQTypography.caption)
+                        .foregroundColor(RQColors.textSecondary)
+                }
+            }
+        }
+        .padding(RQSpacing.md)
+        .background(RQColors.accent.opacity(0.08))
         .cornerRadius(RQRadius.medium)
     }
 
