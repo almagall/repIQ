@@ -808,6 +808,12 @@ final class ActiveWorkoutViewModel {
             let currentWeightPR = weightPR?.value ?? 0
 
             if completedSet.weight > currentWeightPR && completedSet.weight > 0 {
+                // Clear previous weight PR badge from earlier sets of the same exercise
+                for i in 0..<exercises[exerciseIndex].sets.count where i != setIndex {
+                    if exercises[exerciseIndex].sets[i].prType == .weight {
+                        exercises[exerciseIndex].sets[i].prType = nil
+                    }
+                }
                 exercises[exerciseIndex].sets[setIndex].prType = .weight
                 let weightDelta = completedSet.weight - currentWeightPR
                 let pctImprovement = currentWeightPR > 0 ? (weightDelta / currentWeightPR) * 100 : nil
@@ -844,6 +850,13 @@ final class ActiveWorkoutViewModel {
                 let currentRepPR = Int(repPR?.repsAtWeight ?? 0)
 
                 if completedSet.reps > currentRepPR && completedSet.reps > 0 && completedSet.weight > 0 {
+                    // Clear previous rep PR badge at this weight from earlier sets
+                    for i in 0..<exercises[exerciseIndex].sets.count where i != setIndex {
+                        if exercises[exerciseIndex].sets[i].prType == .reps
+                            && exercises[exerciseIndex].sets[i].weight == completedSet.weight {
+                            exercises[exerciseIndex].sets[i].prType = nil
+                        }
+                    }
                     exercises[exerciseIndex].sets[setIndex].prType = .reps
                     let repDelta = completedSet.reps - currentRepPR
                     let pctImprovement = currentRepPR > 0 ? (Double(repDelta) / Double(currentRepPR)) * 100 : nil
