@@ -208,7 +208,6 @@ struct SocialProfileView: View {
                 .tracking(1.5)
 
             LazyVGrid(columns: [.init(.flexible()), .init(.flexible())], spacing: RQSpacing.md) {
-                statCard(icon: "brain.head.profile", value: "\(viewModel.totalIQ)", label: "IQ Points", color: RQColors.accent)
                 statCard(icon: "flame.fill", value: "\(viewModel.currentStreak)", label: "Day Streak", color: RQColors.warning)
                 statCard(icon: "person.2.fill", value: "\(viewModel.friends.count)", label: "Friends", color: RQColors.info)
             }

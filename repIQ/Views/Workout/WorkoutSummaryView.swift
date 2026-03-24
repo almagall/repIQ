@@ -123,8 +123,8 @@ struct WorkoutSummaryView: View {
                     )
                 }
 
-                // Gamification: IQ Points + Streak
-                if summary.iqPointsEarned > 0 || summary.currentStreak > 0 {
+                // Streak
+                if summary.currentStreak > 0 {
                     gamificationSection
                 }
 
@@ -182,44 +182,21 @@ struct WorkoutSummaryView: View {
     // MARK: - Gamification
 
     private var gamificationSection: some View {
-        HStack(spacing: RQSpacing.lg) {
-            if summary.iqPointsEarned > 0 {
-                RQCard {
-                    VStack(spacing: RQSpacing.sm) {
-                        Image(systemName: "brain.head.profile")
-                            .font(.system(size: 20))
-                            .foregroundColor(RQColors.accent)
-                        Text("+\(summary.iqPointsEarned)")
-                            .font(RQTypography.numbers)
-                            .foregroundColor(RQColors.accent)
-                        Text("IQ Earned")
-                            .font(RQTypography.label)
-                            .textCase(.uppercase)
-                            .tracking(1.5)
-                            .foregroundColor(RQColors.textSecondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                }
+        RQCard {
+            VStack(spacing: RQSpacing.sm) {
+                Image(systemName: "flame.fill")
+                    .font(.system(size: 20))
+                    .foregroundColor(RQColors.warning)
+                Text("\(summary.currentStreak)")
+                    .font(RQTypography.numbers)
+                    .foregroundColor(RQColors.warning)
+                Text("Day Streak")
+                    .font(RQTypography.label)
+                    .textCase(.uppercase)
+                    .tracking(1.5)
+                    .foregroundColor(RQColors.textSecondary)
             }
-
-            if summary.currentStreak > 0 {
-                RQCard {
-                    VStack(spacing: RQSpacing.sm) {
-                        Image(systemName: "flame.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(RQColors.warning)
-                        Text("\(summary.currentStreak)")
-                            .font(RQTypography.numbers)
-                            .foregroundColor(RQColors.warning)
-                        Text("Day Streak")
-                            .font(RQTypography.label)
-                            .textCase(.uppercase)
-                            .tracking(1.5)
-                            .foregroundColor(RQColors.textSecondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-            }
+            .frame(maxWidth: .infinity)
         }
     }
 
