@@ -43,15 +43,15 @@ struct ProfileView: View {
                                     HStack(spacing: RQSpacing.xs) {
                                         Image(systemName: "building.2.fill")
                                             .font(.system(size: 10))
-                                            .foregroundColor(RQColors.textTertiary)
+                                            .foregroundColor(RQColors.textPrimary)
                                         VStack(alignment: .leading, spacing: 1) {
                                             Text(gym)
                                                 .font(RQTypography.caption)
-                                                .foregroundColor(RQColors.textTertiary)
+                                                .foregroundColor(RQColors.textPrimary)
                                             if let address = gymAddress, !address.isEmpty {
                                                 Text(address)
                                                     .font(.system(size: 10))
-                                                    .foregroundColor(RQColors.textTertiary.opacity(0.7))
+                                                    .foregroundColor(RQColors.textPrimary)
                                                     .lineLimit(1)
                                             }
                                         }
