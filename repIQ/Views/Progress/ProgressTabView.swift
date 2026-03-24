@@ -125,7 +125,7 @@ struct ProgressTabView: View {
 
                     VStack(alignment: .leading, spacing: RQSpacing.xxs) {
                         if let streak = viewModel.streakData, streak.currentStreak > 0 {
-                            Text("\(streak.currentStreak) DAY STREAK")
+                            Text("\(streak.currentStreak) WEEK STREAK")
                                 .font(RQTypography.numbers)
                                 .foregroundColor(RQColors.textPrimary)
                         } else {
@@ -135,7 +135,7 @@ struct ProgressTabView: View {
                         }
 
                         if let streak = viewModel.streakData, streak.bestStreak > 0 {
-                            Text("Best: \(streak.bestStreak) days")
+                            Text("Best: \(streak.bestStreak) week\(streak.bestStreak == 1 ? "" : "s")")
                                 .font(RQTypography.caption)
                                 .foregroundColor(RQColors.textTertiary)
                         }
@@ -144,7 +144,7 @@ struct ProgressTabView: View {
 
                 Spacer()
 
-                if let streak = viewModel.streakData, streak.currentStreak >= 7 {
+                if let streak = viewModel.streakData, streak.currentStreak >= 4 {
                     Text("\(streak.currentStreak)")
                         .font(RQTypography.title1)
                         .foregroundColor(RQColors.accent.opacity(0.2))
@@ -155,9 +155,9 @@ struct ProgressTabView: View {
 
     private var streakColor: Color {
         guard let streak = viewModel.streakData else { return RQColors.textTertiary }
-        if streak.currentStreak >= 14 { return RQColors.warning }
-        if streak.currentStreak >= 7 { return RQColors.accent }
-        if streak.currentStreak >= 3 { return RQColors.success }
+        if streak.currentStreak >= 12 { return RQColors.warning }  // 3+ months
+        if streak.currentStreak >= 4 { return RQColors.accent }    // 1+ month
+        if streak.currentStreak >= 2 { return RQColors.success }   // 2+ weeks
         if streak.currentStreak > 0 { return RQColors.textSecondary }
         return RQColors.textTertiary
     }
@@ -262,7 +262,7 @@ struct ProgressTabView: View {
                 color: RQColors.accent
             )
             overviewStatCard(
-                label: "THIS WEEK",
+                label: "WEEKLY WORKOUTS",
                 value: "\(viewModel.weeklySessionCount)",
                 icon: "figure.strengthtraining.traditional",
                 color: RQColors.accent

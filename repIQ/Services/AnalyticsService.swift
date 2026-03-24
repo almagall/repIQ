@@ -268,43 +268,50 @@ struct AnalyticsService: Sendable {
             return calendar.startOfDay(for: date)
         })
 
-        let sortedDates = workoutDates.sorted(by: >)
-        let lastWorkoutDate = sortedDates.first
+        let lastWorkoutDate = workoutDates.max()
 
-        // Calculate current streak (walking backward from today)
-        let today = calendar.startOfDay(for: Date())
+        // Weekly streak: count consecutive weeks with at least 1 workout
+        // Group workout dates into week-of-year identifiers
+        let workoutWeeks: Set<String> = Set(workoutDates.map { date in
+            let year = calendar.component(.yearForWeekOfYear, from: date)
+            let week = calendar.component(.weekOfYear, from: date)
+            return "\(year)-\(week)"
+        })
+
+        // Walk backward from current week
+        let today = Date()
         var currentStreak = 0
-        var checkDate = today
-        var gapUsed = false
+        var checkWeekDate = today
 
-        // Allow today or yesterday to start counting
-        if !workoutDates.contains(checkDate) {
-            if let yesterday = calendar.date(byAdding: .day, value: -1, to: checkDate),
-               workoutDates.contains(yesterday) {
-                checkDate = yesterday
-                gapUsed = true
-            } else {
-                // No recent workout, streak is 0
-                let bestStreak = calculateBestStreak(dates: workoutDates, calendar: calendar)
-                return StreakData(currentStreak: 0, bestStreak: bestStreak, lastWorkoutDate: lastWorkoutDate)
+        // Check current week first
+        let currentWeekId = "\(calendar.component(.yearForWeekOfYear, from: today))-\(calendar.component(.weekOfYear, from: today))"
+
+        // If no workout this week, check if last week had one (grace: current week is still in progress)
+        if !workoutWeeks.contains(currentWeekId) {
+            if let lastWeekDate = calendar.date(byAdding: .weekOfYear, value: -1, to: today) {
+                let lastWeekId = "\(calendar.component(.yearForWeekOfYear, from: lastWeekDate))-\(calendar.component(.weekOfYear, from: lastWeekDate))"
+                if workoutWeeks.contains(lastWeekId) {
+                    checkWeekDate = lastWeekDate
+                } else {
+                    let bestStreak = calculateBestWeeklyStreak(workoutWeeks: workoutWeeks, calendar: calendar, latestDate: lastWorkoutDate ?? today)
+                    return StreakData(currentStreak: 0, bestStreak: bestStreak, lastWorkoutDate: lastWorkoutDate)
+                }
             }
         }
 
+        // Count consecutive weeks backward
         while true {
-            if workoutDates.contains(checkDate) {
+            let weekId = "\(calendar.component(.yearForWeekOfYear, from: checkWeekDate))-\(calendar.component(.weekOfYear, from: checkWeekDate))"
+            if workoutWeeks.contains(weekId) {
                 currentStreak += 1
-                gapUsed = false
-            } else if !gapUsed {
-                // Allow one rest day gap
-                gapUsed = true
+                guard let prevWeek = calendar.date(byAdding: .weekOfYear, value: -1, to: checkWeekDate) else { break }
+                checkWeekDate = prevWeek
             } else {
                 break
             }
-            guard let prev = calendar.date(byAdding: .day, value: -1, to: checkDate) else { break }
-            checkDate = prev
         }
 
-        let bestStreak = calculateBestStreak(dates: workoutDates, calendar: calendar)
+        let bestStreak = calculateBestWeeklyStreak(workoutWeeks: workoutWeeks, calendar: calendar, latestDate: lastWorkoutDate ?? today)
 
         return StreakData(
             currentStreak: currentStreak,
@@ -782,32 +789,28 @@ struct AnalyticsService: Sendable {
     }
 
     /// Calculates the longest streak from a set of workout dates.
-    private func calculateBestStreak(dates: Set<Date>, calendar: Calendar) -> Int {
-        guard !dates.isEmpty else { return 0 }
-        let sorted = dates.sorted()
+    private func calculateBestWeeklyStreak(workoutWeeks: Set<String>, calendar: Calendar, latestDate: Date) -> Int {
+        guard !workoutWeeks.isEmpty else { return 0 }
 
-        var bestStreak = 1
-        var currentStreak = 1
-        var gapUsed = false
+        // Walk backward from the latest workout date week by week
+        var bestStreak = 0
+        var currentStreak = 0
+        var checkDate = latestDate
 
-        for i in 1..<sorted.count {
-            let daysBetween = calendar.dateComponents([.day], from: sorted[i - 1], to: sorted[i]).day ?? 0
-
-            if daysBetween == 1 {
+        // Go back far enough to cover all data (52 weeks * 5 years max)
+        for _ in 0..<260 {
+            let weekId = "\(calendar.component(.yearForWeekOfYear, from: checkDate))-\(calendar.component(.weekOfYear, from: checkDate))"
+            if workoutWeeks.contains(weekId) {
                 currentStreak += 1
-                gapUsed = false
-            } else if daysBetween == 2 && !gapUsed {
-                // Allow one rest day gap
-                currentStreak += 1
-                gapUsed = true
-            } else {
                 bestStreak = max(bestStreak, currentStreak)
-                currentStreak = 1
-                gapUsed = false
+            } else {
+                currentStreak = 0
             }
+            guard let prevWeek = calendar.date(byAdding: .weekOfYear, value: -1, to: checkDate) else { break }
+            checkDate = prevWeek
         }
 
-        return max(bestStreak, currentStreak)
+        return bestStreak
     }
 
     private func buildEmptyWeeks(from startDate: Date, count: Int) -> [WeeklyVolumeSummary] {
