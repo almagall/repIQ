@@ -89,52 +89,38 @@ struct FriendsView: View {
     private func friendRow(_ friendship: Friendship) -> some View {
         let name = friendDisplayName(friendship)
 
-        return HStack(spacing: RQSpacing.md) {
-            // Avatar
-            profileAvatar(name: name, size: 44)
+        return RQCard {
+            HStack(spacing: RQSpacing.md) {
+                profileAvatar(name: name, size: 44)
 
-            // Info
-            VStack(alignment: .leading, spacing: RQSpacing.xxs) {
-                Text(name)
-                    .font(RQTypography.headline)
-                    .foregroundColor(RQColors.textPrimary)
+                VStack(alignment: .leading, spacing: RQSpacing.xxs) {
+                    Text(name)
+                        .font(RQTypography.headline)
+                        .foregroundColor(RQColors.textPrimary)
 
-                if let username = friendship.friendProfile?.username, !username.isEmpty {
-                    Text("@\(username)")
-                        .font(RQTypography.caption)
+                    if let username = friendship.friendProfile?.username, !username.isEmpty {
+                        Text("@\(username)")
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.textTertiary)
+                    }
+                }
+
+                Spacer()
+
+                Menu {
+                    Button(role: .destructive) {
+                        Task { await viewModel.removeFriend(friendship) }
+                    } label: {
+                        Label("Remove Friend", systemImage: "person.badge.minus")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 16))
                         .foregroundColor(RQColors.textTertiary)
+                        .frame(width: 32, height: 32)
                 }
-
-            }
-
-            Spacer()
-
-            // Actions
-            Menu {
-                Button {
-                    Task { await viewModel.toggleTrainingPartner(friendship) }
-                } label: {
-                    Label(
-                        friendship.safeIsTrainingPartner ? "Remove Partner" : "Make Partner",
-                        systemImage: friendship.safeIsTrainingPartner ? "person.badge.minus" : "person.badge.plus"
-                    )
-                }
-
-                Button(role: .destructive) {
-                    Task { await viewModel.removeFriend(friendship) }
-                } label: {
-                    Label("Remove Friend", systemImage: "person.badge.minus")
-                }
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 16))
-                    .foregroundColor(RQColors.textTertiary)
-                    .frame(width: 32, height: 32)
             }
         }
-        .padding(RQSpacing.cardPadding)
-        .background(RQColors.surfacePrimary)
-        .cornerRadius(RQRadius.medium)
     }
 
     // MARK: - Requests List
@@ -153,57 +139,56 @@ struct FriendsView: View {
     private func requestRow(_ request: Friendship) -> some View {
         let name = friendDisplayName(request)
 
-        return HStack(spacing: RQSpacing.md) {
-            profileAvatar(name: name, size: 44)
+        return RQCard {
+            HStack(spacing: RQSpacing.md) {
+                profileAvatar(name: name, size: 44)
 
-            VStack(alignment: .leading, spacing: RQSpacing.xxs) {
-                Text(name)
-                    .font(RQTypography.headline)
-                    .foregroundColor(RQColors.textPrimary)
-                if let username = request.friendProfile?.username, !username.isEmpty {
-                    Text("@\(username)")
-                        .font(RQTypography.caption)
-                        .foregroundColor(RQColors.textTertiary)
-                } else {
-                    Text("Wants to be friends")
-                        .font(RQTypography.caption)
-                        .foregroundColor(RQColors.textTertiary)
-                }
-            }
-
-            Spacer()
-
-            HStack(spacing: RQSpacing.sm) {
-                Button {
-                    Task { await viewModel.acceptRequest(request) }
-                } label: {
-                    Text("Accept")
-                        .font(RQTypography.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(RQColors.background)
-                        .padding(.horizontal, RQSpacing.md)
-                        .padding(.vertical, RQSpacing.sm)
-                        .background(RQColors.accent)
-                        .cornerRadius(RQRadius.large)
+                VStack(alignment: .leading, spacing: RQSpacing.xxs) {
+                    Text(name)
+                        .font(RQTypography.headline)
+                        .foregroundColor(RQColors.textPrimary)
+                    if let username = request.friendProfile?.username, !username.isEmpty {
+                        Text("@\(username)")
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.textTertiary)
+                    } else {
+                        Text("Wants to be friends")
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.textTertiary)
+                    }
                 }
 
-                Button {
-                    Task { await viewModel.declineRequest(request) }
-                } label: {
-                    Text("Decline")
-                        .font(RQTypography.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(RQColors.textSecondary)
-                        .padding(.horizontal, RQSpacing.md)
-                        .padding(.vertical, RQSpacing.sm)
-                        .background(RQColors.surfaceTertiary)
-                        .cornerRadius(RQRadius.large)
+                Spacer()
+
+                HStack(spacing: RQSpacing.sm) {
+                    Button {
+                        Task { await viewModel.acceptRequest(request) }
+                    } label: {
+                        Text("Accept")
+                            .font(RQTypography.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(RQColors.background)
+                            .padding(.horizontal, RQSpacing.md)
+                            .padding(.vertical, RQSpacing.sm)
+                            .background(RQColors.accent)
+                            .cornerRadius(RQRadius.large)
+                    }
+
+                    Button {
+                        Task { await viewModel.declineRequest(request) }
+                    } label: {
+                        Text("Decline")
+                            .font(RQTypography.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(RQColors.textSecondary)
+                            .padding(.horizontal, RQSpacing.md)
+                            .padding(.vertical, RQSpacing.sm)
+                            .background(RQColors.surfaceTertiary)
+                            .cornerRadius(RQRadius.large)
+                    }
                 }
             }
         }
-        .padding(RQSpacing.cardPadding)
-        .background(RQColors.surfacePrimary)
-        .cornerRadius(RQRadius.medium)
     }
 
     // MARK: - Partners List
@@ -216,7 +201,7 @@ struct FriendsView: View {
             if let gymName = viewModel.socialProfile?.gymName,
                let gymPlaceId = viewModel.socialProfile?.gymPlaceId,
                !gymName.isEmpty {
-                VStack(alignment: .leading, spacing: RQSpacing.md) {
+                RQCard {
                     HStack {
                         Image(systemName: "building.2.fill")
                             .font(.system(size: 14))
@@ -310,9 +295,6 @@ struct FriendsView: View {
                         }
                     }
                 }
-                .padding(RQSpacing.cardPadding)
-                .background(RQColors.surfacePrimary)
-                .cornerRadius(RQRadius.medium)
                 .task {
                     await loadGymMembers(placeId: gymPlaceId)
                 }
@@ -370,21 +352,22 @@ struct FriendsView: View {
         let isFriend = viewModel.friendIds.contains(user.id)
         let name = user.displayName?.isEmpty == false ? user.displayName! : user.username ?? "User"
 
-        return HStack(spacing: RQSpacing.md) {
-            profileAvatar(name: name, size: 44)
+        return RQCard {
+            HStack(spacing: RQSpacing.md) {
+                profileAvatar(name: name, size: 44)
 
-            VStack(alignment: .leading, spacing: RQSpacing.xxs) {
-                Text(name)
-                    .font(RQTypography.headline)
-                    .foregroundColor(RQColors.textPrimary)
-                if let username = user.username {
-                    Text("@\(username)")
-                        .font(RQTypography.caption)
-                        .foregroundColor(RQColors.textTertiary)
+                VStack(alignment: .leading, spacing: RQSpacing.xxs) {
+                    Text(name)
+                        .font(RQTypography.headline)
+                        .foregroundColor(RQColors.textPrimary)
+                    if let username = user.username {
+                        Text("@\(username)")
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.textTertiary)
+                    }
                 }
-            }
 
-            Spacer()
+                Spacer()
 
             if isFriend {
                 Text("Friends")
@@ -423,9 +406,7 @@ struct FriendsView: View {
                 }
             }
         }
-        .padding(RQSpacing.cardPadding)
-        .background(RQColors.surfacePrimary)
-        .cornerRadius(RQRadius.medium)
+    }
     }
 
     // MARK: - Gym Members

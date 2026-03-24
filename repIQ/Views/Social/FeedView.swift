@@ -28,7 +28,7 @@ struct FeedView: View {
     // MARK: - Feed Item Card
 
     private func feedItemCard(_ item: FeedItem) -> some View {
-        VStack(alignment: .leading, spacing: RQSpacing.md) {
+        RQCard {
             // Header: user info + time
             HStack(spacing: RQSpacing.md) {
                 // Avatar placeholder
@@ -109,9 +109,6 @@ struct FeedView: View {
                 commentsSection(item)
             }
         }
-        .padding(RQSpacing.cardPadding)
-        .background(RQColors.surfacePrimary)
-        .cornerRadius(RQRadius.medium)
     }
 
     // MARK: - Feed Content
