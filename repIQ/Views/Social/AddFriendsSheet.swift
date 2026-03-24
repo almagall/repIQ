@@ -8,65 +8,19 @@ struct AddFriendsSheet: View {
     @State private var searchText = ""
     @State private var searchResults: [SocialProfile] = []
     @State private var isSearching = false
-    @State private var selectedTab: Tab = .search
-
-    enum Tab: String, CaseIterable {
-        case search = "Find"
-        case requests = "Requests"
-    }
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // Tab picker
-                HStack(spacing: RQSpacing.sm) {
-                    ForEach(Tab.allCases, id: \.rawValue) { tab in
-                        Button {
-                            selectedTab = tab
-                        } label: {
-                            HStack(spacing: RQSpacing.xs) {
-                                Text(tab.rawValue)
-                                    .font(RQTypography.caption)
-                                    .fontWeight(.semibold)
-
-                                if tab == .requests && !viewModel.pendingRequests.isEmpty {
-                                    Text("\(viewModel.pendingRequests.count)")
-                                        .font(.system(size: 9, weight: .bold))
-                                        .foregroundColor(RQColors.background)
-                                        .padding(.horizontal, 4)
-                                        .padding(.vertical, 1)
-                                        .background(RQColors.error)
-                                        .clipShape(Capsule())
-                                }
-                            }
-                            .foregroundColor(selectedTab == tab ? RQColors.background : RQColors.textSecondary)
-                            .padding(.horizontal, RQSpacing.md)
-                            .padding(.vertical, RQSpacing.sm)
-                            .background(selectedTab == tab ? RQColors.accent : RQColors.surfaceTertiary)
-                            .cornerRadius(RQRadius.large)
-                        }
-                    }
-                    Spacer()
+            ScrollView {
+                VStack(spacing: RQSpacing.lg) {
+                    searchSection
                 }
                 .padding(.horizontal, RQSpacing.screenHorizontal)
-                .padding(.vertical, RQSpacing.sm)
-
-                ScrollView {
-                    VStack(spacing: RQSpacing.lg) {
-                        switch selectedTab {
-                        case .search:
-                            searchSection
-                        case .requests:
-                            requestsSection
-                        }
-                    }
-                    .padding(.horizontal, RQSpacing.screenHorizontal)
-                    .padding(.vertical, RQSpacing.md)
-                }
+                .padding(.vertical, RQSpacing.md)
             }
             .scrollDismissesKeyboard(.interactively)
             .background(RQColors.background)
-            .navigationTitle("Add Friends")
+            .navigationTitle("Find Friends")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
             .toolbar {
