@@ -120,41 +120,7 @@ struct FeedView: View {
     private func feedItemContent(_ item: FeedItem) -> some View {
         switch item.itemType {
         case .workoutCompleted:
-            VStack(alignment: .leading, spacing: RQSpacing.xs) {
-                if let dayName = item.data.workoutDayName, !dayName.isEmpty {
-                    Text("Completed \(dayName)")
-                        .font(RQTypography.body)
-                        .foregroundColor(RQColors.textSecondary)
-                } else {
-                    Text("Completed a workout")
-                        .font(RQTypography.body)
-                        .foregroundColor(RQColors.textSecondary)
-                }
-
-                // Expandable exercise list
-                if let exercises = item.data.exerciseNames, !exercises.isEmpty {
-                    DisclosureGroup {
-                        VStack(alignment: .leading, spacing: RQSpacing.xxs) {
-                            ForEach(exercises, id: \.self) { name in
-                                HStack(spacing: RQSpacing.xs) {
-                                    Circle()
-                                        .fill(RQColors.accent)
-                                        .frame(width: 4, height: 4)
-                                    Text(name)
-                                        .font(RQTypography.caption)
-                                        .foregroundColor(RQColors.textTertiary)
-                                }
-                            }
-                        }
-                        .padding(.top, RQSpacing.xxs)
-                    } label: {
-                        Text("\(exercises.count) exercise\(exercises.count == 1 ? "" : "s")")
-                            .font(RQTypography.caption)
-                            .foregroundColor(RQColors.accent)
-                    }
-                    .tint(RQColors.accent)
-                }
-            }
+            workoutCompletedContent(item)
 
         case .prAchieved:
             HStack(spacing: RQSpacing.sm) {
@@ -209,6 +175,82 @@ struct FeedView: View {
                     .font(RQTypography.body)
                     .foregroundColor(RQColors.textPrimary)
                     .fontWeight(.semibold)
+            }
+        }
+    }
+
+    // MARK: - Workout Completed Content
+
+    @State private var expandedWorkouts: Set<UUID> = []
+
+    private func workoutCompletedContent(_ item: FeedItem) -> some View {
+        VStack(alignment: .leading, spacing: RQSpacing.md) {
+            // Workout title
+            if let dayName = item.data.workoutDayName, !dayName.isEmpty {
+                Text("Completed \(dayName)")
+                    .font(RQTypography.body)
+                    .fontWeight(.semibold)
+                    .foregroundColor(RQColors.textPrimary)
+            } else {
+                Text("Completed a workout")
+                    .font(RQTypography.body)
+                    .fontWeight(.semibold)
+                    .foregroundColor(RQColors.textPrimary)
+            }
+
+            // Exercise list — expandable
+            if let exercises = item.data.exerciseNames, !exercises.isEmpty {
+                let isExpanded = expandedWorkouts.contains(item.id)
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        if isExpanded {
+                            expandedWorkouts.remove(item.id)
+                        } else {
+                            expandedWorkouts.insert(item.id)
+                        }
+                    }
+                } label: {
+                    HStack(spacing: RQSpacing.xs) {
+                        Text("\(exercises.count) exercise\(exercises.count == 1 ? "" : "s")")
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.accent)
+
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(RQColors.accent)
+                    }
+                }
+
+                if isExpanded {
+                    VStack(spacing: 0) {
+                        ForEach(Array(exercises.enumerated()), id: \.offset) { index, name in
+                            HStack(spacing: RQSpacing.sm) {
+                                RoundedRectangle(cornerRadius: 1)
+                                    .fill(RQColors.accent)
+                                    .frame(width: 2, height: 20)
+
+                                Text(name)
+                                    .font(RQTypography.caption)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(RQColors.textSecondary)
+
+                                Spacer()
+                            }
+                            .padding(.vertical, RQSpacing.xxs)
+
+                            if index < exercises.count - 1 {
+                                Divider()
+                                    .background(RQColors.surfaceTertiary)
+                                    .padding(.leading, RQSpacing.lg)
+                            }
+                        }
+                    }
+                    .padding(RQSpacing.sm)
+                    .background(RQColors.surfaceTertiary.opacity(0.5))
+                    .cornerRadius(RQRadius.small)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
             }
         }
     }
