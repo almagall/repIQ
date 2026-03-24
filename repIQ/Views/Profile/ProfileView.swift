@@ -26,13 +26,14 @@ struct ProfileView: View {
                                 )
 
                             VStack(alignment: .leading, spacing: RQSpacing.xs) {
-                                Text(viewModel.profile?.displayName ?? "Athlete")
-                                    .font(RQTypography.headline)
-                                    .foregroundColor(RQColors.textPrimary)
                                 if let username = viewModel.profile?.username, !username.isEmpty {
-                                    Text("@\(username)")
-                                        .font(RQTypography.subheadline)
-                                        .foregroundColor(RQColors.textSecondary)
+                                    Text(username)
+                                        .font(RQTypography.headline)
+                                        .foregroundColor(RQColors.textPrimary)
+                                } else {
+                                    Text(viewModel.profile?.displayName ?? "User")
+                                        .font(RQTypography.headline)
+                                        .foregroundColor(RQColors.textPrimary)
                                 }
                             }
                             Spacer()
