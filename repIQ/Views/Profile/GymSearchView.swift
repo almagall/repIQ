@@ -261,16 +261,25 @@ struct GymSearchView: View {
     }
 
     private func loadCurrentGym() async {
+        struct GymFields: Decodable {
+            let gymName: String?
+            let gymPlaceId: String?
+            enum CodingKeys: String, CodingKey {
+                case gymName = "gym_name"
+                case gymPlaceId = "gym_place_id"
+            }
+        }
+
         do {
             guard let userId = try? await supabase.auth.session.user.id else { return }
-            let profile: SocialProfile = try await supabase.from("profiles")
-                .select()
+            let fields: GymFields = try await supabase.from("profiles")
+                .select("gym_name, gym_place_id")
                 .eq("id", value: userId.uuidString)
                 .single()
                 .execute()
                 .value
-            currentGymName = profile.gymName
-            currentGymPlaceId = profile.gymPlaceId
+            currentGymName = fields.gymName
+            currentGymPlaceId = fields.gymPlaceId
         } catch {}
     }
 

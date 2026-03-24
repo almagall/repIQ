@@ -156,15 +156,19 @@ struct ProfileView: View {
             .task {
                 await viewModel.loadProfile()
                 username = viewModel.profile?.username ?? ""
-                // Load gym name from social profile
+                // Load gym name directly
                 if let userId = try? await supabase.auth.session.user.id {
-                    let profile: SocialProfile? = try? await supabase.from("profiles")
-                        .select()
+                    struct GymField: Decodable {
+                        let gymName: String?
+                        enum CodingKeys: String, CodingKey { case gymName = "gym_name" }
+                    }
+                    let field: GymField? = try? await supabase.from("profiles")
+                        .select("gym_name")
                         .eq("id", value: userId.uuidString)
                         .single()
                         .execute()
                         .value
-                    gymName = profile?.gymName
+                    gymName = field?.gymName
                 }
             }
             .confirmationDialog("Weight Unit", isPresented: $showWeightUnitPicker) {
