@@ -108,7 +108,7 @@ struct FriendsView: View {
                         .foregroundColor(RQColors.textTertiary)
                 }
 
-                if friendship.isTrainingPartner {
+                if friendship.safeIsTrainingPartner {
                     HStack(spacing: RQSpacing.xxs) {
                         Image(systemName: "figure.2.and.child.holdinghands")
                             .font(.system(size: 10))
@@ -128,8 +128,8 @@ struct FriendsView: View {
                     Task { await viewModel.toggleTrainingPartner(friendship) }
                 } label: {
                     Label(
-                        friendship.isTrainingPartner ? "Remove Partner" : "Make Partner",
-                        systemImage: friendship.isTrainingPartner ? "person.badge.minus" : "person.badge.plus"
+                        friendship.safeIsTrainingPartner ? "Remove Partner" : "Make Partner",
+                        systemImage: friendship.safeIsTrainingPartner ? "person.badge.minus" : "person.badge.plus"
                     )
                 }
 
@@ -239,12 +239,12 @@ struct FriendsView: View {
                             .font(RQTypography.headline)
                             .foregroundColor(RQColors.textPrimary)
 
-                        if partner.partnerStreak > 0 {
+                        if partner.safePartnerStreak > 0 {
                             HStack(spacing: RQSpacing.xxs) {
                                 Image(systemName: "flame.fill")
                                     .font(.system(size: 10))
                                     .foregroundColor(RQColors.warning)
-                                Text("\(partner.partnerStreak) day partner streak")
+                                Text("\(partner.safePartnerStreak) day partner streak")
                                     .font(RQTypography.caption)
                                     .foregroundColor(RQColors.warning)
                             }
