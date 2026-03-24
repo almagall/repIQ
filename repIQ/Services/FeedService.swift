@@ -34,8 +34,31 @@ struct FeedService: Sendable {
     func fetchFeed(userId: UUID, friendIds: [UUID], limit: Int = 50) async throws -> [FeedItem] {
         let allIds = ([userId] + friendIds).map(\.uuidString)
 
-        let items: [FeedItem] = try await supabase.from("feed_items")
+        // First try full query with nested joins
+        if let items: [FeedItem] = try? await supabase.from("feed_items")
             .select("*, profiles(*), feed_reactions(*, profiles(*)), feed_comments(*, profiles(*))")
+            .in("user_id", values: allIds)
+            .order("created_at", ascending: false)
+            .limit(limit)
+            .execute()
+            .value {
+            return items
+        }
+
+        // Fallback: simpler query without nested reaction/comment profiles
+        if let items: [FeedItem] = try? await supabase.from("feed_items")
+            .select("*, profiles(*), feed_reactions(*), feed_comments(*)")
+            .in("user_id", values: allIds)
+            .order("created_at", ascending: false)
+            .limit(limit)
+            .execute()
+            .value {
+            return items
+        }
+
+        // Final fallback: just feed items with user profile, no reactions/comments
+        let items: [FeedItem] = try await supabase.from("feed_items")
+            .select("*, profiles(*)")
             .in("user_id", values: allIds)
             .order("created_at", ascending: false)
             .limit(limit)
