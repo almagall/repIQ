@@ -171,7 +171,7 @@ final class TemplateEditorViewModel {
 
     // MARK: - Exercises within a day
 
-    func addExercise(to day: WorkoutDay, exercise: Exercise, trainingMode: TrainingMode, targetSets: Int = 3) async {
+    func addExercise(to day: WorkoutDay, exercise: Exercise, trainingMode: TrainingMode, targetSets: Int = 4) async {
         isLoading = true
         do {
             let currentCount = day.exercises?.count ?? 0

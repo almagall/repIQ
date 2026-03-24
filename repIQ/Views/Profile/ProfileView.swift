@@ -39,63 +39,6 @@ struct ProfileView: View {
                         }
                     }
 
-                    // Social Identity Section
-                    RQCard {
-                        VStack(alignment: .leading, spacing: RQSpacing.lg) {
-                            Text("Social Identity")
-                                .font(RQTypography.label)
-                                .textCase(.uppercase)
-                                .tracking(1.5)
-                                .foregroundColor(RQColors.textSecondary)
-
-                            // Username
-                            VStack(alignment: .leading, spacing: RQSpacing.sm) {
-                                Text("USERNAME")
-                                    .font(RQTypography.label)
-                                    .foregroundColor(RQColors.textTertiary)
-                                    .tracking(1.5)
-
-                                TextField("Choose a username", text: $username)
-                                    .font(RQTypography.body)
-                                    .foregroundColor(RQColors.textPrimary)
-                                    .autocapitalization(.none)
-                                    .autocorrectionDisabled()
-                                    .padding(.horizontal, RQSpacing.md)
-                                    .padding(.vertical, RQSpacing.md)
-                                    .background(RQColors.surfaceTertiary)
-                                    .cornerRadius(RQRadius.medium)
-                            }
-
-                            // Save
-                            Button {
-                                isSavingSocial = true
-                                Task {
-                                    await viewModel.updateUsernameAndBio(
-                                        username: username.isEmpty ? nil : username,
-                                        bio: nil
-                                    )
-                                    isSavingSocial = false
-                                }
-                            } label: {
-                                HStack {
-                                    if isSavingSocial {
-                                        ProgressView()
-                                            .tint(RQColors.background)
-                                    } else {
-                                        Text("Save")
-                                            .font(RQTypography.headline)
-                                    }
-                                }
-                                .foregroundColor(RQColors.background)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, RQSpacing.md)
-                                .background(RQColors.accent)
-                                .cornerRadius(RQRadius.medium)
-                            }
-                            .disabled(isSavingSocial)
-                        }
-                    }
-
                     // Settings Section
                     RQCard {
                         VStack(alignment: .leading, spacing: RQSpacing.lg) {
