@@ -310,8 +310,8 @@ struct DashboardView: View {
     // MARK: - Week View
 
     private var weekView: some View {
-        let dayLabels = ["M", "T", "W", "T", "F", "S", "S"]
-        let calendarIndices = [1, 2, 3, 4, 5, 6, 0]
+        let dayLabels = ["S", "M", "T", "W", "T", "F", "S"]
+        let calendarIndices = [0, 1, 2, 3, 4, 5, 6]
         let today = Calendar.current.component(.weekday, from: Date()) - 1
         let trainedCount = viewModel.weeklyTrainingDays.count
 
