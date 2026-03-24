@@ -26,8 +26,6 @@ struct GymHubView: View {
                     // Gym activity feed
                     gymActivitySection
 
-                    // Username search
-                    usernameSearchSection
                 } else {
                     // No gym set — prompt to set one
                     noGymState
@@ -343,62 +341,6 @@ struct GymHubView: View {
         }
     }
 
-    // MARK: - Username Search
-
-    @State private var searchText = ""
-    @State private var searchResults: [SocialProfile] = []
-    @State private var isSearching = false
-
-    private var usernameSearchSection: some View {
-        VStack(alignment: .leading, spacing: RQSpacing.md) {
-            Text("Find by Username")
-                .font(RQTypography.label)
-                .textCase(.uppercase)
-                .tracking(1.5)
-                .foregroundColor(RQColors.textSecondary)
-
-            HStack(spacing: RQSpacing.sm) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 14))
-                    .foregroundColor(RQColors.textTertiary)
-
-                TextField("Search by username", text: $searchText)
-                    .font(RQTypography.body)
-                    .foregroundColor(RQColors.textPrimary)
-                    .autocapitalization(.none)
-                    .autocorrectionDisabled()
-                    .onSubmit {
-                        Task { await performSearch() }
-                    }
-
-                if !searchText.isEmpty {
-                    Button {
-                        searchText = ""
-                        searchResults = []
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 14))
-                            .foregroundColor(RQColors.textTertiary)
-                    }
-                }
-            }
-            .padding(RQSpacing.md)
-            .background(RQColors.surfaceTertiary)
-            .cornerRadius(RQRadius.medium)
-
-            if isSearching {
-                ProgressView()
-                    .tint(RQColors.accent)
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, RQSpacing.md)
-            } else {
-                ForEach(searchResults) { user in
-                    memberCard(user)
-                }
-            }
-        }
-    }
-
     // MARK: - Data Loading
 
     private func loadGymData() async {
@@ -443,16 +385,6 @@ struct GymHubView: View {
         // Filter out own items
         gymFeedItems = gymFeedItems.filter { $0.userId != userId }
         isLoadingFeed = false
-    }
-
-    private func performSearch() async {
-        guard !searchText.isEmpty else { return }
-        isSearching = true
-        do {
-            guard let userId = try? await supabase.auth.session.user.id else { return }
-            searchResults = try await viewModel.searchUsers(query: searchText)
-        } catch {}
-        isSearching = false
     }
 
     // MARK: - Helpers
