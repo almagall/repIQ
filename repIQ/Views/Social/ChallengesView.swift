@@ -3,49 +3,15 @@ import SwiftUI
 /// Head-to-head challenges and clubs management.
 struct ChallengesView: View {
     @Bindable var viewModel: SocialViewModel
-    @State private var selectedTab: ChallengeTab = .active
     @State private var showCreateChallenge = false
 
-    enum ChallengeTab: String, CaseIterable {
-        case active = "Active"
-        case clubs = "Clubs"
-    }
-
     var body: some View {
-        VStack(spacing: 0) {
-            // Sub-tab picker
-            HStack(spacing: RQSpacing.sm) {
-                ForEach(ChallengeTab.allCases, id: \.rawValue) { tab in
-                    Button {
-                        selectedTab = tab
-                    } label: {
-                        Text(tab.rawValue)
-                            .font(RQTypography.caption)
-                            .fontWeight(.semibold)
-                            .foregroundColor(selectedTab == tab ? RQColors.background : RQColors.textSecondary)
-                            .padding(.horizontal, RQSpacing.md)
-                            .padding(.vertical, RQSpacing.sm)
-                            .background(selectedTab == tab ? RQColors.accent : RQColors.surfaceTertiary)
-                            .cornerRadius(RQRadius.large)
-                    }
-                }
-                Spacer()
+        ScrollView {
+            VStack(spacing: RQSpacing.lg) {
+                challengesList
             }
             .padding(.horizontal, RQSpacing.screenHorizontal)
-            .padding(.vertical, RQSpacing.sm)
-
-            ScrollView {
-                VStack(spacing: RQSpacing.lg) {
-                    switch selectedTab {
-                    case .active:
-                        challengesList
-                    case .clubs:
-                        clubsList
-                    }
-                }
-                .padding(.horizontal, RQSpacing.screenHorizontal)
-                .padding(.vertical, RQSpacing.lg)
-            }
+            .padding(.vertical, RQSpacing.lg)
         }
         .sheet(isPresented: $showCreateChallenge) {
             CreateChallengeView(viewModel: viewModel)
