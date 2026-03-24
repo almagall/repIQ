@@ -118,10 +118,13 @@ struct Friendship: Codable, Identifiable, Sendable {
     let userId: UUID
     let friendId: UUID
     var status: FriendshipStatus
-    var isTrainingPartner: Bool
-    var partnerStreak: Int
+    var isTrainingPartner: Bool?
+    var partnerStreak: Int?
     let createdAt: Date
     var friendProfile: Profile?
+
+    var safeIsTrainingPartner: Bool { isTrainingPartner ?? false }
+    var safePartnerStreak: Int { partnerStreak ?? 0 }
 
     enum CodingKeys: String, CodingKey {
         case id, status

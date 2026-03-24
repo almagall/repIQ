@@ -308,7 +308,7 @@ final class SocialViewModel {
 
     /// Toggles training partner status.
     func toggleTrainingPartner(_ friendship: Friendship) async {
-        let isCurrentlyPartner = friendship.isTrainingPartner
+        let isCurrentlyPartner = friendship.safeIsTrainingPartner
         do {
             try await socialService.toggleTrainingPartner(
                 friendshipId: friendship.id,
