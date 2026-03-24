@@ -11,6 +11,7 @@ struct DashboardView: View {
     @State private var showCalendarView = false
     @State private var calendarMonth = Date()
     @State private var socialViewModel = SocialViewModel()
+    @AppStorage("hasSeenWelcomeCard") private var hasSeenWelcomeCard = false
 
     @Environment(WorkoutCoordinator.self) private var workoutCoordinator
 
@@ -18,6 +19,11 @@ struct DashboardView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: RQSpacing.lg) {
+                    // Welcome card for new users
+                    if !hasSeenWelcomeCard && !templateListViewModel.templates.isEmpty && viewModel.totalSessionCount == 0 {
+                        welcomeCard
+                    }
+
                     // Quick Start
                     QuickStartCard {
                         if !viewModel.templates.isEmpty {
@@ -455,6 +461,59 @@ struct DashboardView: View {
         }
 
         return days
+    }
+
+    // MARK: - Welcome Card
+
+    private var welcomeCard: some View {
+        RQCard {
+            VStack(alignment: .leading, spacing: RQSpacing.md) {
+                HStack {
+                    Image(systemName: "hand.wave.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(RQColors.accent)
+
+                    Text("Your program is ready")
+                        .font(RQTypography.headline)
+                        .foregroundColor(RQColors.textPrimary)
+
+                    Spacer()
+
+                    Button {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            hasSeenWelcomeCard = true
+                        }
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(RQColors.textTertiary)
+                            .frame(width: 24, height: 24)
+                            .background(RQColors.surfaceTertiary)
+                            .clipShape(Circle())
+                    }
+                }
+
+                Text("Tap Start Workout to begin your first session. Your first few workouts help the app learn your strength levels — after that, you will get personalized targets.")
+                    .font(RQTypography.caption)
+                    .foregroundColor(RQColors.textSecondary)
+
+                Button {
+                    hasSeenWelcomeCard = true
+                    if !viewModel.templates.isEmpty {
+                        showTemplatePicker = true
+                    }
+                } label: {
+                    Text("Start First Workout")
+                        .font(RQTypography.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, RQSpacing.sm)
+                        .background(RQColors.accent)
+                        .cornerRadius(RQRadius.medium)
+                }
+            }
+        }
     }
 
     // MARK: - Template Picker Sheet (with inline day selection via NavigationStack push)
