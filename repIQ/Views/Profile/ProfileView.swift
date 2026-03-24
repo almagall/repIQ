@@ -101,6 +101,19 @@ struct ProfileView: View {
 
                             Divider().background(RQColors.surfaceTertiary)
 
+                            // My Gym
+                            NavigationLink {
+                                GymSearchView()
+                            } label: {
+                                settingsRow(
+                                    icon: "building.2",
+                                    title: "My Gym",
+                                    value: ""
+                                )
+                            }
+
+                            Divider().background(RQColors.surfaceTertiary)
+
                             // Account
                             NavigationLink {
                                 AccountView(profile: viewModel.profile)

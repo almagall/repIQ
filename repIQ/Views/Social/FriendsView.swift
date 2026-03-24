@@ -1,12 +1,15 @@
 import SwiftUI
+import Supabase
 
-/// Friends management: friend list, pending requests, search, and training partners.
+/// Friends management: friend list, pending requests, and search.
 struct FriendsView: View {
     @Bindable var viewModel: SocialViewModel
     @State private var searchText = ""
     @State private var searchResults: [SocialProfile] = []
     @State private var isSearching = false
     @State private var selectedTab: FriendsTab = .friends
+    @State private var gymMembers: [SocialProfile] = []
+    @State private var isLoadingGymMembers = false
 
     enum FriendsTab: String, CaseIterable {
         case friends = "Friends"
@@ -212,6 +215,112 @@ struct FriendsView: View {
 
     private var searchSection: some View {
         VStack(spacing: RQSpacing.lg) {
+            // Gym discovery
+            if let gymName = viewModel.socialProfile?.gymName,
+               let gymPlaceId = viewModel.socialProfile?.gymPlaceId,
+               !gymName.isEmpty {
+                VStack(alignment: .leading, spacing: RQSpacing.md) {
+                    HStack {
+                        Image(systemName: "building.2.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(RQColors.accent)
+
+                        Text("At Your Gym")
+                            .font(RQTypography.label)
+                            .textCase(.uppercase)
+                            .tracking(1.5)
+                            .foregroundColor(RQColors.textSecondary)
+
+                        Spacer()
+
+                        Text(gymName)
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.textTertiary)
+                            .lineLimit(1)
+                    }
+
+                    if isLoadingGymMembers {
+                        HStack {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: RQColors.accent))
+                                .scaleEffect(0.7)
+                            Text("Finding members...")
+                                .font(RQTypography.caption)
+                                .foregroundColor(RQColors.textTertiary)
+                        }
+                    } else if gymMembers.isEmpty {
+                        HStack(spacing: RQSpacing.sm) {
+                            Image(systemName: "person.slash")
+                                .font(.system(size: 14))
+                                .foregroundColor(RQColors.textTertiary)
+                            Text("No other members yet")
+                                .font(RQTypography.caption)
+                                .foregroundColor(RQColors.textTertiary)
+                        }
+                        .padding(.vertical, RQSpacing.sm)
+                    } else {
+                        Text("\(gymMembers.count) member\(gymMembers.count == 1 ? "" : "s")")
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.accent)
+
+                        ForEach(gymMembers) { member in
+                            HStack(spacing: RQSpacing.md) {
+                                profileAvatar(name: member.username ?? member.displayName ?? "?", size: 36)
+
+                                VStack(alignment: .leading, spacing: RQSpacing.xxs) {
+                                    Text(member.username ?? member.displayName ?? "User")
+                                        .font(RQTypography.body)
+                                        .foregroundColor(RQColors.textPrimary)
+
+                                    if let username = member.username, !username.isEmpty,
+                                       let display = member.displayName, !display.isEmpty,
+                                       username != display {
+                                        Text(display)
+                                            .font(RQTypography.caption)
+                                            .foregroundColor(RQColors.textTertiary)
+                                    }
+                                }
+
+                                Spacer()
+
+                                let isFriend = viewModel.friendIds.contains(member.id)
+                                let isSent = viewModel.sentRequestIds.contains(member.id)
+
+                                if isFriend {
+                                    Text("Friends")
+                                        .font(RQTypography.caption)
+                                        .foregroundColor(RQColors.success)
+                                } else if isSent {
+                                    Text("Sent")
+                                        .font(RQTypography.caption)
+                                        .foregroundColor(RQColors.textTertiary)
+                                } else {
+                                    Button {
+                                        Task { await viewModel.sendFriendRequest(to: member.id) }
+                                    } label: {
+                                        Text("Add")
+                                            .font(RQTypography.caption)
+                                            .fontWeight(.semibold)
+                                            .foregroundColor(RQColors.background)
+                                            .padding(.horizontal, RQSpacing.md)
+                                            .padding(.vertical, 5)
+                                            .background(RQColors.accent)
+                                            .cornerRadius(RQRadius.large)
+                                    }
+                                }
+                            }
+                            .padding(.vertical, RQSpacing.xxs)
+                        }
+                    }
+                }
+                .padding(RQSpacing.cardPadding)
+                .background(RQColors.surfacePrimary)
+                .cornerRadius(RQRadius.medium)
+                .task {
+                    await loadGymMembers(placeId: gymPlaceId)
+                }
+            }
+
             // Search bar
             HStack(spacing: RQSpacing.sm) {
                 Image(systemName: "magnifyingglass")
@@ -320,6 +429,17 @@ struct FriendsView: View {
         .padding(RQSpacing.cardPadding)
         .background(RQColors.surfacePrimary)
         .cornerRadius(RQRadius.medium)
+    }
+
+    // MARK: - Gym Members
+
+    private func loadGymMembers(placeId: String) async {
+        isLoadingGymMembers = true
+        do {
+            guard let userId = try? await supabase.auth.session.user.id else { return }
+            gymMembers = try await GymService().fetchGymMembers(placeId: placeId, excludeUserId: userId)
+        } catch {}
+        isLoadingGymMembers = false
     }
 
     // MARK: - Helpers

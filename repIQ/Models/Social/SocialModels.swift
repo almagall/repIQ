@@ -83,6 +83,9 @@ struct SocialProfile: Codable, Identifiable, Sendable {
     var experienceLevel: String?
     var preferredFrequency: Int?
     var gymName: String?
+    var gymPlaceId: String?
+    var gymLatitude: Double?
+    var gymLongitude: Double?
 
     enum CodingKeys: String, CodingKey {
         case id, email, bio, username
@@ -102,6 +105,9 @@ struct SocialProfile: Codable, Identifiable, Sendable {
         case experienceLevel = "experience_level"
         case preferredFrequency = "preferred_frequency"
         case gymName = "gym_name"
+        case gymPlaceId = "gym_place_id"
+        case gymLatitude = "gym_latitude"
+        case gymLongitude = "gym_longitude"
     }
 }
 
