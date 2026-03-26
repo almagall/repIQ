@@ -406,7 +406,6 @@ final class SocialViewModel {
             return try await socialService.searchUsers(query: query, currentUserId: userId)
         } catch {
             errorMessage = "Search failed: \(error.localizedDescription)"
-            print("[SearchUsers] Error: \(error)")
             return []
         }
     }
