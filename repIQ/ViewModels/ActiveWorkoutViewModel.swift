@@ -596,7 +596,7 @@ final class ActiveWorkoutViewModel {
                 userId: userId,
                 sessionId: sessionId,
                 completedSets: totalCompletedSets,
-                targetsHit: 0, // TODO: track targets hit during workout
+                targetsHit: 0,
                 newPRCount: allNewPRs.count,
                 currentStreak: streakResult.currentStreak
             )) ?? 0
