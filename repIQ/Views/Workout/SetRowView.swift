@@ -74,6 +74,13 @@ struct SetRowView: View {
                                 .foregroundColor(RQColors.accent.opacity(0.7))
                         }
 
+                        // Declining reps note for later hypertrophy sets (Gap 2)
+                        if trainingMode == .hypertrophy && setPosition >= 2 && !isBodyweightOnly {
+                            Text("(drop 1-2 reps is normal)")
+                                .font(.system(size: 9))
+                                .foregroundColor(RQColors.textTertiary.opacity(0.6))
+                        }
+
                         Spacer()
                     }
                     .padding(.bottom, 3)

@@ -216,12 +216,16 @@ final class ActiveWorkoutViewModel {
 
         let increment = ProgressionService.weightIncrement(for: equipment)
 
+        // Apply mesocycle RPE offset
+        let mesocycleOffset = target.mesocycleRPEOffset
+
         switch trainingMode {
         case .hypertrophy:
             // Straight sets: same weight × same rep target all sets
-            // RPE naturally drifts up with fatigue
+            // RPE naturally drifts up with fatigue + mesocycle progression
+            let baseRPE = target.targetRPE + mesocycleOffset
             let rpe = expectedRPE(
-                baseRPE: target.targetRPE,
+                baseRPE: baseRPE,
                 trainingMode: trainingMode,
                 setPosition: setPosition,
                 totalSets: totalSets
@@ -229,38 +233,35 @@ final class ActiveWorkoutViewModel {
             return (target.targetWeight, target.targetRepsLow, rpe)
 
         case .strength:
-            // Ascending weight model (Barbell Medicine / 5/3/1 style):
-            // All sets use the same rep target. Weight ramps to a top set.
-            // Start percentage scales with set count so ramp feels natural:
-            //   2 sets: 87% → 100%
-            //   3 sets: 82% → 91% → 100%
-            //   4 sets: 80% → 87% → 93% → 100%
-            //   5 sets: 78% → 84% → 89% → 95% → 100%
-            //   6 sets: 77% → 82% → 86% → 91% → 95% → 100%
+            // Ascending weight model with autoregulation (Gap 4):
+            // Weight ramps to a top set. The top set is RPE-guided — weight is a target
+            // but users should adjust based on how the ramp feels.
+            // RPE on the top set includes mesocycle progression.
             let topWeight = target.targetWeight
             let topReps = target.targetRepsLow
             let lastIndex = max(totalSets - 1, 0)
 
             if totalSets <= 1 {
-                return (topWeight, topReps, target.targetRPE)
+                let topRPE = min(target.targetRPE + mesocycleOffset, 9.5)
+                return (topWeight, topReps, (topRPE * 2).rounded() / 2)
             }
 
-            // Start percentage decreases as sets increase (more ramp room)
             let startPct: Double
             switch totalSets {
             case 2: startPct = 0.87
             case 3: startPct = 0.82
             case 4: startPct = 0.80
             case 5: startPct = 0.78
-            default: startPct = 0.77 // 6+
+            default: startPct = 0.77
             }
 
             let progress = Double(setPosition) / Double(lastIndex)
             let weightPct = startPct + progress * (1.0 - startPct)
             let setWeight = roundToIncrement(topWeight * weightPct, increment)
 
-            // RPE ramps from 6 to target RPE (typically 8), snapped to 0.5 increments
-            let rawRPE = 6.0 + progress * (target.targetRPE - 6.0)
+            // RPE ramps from 6 to (target RPE + mesocycle offset), snapped to 0.5
+            let topRPE = min(target.targetRPE + mesocycleOffset, 9.5)
+            let rawRPE = 6.0 + progress * (topRPE - 6.0)
             let rpe = (rawRPE * 2).rounded() / 2
 
             return (setWeight, topReps, rpe)
