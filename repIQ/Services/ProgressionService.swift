@@ -3,17 +3,22 @@ import Supabase
 
 struct ProgressionService: Sendable {
 
-    // MARK: - Core Algorithm (e1RM-Based)
+    // MARK: - Core Algorithm (e1RM-Based with RPE + Mesocycle Awareness)
 
     /// Calculates the progression target using estimated 1RM trends across recent sessions.
-    /// Uses the Epley formula (weight × (1 + reps/30)) to compute e1RM from the best working set,
-    /// then prescribes weight as a percentage of e1RM for the target rep range.
+    /// Incorporates:
+    /// - RPE + e1RM combined fatigue signals (Gap 7)
+    /// - e1RM confidence weighting by rep range (Gap 5)
+    /// - Mesocycle RPE progression (Gap 5 from RP framework)
+    /// - Proactive deload ceiling (Gap 3)
+    /// - Off-day escalation (Gap 6)
     func calculateTarget(
         exerciseId: UUID,
         trainingMode: TrainingMode,
         equipment: String,
         recentSessions: [[WorkoutSet]],
-        repCap: Int? = nil
+        repCap: Int? = nil,
+        weeksSinceDeload: Int? = nil
     ) -> ProgressionTarget? {
         guard let latestSession = recentSessions.first, !latestSession.isEmpty else {
             return nil
@@ -25,7 +30,8 @@ struct ProgressionService: Sendable {
                 exerciseId: exerciseId,
                 trainingMode: trainingMode,
                 recentSessions: recentSessions,
-                repCap: repCap
+                repCap: repCap,
+                weeksSinceDeload: weeksSinceDeload
             )
         }
 
@@ -50,13 +56,23 @@ struct ProgressionService: Sendable {
 
         guard let latestE1RM = sessionE1RMs.first else { return nil }
 
+        // e1RM confidence based on rep range (Gap 5: e1RM weighting by rep range)
+        // Brzycki/Epley formulas are most accurate at 2-10 reps, error increases above 10
+        let e1rmConfidence = e1rmConfidenceFactor(medReps: medReps)
+
+        // RPE fatigue detection (Gap 7: RPE + e1RM combined signals)
+        // If e1RM is stable but RPE is rising, that signals hidden fatigue
+        let rpeFatigueDetected = detectRPEFatigue(recentSessions: recentSessions, targetRPE: targetRPE)
+
+        // Mesocycle RPE offset (Gap 5: RPE progression across mesocycle)
+        let mesocycleOffset = mesocycleRPEOffset(weeksSinceDeload: weeksSinceDeload)
+
         // Off-day detection: if latest best weight is far below recent best, use best e1RM
         let allRecentWorkingSets = recentSessions.flatMap { $0.filter { $0.setType == .working } }
         let bestRecentWeight = allRecentWorkingSets.map(\.weight).max() ?? medWeight
         let currentE1RM: Double
 
         if medWeight < bestRecentWeight * 0.90 {
-            // Off-day: use best recent e1RM instead of the poor session
             currentE1RM = sessionE1RMs.max() ?? latestE1RM
         } else {
             currentE1RM = latestE1RM
@@ -72,7 +88,16 @@ struct ProgressionService: Sendable {
         let tRepsHigh: Int
         let reasoning: String
 
-        if sessionE1RMs.count < 2 {
+        // Proactive deload ceiling (Gap 3): force deload after 7+ weeks regardless of trend
+        if let weeks = weeksSinceDeload, weeks >= 7 {
+            let deloadedE1RM = currentE1RM * 0.90
+            decision = .deload
+            tWeight = roundToIncrement(deloadedE1RM * percentageOfE1RM(forReps: targetMidRep), increment)
+            tRepsLow = repRange.lowerBound
+            tRepsHigh = min(repRange.lowerBound + 2, effectiveUpperBound)
+            reasoning = "You've been training \(weeks) weeks without a deload. Scheduled recovery week to prevent overtraining and break through plateaus."
+
+        } else if sessionE1RMs.count < 2 {
             // Only 1 session — maintain (repeat what they did)
             decision = .maintain
             tWeight = roundToIncrement(medWeight, increment)
@@ -90,8 +115,28 @@ struct ProgressionService: Sendable {
 
             let percentChange = (currentE1RM - previousE1RM) / previousE1RM
 
-            if medWeight < bestRecentWeight * 0.90 {
-                // Off-day override
+            // Off-day escalation (Gap 6): consecutive bad sessions → deload
+            let consecutiveBadSessions = countConsecutiveBadSessions(recentSessions: recentSessions)
+
+            if consecutiveBadSessions >= 2 {
+                // Two or more consecutive >10% drops → real fatigue, not just off days
+                let deloadedE1RM = currentE1RM * 0.90
+                decision = .deload
+                tWeight = roundToIncrement(deloadedE1RM * percentageOfE1RM(forReps: targetMidRep), increment)
+                tRepsLow = repRange.lowerBound
+                tRepsHigh = min(repRange.lowerBound + 2, effectiveUpperBound)
+                reasoning = "Performance has declined for multiple sessions. Deloading to allow recovery."
+
+            } else if rpeFatigueDetected && percentChange >= -0.02 {
+                // RPE rising at same e1RM → approaching fatigue ceiling (Gap 7)
+                decision = .maintain
+                tWeight = roundToIncrement(medWeight, increment)
+                tRepsLow = medReps
+                tRepsHigh = min(medReps, effectiveUpperBound)
+                reasoning = "Weight is stable but effort is increasing. Maintaining to manage fatigue before it impacts performance."
+
+            } else if medWeight < bestRecentWeight * 0.90 {
+                // Single off-day
                 decision = .maintain
                 tWeight = roundToIncrement(currentE1RM * percentageOfE1RM(forReps: targetMidRep), increment)
                 tRepsLow = repRange.lowerBound
@@ -99,12 +144,30 @@ struct ProgressionService: Sendable {
                 reasoning = "Last session was below your recent bests. Keeping targets at your proven capacity."
 
             } else if percentChange > 0.02 {
-                // e1RM trending up — increase weight
-                decision = .increaseWeight
-                tWeight = roundToIncrement(currentE1RM * percentageOfE1RM(forReps: targetMidRep), increment)
-                tRepsLow = repRange.lowerBound
-                tRepsHigh = min(repRange.lowerBound + 2, effectiveUpperBound)
-                reasoning = "Estimated 1RM is trending up. Prescribing weight for continued progress."
+                // e1RM trending up — decide based on rep range confidence
+                if e1rmConfidence >= 0.8 {
+                    // High confidence (low rep range) — trust e1RM, increase weight
+                    decision = .increaseWeight
+                    tWeight = roundToIncrement(currentE1RM * percentageOfE1RM(forReps: targetMidRep), increment)
+                    tRepsLow = repRange.lowerBound
+                    tRepsHigh = min(repRange.lowerBound + 2, effectiveUpperBound)
+                    reasoning = "Estimated 1RM is trending up. Prescribing weight for continued progress."
+                } else {
+                    // Lower confidence (high rep range) — favor rep progression first
+                    if medReps < effectiveUpperBound {
+                        decision = .increaseReps
+                        tWeight = roundToIncrement(medWeight, increment)
+                        tRepsLow = min(medReps + 1, effectiveUpperBound)
+                        tRepsHigh = min(medReps + 2, effectiveUpperBound)
+                        reasoning = "Getting stronger. Adding reps before increasing weight for this rep range."
+                    } else {
+                        decision = .increaseWeight
+                        tWeight = roundToIncrement(currentE1RM * percentageOfE1RM(forReps: targetMidRep), increment)
+                        tRepsLow = repRange.lowerBound
+                        tRepsHigh = min(repRange.lowerBound + 2, effectiveUpperBound)
+                        reasoning = "Hit top of rep range. Increasing weight and resetting reps."
+                    }
+                }
 
             } else if percentChange >= -0.02 {
                 // e1RM flat — increase reps at same weight
@@ -137,20 +200,21 @@ struct ProgressionService: Sendable {
             previousWeight: medWeight,
             previousReps: medReps,
             previousRPE: avgRPE,
-            estimatedOneRM: currentE1RM
+            estimatedOneRM: currentE1RM,
+            mesocycleRPEOffset: mesocycleOffset,
+            rpeFatigueDetected: rpeFatigueDetected,
+            e1rmConfidence: e1rmConfidence
         )
     }
 
     // MARK: - Bodyweight Progression
 
-    /// Rep-only progression for bodyweight exercises.
-    /// Primary axis: increase reps each session. No weight manipulation.
-    /// When reps hit the ceiling (rep cap or top of range), suggests adding external weight.
     private func calculateBodyweightTarget(
         exerciseId: UUID,
         trainingMode: TrainingMode,
         recentSessions: [[WorkoutSet]],
-        repCap: Int?
+        repCap: Int?,
+        weeksSinceDeload: Int?
     ) -> ProgressionTarget? {
         guard let latestSession = recentSessions.first else { return nil }
 
@@ -163,16 +227,23 @@ struct ProgressionService: Sendable {
 
         let medReps = medianInt(latestWorkingSets.map(\.reps))
         let avgRPE = averageRPE(latestWorkingSets, default: targetRPE)
-        // Use weight from sets (could be added weight from dip belt etc.)
         let medWeight = median(latestWorkingSets.map(\.weight))
+
+        let mesocycleOffset = mesocycleRPEOffset(weeksSinceDeload: weeksSinceDeload)
 
         let decision: ProgressionDecision
         let tRepsLow: Int
         let tRepsHigh: Int
         let reasoning: String
 
-        if recentSessions.count < 2 {
-            // First session — maintain
+        // Proactive deload ceiling
+        if let weeks = weeksSinceDeload, weeks >= 7 {
+            decision = .deloadVolume
+            tRepsLow = max(medReps - 2, repRange.lowerBound)
+            tRepsHigh = max(medReps - 1, repRange.lowerBound)
+            reasoning = "Scheduled recovery week after \(weeks) weeks of training."
+
+        } else if recentSessions.count < 2 {
             decision = .maintain
             tRepsLow = medReps
             tRepsHigh = min(medReps, effectiveUpperBound)
@@ -183,28 +254,24 @@ struct ProgressionService: Sendable {
             let prevMedReps = prevWorkingSets.isEmpty ? medReps : medianInt(prevWorkingSets.map(\.reps))
 
             if medReps >= effectiveUpperBound {
-                // Hit the rep ceiling — suggest adding weight
                 decision = .increaseWeight
                 tRepsLow = repRange.lowerBound
                 tRepsHigh = min(repRange.lowerBound + 2, effectiveUpperBound)
-                reasoning = "You've reached \(effectiveUpperBound) reps. Consider adding external weight to keep progressing in the strength range."
+                reasoning = "You've reached \(effectiveUpperBound) reps. Consider adding external weight to keep progressing."
 
             } else if medReps > prevMedReps {
-                // Reps trending up — increase reps
                 decision = .increaseReps
                 tRepsLow = min(medReps + 1, effectiveUpperBound)
                 tRepsHigh = min(medReps + 2, effectiveUpperBound)
                 reasoning = "Reps are improving. Keep pushing for more reps each session."
 
             } else if medReps == prevMedReps {
-                // Reps flat — maintain and push
                 decision = .increaseReps
                 tRepsLow = min(medReps + 1, effectiveUpperBound)
                 tRepsHigh = min(medReps + 1, effectiveUpperBound)
                 reasoning = "Reps are holding steady. Aim for one more rep per set."
 
             } else {
-                // Reps declining — deload (reduce volume)
                 decision = .deloadVolume
                 tRepsLow = max(medReps - 1, repRange.lowerBound)
                 tRepsHigh = medReps
@@ -215,7 +282,7 @@ struct ProgressionService: Sendable {
         return ProgressionTarget(
             exerciseId: exerciseId,
             trainingMode: trainingMode,
-            targetWeight: medWeight, // 0 for pure bodyweight, or added weight if any
+            targetWeight: medWeight,
             targetRepsLow: tRepsLow,
             targetRepsHigh: tRepsHigh,
             targetRPE: targetRPE,
@@ -224,13 +291,101 @@ struct ProgressionService: Sendable {
             previousWeight: medWeight,
             previousReps: medReps,
             previousRPE: avgRPE,
-            estimatedOneRM: 0 // Not applicable for bodyweight
+            estimatedOneRM: 0,
+            mesocycleRPEOffset: mesocycleOffset,
+            rpeFatigueDetected: false,
+            e1rmConfidence: 1.0
         )
+    }
+
+    // MARK: - RPE Fatigue Detection (Gap 7)
+
+    /// Detects hidden fatigue: e1RM stable but RPE rising across sessions.
+    /// If average RPE increased by 1+ point over 2-3 sessions at similar e1RM, fatigue is accumulating.
+    private func detectRPEFatigue(recentSessions: [[WorkoutSet]], targetRPE: Double) -> Bool {
+        guard recentSessions.count >= 2 else { return false }
+
+        let sessionRPEs = recentSessions.prefix(3).map { session -> Double in
+            averageRPE(session.filter { $0.setType == .working }, default: targetRPE)
+        }
+
+        // Check if RPE is trending up significantly
+        guard sessionRPEs.count >= 2 else { return false }
+        let latestRPE = sessionRPEs[0]
+        let previousRPE = sessionRPEs.count >= 3
+            ? (sessionRPEs[1] + sessionRPEs[2]) / 2.0
+            : sessionRPEs[1]
+
+        // Also check that e1RM isn't improving (if e1RM is rising, higher RPE is expected)
+        let sessionE1RMs = recentSessions.prefix(3).compactMap { session -> Double? in
+            let e1rm = bestE1RM(from: session)
+            return e1rm > 0 ? e1rm : nil
+        }
+
+        guard sessionE1RMs.count >= 2 else { return false }
+        let e1rmChange = (sessionE1RMs[0] - sessionE1RMs[1]) / sessionE1RMs[1]
+
+        // Fatigue signal: RPE up by 1+ point AND e1RM flat or declining
+        return (latestRPE - previousRPE) >= 1.0 && e1rmChange <= 0.02
+    }
+
+    // MARK: - e1RM Confidence by Rep Range (Gap 5)
+
+    /// Returns a confidence factor for e1RM estimates based on the rep range used.
+    /// Brzycki/Epley are most accurate at 2-10 reps. Above 10, error increases significantly.
+    private func e1rmConfidenceFactor(medReps: Int) -> Double {
+        switch medReps {
+        case 1...5: return 1.0    // Highest confidence
+        case 6...8: return 0.9    // Very reliable
+        case 9...10: return 0.8   // Good reliability
+        case 11...12: return 0.65 // Moderate — individual endurance varies
+        case 13...15: return 0.5  // Lower — double progression preferred
+        default: return 0.4       // 15+ reps — e1RM unreliable
+        }
+    }
+
+    // MARK: - Mesocycle RPE Progression (Gap 5 from RP Framework)
+
+    /// Returns an RPE offset based on weeks since last deload.
+    /// Week 1-2: train at base RPE (offset 0)
+    /// Week 3-4: train slightly harder (+0.5)
+    /// Week 5-6: train harder (+1.0)
+    /// Week 7+: should be deloading (handled by proactive deload ceiling)
+    private func mesocycleRPEOffset(weeksSinceDeload: Int?) -> Double {
+        guard let weeks = weeksSinceDeload else { return 0 }
+        switch weeks {
+        case 0...2: return 0      // Early mesocycle: base effort
+        case 3...4: return 0.5    // Mid mesocycle: push slightly harder
+        case 5...6: return 1.0    // Late mesocycle: peak effort before deload
+        default: return 0         // Should be deloading
+        }
+    }
+
+    // MARK: - Off-Day Escalation (Gap 6)
+
+    /// Counts consecutive sessions where median weight dropped >10% from the best recent weight.
+    private func countConsecutiveBadSessions(recentSessions: [[WorkoutSet]]) -> Int {
+        guard recentSessions.count >= 2 else { return 0 }
+
+        let allWorkingSets = recentSessions.flatMap { $0.filter { $0.setType == .working } }
+        let bestRecentWeight = allWorkingSets.map(\.weight).max() ?? 0
+        guard bestRecentWeight > 0 else { return 0 }
+
+        var count = 0
+        for session in recentSessions {
+            let workingSets = session.filter { $0.setType == .working }
+            let sessionMedWeight = median(workingSets.map(\.weight))
+            if sessionMedWeight < bestRecentWeight * 0.90 {
+                count += 1
+            } else {
+                break // Non-consecutive, stop counting
+            }
+        }
+        return count
     }
 
     // MARK: - e1RM Helpers
 
-    /// Returns the highest estimated 1RM from working sets in a session.
     private func bestE1RM(from sets: [WorkoutSet]) -> Double {
         sets.filter { $0.setType == .working }
             .map(\.estimated1RM)
@@ -238,7 +393,6 @@ struct ProgressionService: Sendable {
     }
 
     /// Returns the percentage of e1RM to use for a given rep target.
-    /// Interpolates between anchor points: 3→90%, 5→85%, 8→78%, 10→73%, 12→68%, 15→63%.
     private func percentageOfE1RM(forReps reps: Int) -> Double {
         let anchors: [(reps: Int, pct: Double)] = [
             (1, 1.00), (3, 0.90), (5, 0.85), (8, 0.78),
@@ -256,13 +410,11 @@ struct ProgressionService: Sendable {
                 return low.pct + t * (high.pct - low.pct)
             }
         }
-        return 0.73 // fallback
+        return 0.73
     }
 
     // MARK: - PR Detection
 
-    /// Detects new personal records from completed working sets.
-    /// Returns only NEW PRs (where the value exceeds the current record or no record exists).
     func detectPRs(
         exerciseId: UUID,
         userId: UUID,
@@ -272,85 +424,54 @@ struct ProgressionService: Sendable {
         let workingSets = completedSets.filter { $0.setType == .working }
         guard !workingSets.isEmpty else { return [] }
 
-        // Calculate potential records from this session
         let maxWeight = workingSets.map(\.weight).max() ?? 0
         let maxReps = workingSets.map(\.reps).max() ?? 0
         let totalVolume = workingSets.reduce(0.0) { $0 + $1.volume }
         let maxEstimated1RM = workingSets.map(\.estimated1RM).max() ?? 0
         let bestWeightSet = workingSets.max(by: { $0.weight < $1.weight })
 
-        // Fetch current records
         let currentPRs = try await fetchCurrentPRs(userId: userId, exerciseId: exerciseId)
         let currentByType = Dictionary(uniqueKeysWithValues: currentPRs.map { ($0.recordType, $0) })
 
         var newPRs: [PersonalRecord] = []
         let now = Date()
 
-        // Weight PR
         if maxWeight > (currentByType[.weight]?.value ?? 0) {
-            let pr = PersonalRecord(
-                id: UUID(),
-                userId: userId,
-                exerciseId: exerciseId,
-                recordType: .weight,
-                value: maxWeight,
-                repsAtWeight: bestWeightSet?.reps,
-                sessionId: sessionId,
-                achievedAt: now,
-                createdAt: now
-            )
-            newPRs.append(pr)
+            newPRs.append(PersonalRecord(
+                id: UUID(), userId: userId, exerciseId: exerciseId,
+                recordType: .weight, value: maxWeight,
+                repsAtWeight: bestWeightSet?.reps, sessionId: sessionId,
+                achievedAt: now, createdAt: now
+            ))
         }
 
-        // Reps PR
         if Double(maxReps) > (currentByType[.reps]?.value ?? 0) {
-            let pr = PersonalRecord(
-                id: UUID(),
-                userId: userId,
-                exerciseId: exerciseId,
-                recordType: .reps,
-                value: Double(maxReps),
-                repsAtWeight: nil,
-                sessionId: sessionId,
-                achievedAt: now,
-                createdAt: now
-            )
-            newPRs.append(pr)
+            newPRs.append(PersonalRecord(
+                id: UUID(), userId: userId, exerciseId: exerciseId,
+                recordType: .reps, value: Double(maxReps),
+                repsAtWeight: nil, sessionId: sessionId,
+                achievedAt: now, createdAt: now
+            ))
         }
 
-        // Volume PR
         if totalVolume > (currentByType[.volume]?.value ?? 0) {
-            let pr = PersonalRecord(
-                id: UUID(),
-                userId: userId,
-                exerciseId: exerciseId,
-                recordType: .volume,
-                value: totalVolume,
-                repsAtWeight: nil,
-                sessionId: sessionId,
-                achievedAt: now,
-                createdAt: now
-            )
-            newPRs.append(pr)
+            newPRs.append(PersonalRecord(
+                id: UUID(), userId: userId, exerciseId: exerciseId,
+                recordType: .volume, value: totalVolume,
+                repsAtWeight: nil, sessionId: sessionId,
+                achievedAt: now, createdAt: now
+            ))
         }
 
-        // Estimated 1RM PR
         if maxEstimated1RM > (currentByType[.estimated1rm]?.value ?? 0) {
-            let pr = PersonalRecord(
-                id: UUID(),
-                userId: userId,
-                exerciseId: exerciseId,
-                recordType: .estimated1rm,
-                value: maxEstimated1RM,
-                repsAtWeight: nil,
-                sessionId: sessionId,
-                achievedAt: now,
-                createdAt: now
-            )
-            newPRs.append(pr)
+            newPRs.append(PersonalRecord(
+                id: UUID(), userId: userId, exerciseId: exerciseId,
+                recordType: .estimated1rm, value: maxEstimated1RM,
+                repsAtWeight: nil, sessionId: sessionId,
+                achievedAt: now, createdAt: now
+            ))
         }
 
-        // Upsert new PRs
         for pr in newPRs {
             try await upsertPR(pr)
         }
@@ -365,12 +486,9 @@ struct ProgressionService: Sendable {
         let weeksSinceLastDeload: Int?
     }
 
-    /// Checks whether the user should consider a deload week based on training volume
-    /// and time since last deload. Suggests if 12+ sessions in 5 weeks with no deload.
     func shouldSuggestDeload(userId: UUID, templateId: UUID) async throws -> DeloadSuggestion? {
         let fiveWeeksAgo = Calendar.current.date(byAdding: .weekOfYear, value: -5, to: Date()) ?? Date()
 
-        // Count completed sessions for this template in the last 5 weeks
         struct SessionRow: Decodable { let id: UUID }
         let sessions: [SessionRow] = try await supabase.from("workout_sessions")
             .select("id")
@@ -383,7 +501,6 @@ struct ProgressionService: Sendable {
 
         guard sessions.count >= 12 else { return nil }
 
-        // Check if any deload decision was made in the last 5 weeks
         struct DeloadRow: Decodable { let created_at: String }
         let deloads: [DeloadRow] = try await supabase.from("progression_log")
             .select("created_at")
@@ -396,7 +513,6 @@ struct ProgressionService: Sendable {
 
         if !deloads.isEmpty { return nil }
 
-        // Calculate weeks since last deload (if any)
         let lastDeloads: [DeloadRow] = try await supabase.from("progression_log")
             .select("created_at")
             .eq("user_id", value: userId.uuidString)
@@ -417,7 +533,6 @@ struct ProgressionService: Sendable {
 
     // MARK: - Persistence
 
-    /// Saves a progression target to the progression_log table.
     func saveTarget(_ target: ProgressionTarget, userId: UUID) async throws {
         struct ProgressionLogEntry: Encodable {
             let id: UUID
@@ -458,7 +573,6 @@ struct ProgressionService: Sendable {
             .execute()
     }
 
-    /// Fetches the latest progression target for each exercise.
     func fetchLatestTargets(userId: UUID, exerciseIds: [UUID]) async throws -> [UUID: ProgressionTarget] {
         guard !exerciseIds.isEmpty else { return [:] }
 
@@ -477,8 +591,6 @@ struct ProgressionService: Sendable {
             let estimated_1rm: Double?
         }
 
-        // Fetch latest target per exercise by ordering by created_at DESC
-        // We fetch all recent entries and group client-side (simpler than complex SQL)
         let rows: [ProgressionRow] = try await supabase.from("progression_log")
             .select()
             .eq("user_id", value: userId.uuidString)
@@ -487,7 +599,6 @@ struct ProgressionService: Sendable {
             .execute()
             .value
 
-        // Take the first (most recent) entry per exercise
         var result: [UUID: ProgressionTarget] = [:]
         for row in rows {
             guard let exerciseId = UUID(uuidString: row.exercise_id),
@@ -515,7 +626,6 @@ struct ProgressionService: Sendable {
         return result
     }
 
-    /// Fetches current personal records for an exercise.
     func fetchCurrentPRs(userId: UUID, exerciseId: UUID) async throws -> [PersonalRecord] {
         try await supabase.from("personal_records")
             .select()
@@ -525,7 +635,6 @@ struct ProgressionService: Sendable {
             .value
     }
 
-    /// Upserts a personal record (inserts or updates if a record for the same type already exists).
     func upsertPR(_ pr: PersonalRecord) async throws {
         struct PREntry: Encodable {
             let id: UUID
@@ -552,7 +661,6 @@ struct ProgressionService: Sendable {
             achieved_at: formatter.string(from: pr.achievedAt)
         )
 
-        // Delete existing record for this user/exercise/type, then insert new one
         try await supabase.from("personal_records")
             .delete()
             .eq("user_id", value: pr.userId.uuidString)
@@ -597,7 +705,6 @@ struct ProgressionService: Sendable {
         Self.weightIncrement(for: equipment)
     }
 
-    /// Public static accessor so per-set target logic can use equipment-specific increments.
     static func weightIncrement(for equipment: String) -> Double {
         switch equipment {
         case "barbell", "smith_machine": return AppConstants.WeightIncrements.barbellLbs
