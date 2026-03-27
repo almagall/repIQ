@@ -149,6 +149,21 @@ struct WorkoutSummaryView: View {
                     }
                 }
 
+                // Muscle heatmap
+                if !summary.exerciseSummaries.isEmpty {
+                    VStack(alignment: .leading, spacing: RQSpacing.md) {
+                        Text("Muscles Worked")
+                            .font(RQTypography.label)
+                            .textCase(.uppercase)
+                            .tracking(1.5)
+                            .foregroundColor(RQColors.textSecondary)
+
+                        RQCard {
+                            MuscleHeatmapView(muscleVolume: muscleVolumeMap)
+                        }
+                    }
+                }
+
                 // Exercise breakdown
                 if !summary.exerciseSummaries.isEmpty {
                     VStack(alignment: .leading, spacing: RQSpacing.md) {
@@ -380,6 +395,18 @@ struct WorkoutSummaryView: View {
         case .estimated1rm:
             return "\(formatWeight(value)) lbs"
         }
+    }
+
+    // MARK: - Muscle Volume Map
+
+    /// Aggregates sets completed per muscle group across all exercise summaries.
+    private var muscleVolumeMap: [String: Int] {
+        var map: [String: Int] = [:]
+        for exercise in summary.exerciseSummaries {
+            let group = exercise.muscleGroup.lowercased()
+            map[group, default: 0] += exercise.setsCompleted
+        }
+        return map
     }
 
     // MARK: - Formatting

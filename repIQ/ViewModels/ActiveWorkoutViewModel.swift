@@ -773,7 +773,8 @@ final class ActiveWorkoutViewModel {
                 setType: set.setType,
                 weight: set.weight,
                 reps: set.reps,
-                rpe: set.rpe
+                rpe: set.rpe,
+                notes: set.notes
             )
 
             exercises[exerciseIndex].sets[setIndex].savedSetId = savedSet.id
@@ -1099,6 +1100,13 @@ final class ActiveWorkoutViewModel {
               exercises[exerciseIndex].sets.indices.contains(setIndex),
               !exercises[exerciseIndex].sets[setIndex].isCompleted else { return }
         exercises[exerciseIndex].sets[setIndex].rpe = rpe
+    }
+
+    func updateNote(exerciseIndex: Int, setIndex: Int, notes: String?) {
+        guard exercises.indices.contains(exerciseIndex),
+              exercises[exerciseIndex].sets.indices.contains(setIndex) else { return }
+        let trimmed = notes?.trimmingCharacters(in: .whitespacesAndNewlines)
+        exercises[exerciseIndex].sets[setIndex].notes = trimmed?.isEmpty == true ? nil : trimmed
     }
 
     func updateSetType(exerciseIndex: Int, setIndex: Int, setType: SetType) {

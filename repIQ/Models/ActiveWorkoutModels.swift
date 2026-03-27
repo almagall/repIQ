@@ -47,6 +47,7 @@ struct SetEntry: Identifiable {
     var savedSetId: UUID? // non-nil once persisted to workout_sets
     var isSaving: Bool // loading state on checkmark tap
     var prType: PRType? // non-nil if this set beat a personal record
+    var notes: String? // optional set-level note
 
     var isPR: Bool { prType != nil }
 
@@ -67,6 +68,7 @@ struct SetEntry: Identifiable {
         self.savedSetId = nil
         self.isSaving = false
         self.prType = nil
+        self.notes = nil
     }
 }
 

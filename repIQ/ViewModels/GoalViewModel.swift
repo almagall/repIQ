@@ -8,6 +8,9 @@ final class GoalViewModel {
     var isLoading = false
     var errorMessage: String?
 
+    /// Set when a goal is auto-completed during a sync. Cleared by the view after showing celebration.
+    var justCompletedGoal: Goal?
+
     private let goalService = GoalService()
 
     func loadGoals() async {
@@ -44,6 +47,7 @@ final class GoalViewModel {
                     var updated = completed
                     updated.currentValue = currentValue
                     completedGoals.insert(updated, at: 0)
+                    justCompletedGoal = updated
                 } else {
                     try await goalService.updateGoalProgress(goalId: goal.id, currentValue: currentValue)
                 }

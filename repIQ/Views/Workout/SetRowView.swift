@@ -39,6 +39,8 @@ struct SetRowView: View {
 
     @State private var weightText: String = ""
     @State private var repsText: String = ""
+    @State private var showNotes: Bool = false
+    @State private var notesText: String = ""
 
     var body: some View {
         guard let set else { return AnyView(EmptyView()) }
@@ -223,6 +225,16 @@ struct SetRowView: View {
                         .transition(.scale.combined(with: .opacity))
                     }
 
+                    // Note toggle button
+                    Button {
+                        showNotes.toggle()
+                        if showNotes { notesText = set.notes ?? "" }
+                    } label: {
+                        Image(systemName: (set.notes?.isEmpty == false) ? "pencil.circle.fill" : "pencil.circle")
+                            .font(.system(size: 20))
+                            .foregroundColor((set.notes?.isEmpty == false) ? RQColors.accent.opacity(0.7) : RQColors.textTertiary.opacity(0.5))
+                    }
+
                     // Checkmark button
                     Button {
                         Task {
@@ -250,6 +262,42 @@ struct SetRowView: View {
                 if showPlateBreakdown {
                     PlateBreakdownView(weight: set.weight)
                 }
+
+                // Notes row
+                if showNotes {
+                    HStack(spacing: RQSpacing.xs) {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 10))
+                            .foregroundColor(RQColors.textTertiary)
+
+                        TextField("Add a note…", text: $notesText)
+                            .font(.system(size: 12))
+                            .foregroundColor(RQColors.textPrimary)
+                            .onChange(of: notesText) { _, newValue in
+                                viewModel.updateNote(exerciseIndex: exerciseIndex, setIndex: setIndex, notes: newValue)
+                            }
+                    }
+                    .padding(.horizontal, RQSpacing.sm)
+                    .padding(.vertical, 6)
+                    .background(RQColors.surfaceTertiary.opacity(0.6))
+                    .cornerRadius(RQRadius.small)
+                    .padding(.leading, 32)
+                    .padding(.top, RQSpacing.xxs)
+                } else if let note = set.notes, !note.isEmpty {
+                    // Collapsed preview of existing note
+                    HStack(spacing: RQSpacing.xs) {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 10))
+                            .foregroundColor(RQColors.textTertiary)
+                        Text(note)
+                            .font(.system(size: 11))
+                            .foregroundColor(RQColors.textTertiary)
+                            .lineLimit(1)
+                    }
+                    .padding(.leading, 32)
+                    .padding(.top, RQSpacing.xxs)
+                    .onTapGesture { showNotes = true }
+                }
             }
             .padding(.vertical, RQSpacing.xs)
             .opacity(set.isCompleted ? 0.7 : 1.0)
@@ -261,6 +309,7 @@ struct SetRowView: View {
                 if set.reps > 0 {
                     repsText = "\(set.reps)"
                 }
+                notesText = set.notes ?? ""
 
                 // Auto-fill drop and failure sets only (not warmup or cooldown)
                 if (set.setType == .drop || set.setType == .failure) && set.weight == 0 && set.reps == 0 {
