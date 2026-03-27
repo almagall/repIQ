@@ -216,7 +216,8 @@ struct WorkoutService: Sendable {
         weight: Double,
         reps: Int,
         rpe: Double?,
-        isPR: Bool = false
+        isPR: Bool = false,
+        notes: String? = nil
     ) async throws -> WorkoutSet {
         struct CreateSet: Encodable {
             let id: UUID
@@ -229,6 +230,7 @@ struct WorkoutService: Sendable {
             let rpe: Double?
             let is_pr: Bool
             let completed_at: String
+            let notes: String?
         }
 
         let formatter = ISO8601DateFormatter()
@@ -244,7 +246,8 @@ struct WorkoutService: Sendable {
             reps: reps,
             rpe: rpe,
             is_pr: isPR,
-            completed_at: formatter.string(from: Date())
+            completed_at: formatter.string(from: Date()),
+            notes: notes
         )
 
         let workoutSet: WorkoutSet = try await supabase.from("workout_sets")

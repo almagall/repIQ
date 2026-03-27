@@ -4,6 +4,7 @@ import Supabase
 struct GoalSettingView: View {
     @State private var viewModel = GoalViewModel()
     @State private var showCreateGoal = false
+    @State private var celebrationGoal: Goal?
 
     var body: some View {
         VStack(spacing: RQSpacing.lg) {
@@ -66,6 +67,17 @@ struct GoalSettingView: View {
         }
         .task {
             await viewModel.loadGoals()
+        }
+        .onChange(of: viewModel.justCompletedGoal) { _, goal in
+            if let goal {
+                celebrationGoal = goal
+                viewModel.justCompletedGoal = nil
+            }
+        }
+        .fullScreenCover(item: $celebrationGoal) { goal in
+            GoalCelebrationView(goal: goal) {
+                celebrationGoal = nil
+            }
         }
     }
 

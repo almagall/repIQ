@@ -292,6 +292,61 @@ struct ExerciseLogView: View {
                 .sheet(isPresented: $showDecisionInfoSheet) {
                     InfoSheet(topic: decisionTopic(target))
                 }
+
+                // Inline reasoning — always visible for non-deload decisions
+                // (deload decisions have their own banner below)
+                if target.decision != .deload && target.decision != .deloadVolume {
+                    VStack(alignment: .leading, spacing: RQSpacing.xxs) {
+                        HStack(alignment: .top, spacing: RQSpacing.xs) {
+                            Image(systemName: "text.bubble")
+                                .font(.system(size: 10))
+                                .foregroundColor(RQColors.textTertiary)
+                                .padding(.top, 1)
+
+                            Text(target.reasoning)
+                                .font(.system(size: 11))
+                                .foregroundColor(RQColors.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        // Signal indicators
+                        HStack(spacing: RQSpacing.md) {
+                            if target.rpeFatigueDetected {
+                                HStack(spacing: RQSpacing.xs) {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .font(.system(size: 9))
+                                        .foregroundColor(RQColors.warning.opacity(0.8))
+                                    Text("RPE fatigue signal")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(RQColors.warning.opacity(0.8))
+                                }
+                            }
+
+                            if target.mesocycleRPEOffset > 0 {
+                                HStack(spacing: RQSpacing.xs) {
+                                    Image(systemName: "calendar")
+                                        .font(.system(size: 9))
+                                        .foregroundColor(RQColors.accent.opacity(0.6))
+                                    Text("Mesocycle RPE +\(formatRPE(target.mesocycleRPEOffset))")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(RQColors.accent.opacity(0.6))
+                                }
+                            }
+
+                            if target.e1rmConfidence < 0.85 {
+                                HStack(spacing: RQSpacing.xs) {
+                                    Image(systemName: "chart.bar.fill")
+                                        .font(.system(size: 9))
+                                        .foregroundColor(RQColors.textTertiary)
+                                    Text("High-rep est. (\(Int(target.e1rmConfidence * 100))% confidence)")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(RQColors.textTertiary)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.top, RQSpacing.xxs)
+                }
             }
 
             // Set count + rep range

@@ -201,6 +201,60 @@ enum StrengthPrograms {
                 ]),
         ])
 
+    // MARK: - 5/3/1 Boring But Big
+
+    static let wendler531BBB = ProgramDefinition(
+        id: "wendler-531-bbb",
+        name: "5/3/1 Boring But Big",
+        description: "The most popular 5/3/1 variant by Jim Wendler. After the main 5/3/1 sets, you perform 5 sets of 10 at 50% of the same lift for hypertrophy volume. Builds both strength and size simultaneously over a sustained training block.",
+        category: .strength,
+        difficulty: .intermediate,
+        daysPerWeek: 4,
+        progressionType: .percentageBased,
+        tags: ["popular", "4 days", "strength + size", "Wendler", "BBB"],
+        days: [
+            ProgramDayDefinition(
+                id: "531bbb-ohp", name: "Overhead Press",
+                description: "5/3/1 OHP main sets + BBB 5×10 at 50%, followed by pull and core assistance.",
+                exercises: [
+                    ProgramExerciseDefinition(exerciseName: "Overhead Press", trainingMode: .strength, targetSets: 3, restSecondsOverride: 180, notes: "5/3/1 sets — work to top set"),
+                    ProgramExerciseDefinition(exerciseName: "Overhead Press", trainingMode: .hypertrophy, targetSets: 5, restSecondsOverride: 90, notes: "BBB: 5×10 at 50% — same lift, lighter weight"),
+                    ProgramExerciseDefinition(exerciseName: "Pull-Ups", trainingMode: .hypertrophy, targetSets: 5, restSecondsOverride: 90, notes: "Assistance: Pull"),
+                    ProgramExerciseDefinition(exerciseName: "Dips (Chest)", trainingMode: .hypertrophy, targetSets: 3, notes: "Assistance: Push"),
+                    ProgramExerciseDefinition(exerciseName: "Face Pulls", trainingMode: .hypertrophy, targetSets: 3, notes: "Shoulder health"),
+                ]),
+            ProgramDayDefinition(
+                id: "531bbb-deadlift", name: "Deadlift",
+                description: "5/3/1 Deadlift main sets + BBB 5×10 at 50%, followed by single-leg and core work.",
+                exercises: [
+                    ProgramExerciseDefinition(exerciseName: "Deadlift", trainingMode: .strength, targetSets: 3, restSecondsOverride: 300, notes: "5/3/1 sets — work to top set"),
+                    ProgramExerciseDefinition(exerciseName: "Deadlift", trainingMode: .hypertrophy, targetSets: 5, restSecondsOverride: 120, notes: "BBB: 5×10 at 50% — same lift, lighter weight"),
+                    ProgramExerciseDefinition(exerciseName: "Dumbbell Row", trainingMode: .hypertrophy, targetSets: 5, notes: "Assistance: Pull"),
+                    ProgramExerciseDefinition(exerciseName: "Bulgarian Split Squat", trainingMode: .hypertrophy, targetSets: 3, notes: "Assistance: Single-leg"),
+                    ProgramExerciseDefinition(exerciseName: "Ab Wheel Rollout", trainingMode: .hypertrophy, targetSets: 3, notes: "Assistance: Core"),
+                ]),
+            ProgramDayDefinition(
+                id: "531bbb-bench", name: "Bench Press",
+                description: "5/3/1 Bench main sets + BBB 5×10 at 50%, followed by row and shoulder assistance.",
+                exercises: [
+                    ProgramExerciseDefinition(exerciseName: "Barbell Bench Press", trainingMode: .strength, targetSets: 3, restSecondsOverride: 180, notes: "5/3/1 sets — work to top set"),
+                    ProgramExerciseDefinition(exerciseName: "Barbell Bench Press", trainingMode: .hypertrophy, targetSets: 5, restSecondsOverride: 90, notes: "BBB: 5×10 at 50% — same lift, lighter weight"),
+                    ProgramExerciseDefinition(exerciseName: "Barbell Row", trainingMode: .hypertrophy, targetSets: 5, restSecondsOverride: 90, notes: "Assistance: Pull"),
+                    ProgramExerciseDefinition(exerciseName: "Face Pulls", trainingMode: .hypertrophy, targetSets: 3, notes: "Shoulder health"),
+                    ProgramExerciseDefinition(exerciseName: "Tricep Pushdown", trainingMode: .hypertrophy, targetSets: 3, notes: "Assistance: Triceps"),
+                ]),
+            ProgramDayDefinition(
+                id: "531bbb-squat", name: "Squat",
+                description: "5/3/1 Squat main sets + BBB 5×10 at 50%, followed by hamstring and core work.",
+                exercises: [
+                    ProgramExerciseDefinition(exerciseName: "Barbell Squat", trainingMode: .strength, targetSets: 3, restSecondsOverride: 300, notes: "5/3/1 sets — work to top set"),
+                    ProgramExerciseDefinition(exerciseName: "Barbell Squat", trainingMode: .hypertrophy, targetSets: 5, restSecondsOverride: 120, notes: "BBB: 5×10 at 50% — same lift, lighter weight"),
+                    ProgramExerciseDefinition(exerciseName: "Leg Curls", trainingMode: .hypertrophy, targetSets: 3, notes: "Assistance: Hamstrings"),
+                    ProgramExerciseDefinition(exerciseName: "Hanging Leg Raises", trainingMode: .hypertrophy, targetSets: 3, notes: "Assistance: Core"),
+                    ProgramExerciseDefinition(exerciseName: "Standing Calf Raise", trainingMode: .hypertrophy, targetSets: 4, notes: "Assistance: Calves"),
+                ]),
+        ])
+
     // MARK: - nSuns 5/3/1 LP
 
     static let nsuns = ProgramDefinition(
