@@ -41,6 +41,15 @@ struct ExerciseLogView: View {
                     // Progress indicator
                     progressRow(exercise)
 
+                    // First-time tooltip: targets
+                    if exercise.progressionTarget != nil {
+                        FirstTimeTooltip(
+                            key: "workout_targets",
+                            icon: "target",
+                            message: "These are your personalized targets based on past performance. Aim for the target weight and reps, but adjust if something feels off. The app learns from every session."
+                        )
+                    }
+
                     // Deload explanation banner
                     if let target = exercise.progressionTarget,
                        target.decision == .deload || target.decision == .deloadVolume {
@@ -68,6 +77,15 @@ struct ExerciseLogView: View {
 
                         // Column headers
                         columnHeaders
+
+                        // First-time RPE tooltip (only on working sets)
+                        if group.type == .working {
+                            FirstTimeTooltip(
+                                key: "workout_rpe",
+                                icon: "gauge.with.needle.fill",
+                                message: "RPE measures how hard a set felt (7 = moderate, 8 = challenging, 9 = very hard). Tap after completing a set. This is optional but helps the app calibrate your targets."
+                            )
+                        }
 
                         // Set rows
                         ForEach(Array(group.sets.enumerated()), id: \.element.entry.id) { groupIndex, item in
