@@ -64,14 +64,8 @@ enum LeagueTier: String, Codable, Sendable, CaseIterable {
 
 struct SocialProfile: Codable, Identifiable, Sendable {
     let id: UUID
-    var email: String
-    var weightUnit: WeightUnit?
-    var restTimerDefault: Int?
-    var createdAt: Date
-    var updatedAt: Date
     var username: String?
     var bio: String?
-    var avatarUrl: String?
     var privacyLevel: PrivacyLevel?
     var leagueTier: LeagueTier?
     var totalIQ: Int?
@@ -84,16 +78,9 @@ struct SocialProfile: Codable, Identifiable, Sendable {
     var gymName: String?
     var gymAddress: String?
     var gymPlaceId: String?
-    var gymLatitude: Double?
-    var gymLongitude: Double?
 
     enum CodingKeys: String, CodingKey {
-        case id, email, bio, username
-        case weightUnit = "weight_unit"
-        case restTimerDefault = "rest_timer_default"
-        case createdAt = "created_at"
-        case updatedAt = "updated_at"
-        case avatarUrl = "avatar_url"
+        case id, bio, username
         case privacyLevel = "privacy_level"
         case leagueTier = "league_tier"
         case totalIQ = "total_iq"
@@ -106,8 +93,6 @@ struct SocialProfile: Codable, Identifiable, Sendable {
         case gymName = "gym_name"
         case gymAddress = "gym_address"
         case gymPlaceId = "gym_place_id"
-        case gymLatitude = "gym_latitude"
-        case gymLongitude = "gym_longitude"
     }
 }
 

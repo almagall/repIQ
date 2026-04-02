@@ -34,15 +34,14 @@ struct SocialService: Sendable {
             .execute()
     }
 
-    /// Searches users by username or display name.
+    /// Searches users by username.
     func searchUsers(query: String, currentUserId: UUID) async throws -> [SocialProfile] {
         guard !query.isEmpty else { return [] }
 
-        // Use wildcard pattern for case-insensitive search on username and display_name
         let pattern = "%\(query)%"
         let results: [SocialProfile] = try await supabase.from("profiles")
             .select()
-            .or("username.ilike.\(pattern),display_name.ilike.\(pattern)")
+            .ilike("username", pattern: pattern)
             .neq("id", value: currentUserId.uuidString)
             .limit(20)
             .execute()
