@@ -216,7 +216,9 @@ struct SetRowView: View {
                                 .font(.system(size: 10))
                             Text(prType.label)
                                 .font(.system(size: 9, weight: .black))
+                                .lineLimit(1)
                         }
+                        .fixedSize()
                         .foregroundColor(RQColors.warning)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 3)
