@@ -5,12 +5,16 @@ struct OnboardingView: View {
     @State private var currentStep = 0
     @State private var experienceLevel: OnboardingExperienceLevel?
     @State private var trainingGoal: TrainingGoal?
+    @State private var trainingDaysPerWeek: Int?
     @State private var selectedProgram: ProgramDefinition?
-    @State private var selectedGoalPreset: GoalPreset?
+    @State private var goalBuilderType: GoalType = .weight
+    @State private var goalBuilderExercise: String = ""
+    @State private var goalBuilderTargetText: String = ""
+    @State private var goalBuilderDaysPerWeek: Int = 3
     @State private var isCreatingTemplate = false
     var onComplete: () -> Void
 
-    private let totalSteps = 5
+    private let totalSteps = 6
 
     var body: some View {
         ZStack {
@@ -32,9 +36,10 @@ struct OnboardingView: View {
                 TabView(selection: $currentStep) {
                     experienceStep.tag(0)
                     goalStep.tag(1)
-                    programStep.tag(2)
-                    goalPresetStep.tag(3)
-                    howItWorksStep.tag(4)
+                    frequencyStep.tag(2)
+                    programStep.tag(3)
+                    goalBuilderStep.tag(4)
+                    howItWorksStep.tag(5)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .animation(.easeInOut(duration: 0.3), value: currentStep)
@@ -135,7 +140,55 @@ struct OnboardingView: View {
         .padding(.horizontal, RQSpacing.screenHorizontal)
     }
 
-    // MARK: - Step 3: Program Selection
+    // MARK: - Step 3: Training Frequency
+
+    private var frequencyStep: some View {
+        VStack(spacing: RQSpacing.xxxl) {
+            Spacer()
+
+            VStack(spacing: RQSpacing.md) {
+                Text("How Often Can You Train?")
+                    .font(RQTypography.largeTitle)
+                    .foregroundColor(RQColors.accent)
+                    .multilineTextAlignment(.center)
+
+                Text("We'll match programs to your schedule")
+                    .font(RQTypography.subheadline)
+                    .foregroundColor(RQColors.textSecondary)
+            }
+
+            VStack(spacing: RQSpacing.md) {
+                ForEach(trainingFrequencyOptions, id: \.days) { option in
+                    Button {
+                        trainingDaysPerWeek = option.days
+                    } label: {
+                        onboardingOption(
+                            icon: option.icon,
+                            title: option.title,
+                            subtitle: option.subtitle,
+                            isSelected: trainingDaysPerWeek == option.days
+                        )
+                    }
+                }
+            }
+
+            Spacer()
+
+            HStack(spacing: RQSpacing.md) {
+                RQButton(title: "Back", style: .secondary) {
+                    withAnimation { currentStep = 1 }
+                }
+                RQButton(title: "Continue", isDisabled: trainingDaysPerWeek == nil) {
+                    withAnimation { currentStep = 3 }
+                }
+            }
+            .padding(.horizontal, RQSpacing.screenHorizontal)
+            .padding(.bottom, RQSpacing.xxxl)
+        }
+        .padding(.horizontal, RQSpacing.screenHorizontal)
+    }
+
+    // MARK: - Step 4: Program Selection
 
     private var programStep: some View {
         VStack(spacing: RQSpacing.lg) {
@@ -145,7 +198,7 @@ struct OnboardingView: View {
                     .foregroundColor(RQColors.accent)
                     .padding(.top, RQSpacing.xxxl)
 
-                Text("You can always change this later")
+                Text("Sorted by best fit for your schedule and level")
                     .font(RQTypography.subheadline)
                     .foregroundColor(RQColors.textSecondary)
             }
@@ -166,15 +219,15 @@ struct OnboardingView: View {
             VStack(spacing: RQSpacing.sm) {
                 HStack(spacing: RQSpacing.md) {
                     RQButton(title: "Back", style: .secondary) {
-                        withAnimation { currentStep = 1 }
+                        withAnimation { currentStep = 2 }
                     }
                     RQButton(title: "Continue", isDisabled: selectedProgram == nil) {
-                        withAnimation { currentStep = 3 }
+                        withAnimation { currentStep = 4 }
                     }
                 }
 
                 Button {
-                    withAnimation { currentStep = 3 }
+                    withAnimation { currentStep = 4 }
                 } label: {
                     Text("Skip for now")
                         .font(RQTypography.caption)
@@ -187,62 +240,171 @@ struct OnboardingView: View {
         }
     }
 
-    // MARK: - Step 4: Goal Preset
+    // MARK: - Step 5: Goal Builder
 
-    private var goalPresetStep: some View {
-        VStack(spacing: RQSpacing.xxxl) {
-            Spacer()
+    private var goalBuilderStep: some View {
+        ScrollView {
+            VStack(spacing: RQSpacing.xl) {
+                // Header
+                VStack(spacing: RQSpacing.md) {
+                    Text("Set a Goal")
+                        .font(RQTypography.largeTitle)
+                        .foregroundColor(RQColors.accent)
+                        .padding(.top, RQSpacing.xxxl)
 
-            VStack(spacing: RQSpacing.md) {
-                Text("Set a Goal")
-                    .font(RQTypography.largeTitle)
-                    .foregroundColor(RQColors.accent)
+                    Text("Give yourself something to chase — you can adjust it anytime")
+                        .font(RQTypography.subheadline)
+                        .foregroundColor(RQColors.textSecondary)
+                        .multilineTextAlignment(.center)
+                }
 
-                Text("Goals keep you focused and help track progress")
-                    .font(RQTypography.subheadline)
-                    .foregroundColor(RQColors.textSecondary)
-            }
+                // Quick example chips
+                VStack(alignment: .leading, spacing: RQSpacing.sm) {
+                    Text("QUICK EXAMPLES")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(RQColors.textTertiary)
+                        .kerning(1)
+                        .padding(.horizontal, 2)
 
-            VStack(spacing: RQSpacing.md) {
-                ForEach(goalPresets, id: \.title) { preset in
-                    Button {
-                        selectedGoalPreset = preset
-                    } label: {
-                        onboardingOption(
-                            icon: preset.icon,
-                            title: preset.title,
-                            subtitle: preset.subtitle,
-                            isSelected: selectedGoalPreset?.title == preset.title
-                        )
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: RQSpacing.sm) {
+                            ForEach(goalPresets, id: \.title) { preset in
+                                Button {
+                                    applyPreset(preset)
+                                } label: {
+                                    HStack(spacing: 5) {
+                                        Image(systemName: preset.icon)
+                                            .font(.system(size: 11, weight: .semibold))
+                                        Text(preset.title)
+                                            .font(.system(size: 13, weight: .medium))
+                                    }
+                                    .foregroundColor(RQColors.accent)
+                                    .padding(.horizontal, RQSpacing.md)
+                                    .padding(.vertical, RQSpacing.sm)
+                                    .background(RQColors.accent.opacity(0.12))
+                                    .clipShape(Capsule())
+                                    .overlay(Capsule().stroke(RQColors.accent.opacity(0.3), lineWidth: 1))
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 2)
                     }
                 }
+
+                // Goal builder form
+                VStack(alignment: .leading, spacing: RQSpacing.lg) {
+                    // Goal type selector
+                    HStack(spacing: RQSpacing.sm) {
+                        goalTypeButton(type: .weight, label: "Lift a Weight", icon: "scalemass.fill")
+                        goalTypeButton(type: .consistency, label: "Stay Consistent", icon: "calendar")
+                    }
+
+                    // Fields
+                    if goalBuilderType == .weight {
+                        VStack(alignment: .leading, spacing: RQSpacing.sm) {
+                            Text("EXERCISE")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(RQColors.textTertiary)
+                                .kerning(1)
+
+                            TextField("e.g. Barbell Bench Press", text: $goalBuilderExercise)
+                                .font(RQTypography.body)
+                                .foregroundColor(RQColors.textPrimary)
+                                .padding(RQSpacing.md)
+                                .background(RQColors.surfaceTertiary)
+                                .cornerRadius(RQRadius.small)
+                        }
+
+                        VStack(alignment: .leading, spacing: RQSpacing.sm) {
+                            Text("TARGET WEIGHT")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(RQColors.textTertiary)
+                                .kerning(1)
+
+                            HStack(spacing: RQSpacing.sm) {
+                                TextField("e.g. 225", text: $goalBuilderTargetText)
+                                    .font(RQTypography.numbersSmall)
+                                    .foregroundColor(RQColors.textPrimary)
+                                    .keyboardType(.decimalPad)
+                                    .multilineTextAlignment(.center)
+                                    .padding(RQSpacing.md)
+                                    .background(RQColors.surfaceTertiary)
+                                    .cornerRadius(RQRadius.small)
+                                    .frame(width: 100)
+
+                                Text("lbs")
+                                    .font(RQTypography.body)
+                                    .foregroundColor(RQColors.textSecondary)
+                            }
+                        }
+                    } else {
+                        VStack(alignment: .leading, spacing: RQSpacing.sm) {
+                            Text("SESSIONS PER WEEK")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(RQColors.textTertiary)
+                                .kerning(1)
+
+                            HStack(spacing: RQSpacing.sm) {
+                                ForEach(2...6, id: \.self) { days in
+                                    Button {
+                                        goalBuilderDaysPerWeek = days
+                                    } label: {
+                                        VStack(spacing: 2) {
+                                            Text("\(days)")
+                                                .font(RQTypography.title2)
+                                                .fontWeight(.bold)
+                                                .foregroundColor(goalBuilderDaysPerWeek == days ? RQColors.accent : RQColors.textSecondary)
+                                            Text("days")
+                                                .font(.system(size: 10))
+                                                .foregroundColor(RQColors.textTertiary)
+                                        }
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, RQSpacing.sm)
+                                        .background(goalBuilderDaysPerWeek == days ? RQColors.accent.opacity(0.15) : RQColors.surfaceTertiary)
+                                        .cornerRadius(RQRadius.small)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: RQRadius.small)
+                                                .stroke(goalBuilderDaysPerWeek == days ? RQColors.accent : Color.clear, lineWidth: 1)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(RQSpacing.lg)
+                .background(RQColors.surfaceSecondary)
+                .cornerRadius(RQRadius.medium)
+
+                Spacer(minLength: 80)
             }
-
-            Spacer()
-
+            .padding(.horizontal, RQSpacing.screenHorizontal)
+        }
+        .safeAreaInset(edge: .bottom) {
             VStack(spacing: RQSpacing.sm) {
                 HStack(spacing: RQSpacing.md) {
                     RQButton(title: "Back", style: .secondary) {
-                        withAnimation { currentStep = 2 }
+                        withAnimation { currentStep = 3 }
                     }
-                    RQButton(title: "Continue") {
-                        withAnimation { currentStep = 4 }
+                    RQButton(title: goalBuilderHasContent ? "Set Goal" : "Continue") {
+                        withAnimation { currentStep = 5 }
                     }
                 }
 
-                if selectedGoalPreset == nil {
+                if !goalBuilderHasContent {
                     Text("You can set goals anytime from the home screen")
                         .font(RQTypography.caption)
                         .foregroundColor(RQColors.textTertiary)
                 }
             }
             .padding(.horizontal, RQSpacing.screenHorizontal)
-            .padding(.bottom, RQSpacing.xxxl)
+            .padding(.top, RQSpacing.sm)
+            .padding(.bottom, RQSpacing.xl)
+            .background(RQColors.background)
         }
-        .padding(.horizontal, RQSpacing.screenHorizontal)
     }
 
-    // MARK: - Step 5: How It Works
+    // MARK: - Step 6: How It Works
 
     private var howItWorksStep: some View {
         VStack(spacing: RQSpacing.xxxl) {
@@ -290,7 +452,7 @@ struct OnboardingView: View {
         .padding(.horizontal, RQSpacing.screenHorizontal)
     }
 
-    // MARK: - Goal Presets
+    // MARK: - Goal Presets (used as example chips in builder)
 
     private var goalPresets: [GoalPreset] {
         switch (experienceLevel, trainingGoal) {
@@ -359,11 +521,58 @@ struct OnboardingView: View {
             filtered = filtered.filter { $0.category == category }
         }
 
+        let targetDays = trainingDaysPerWeek ?? 4
+
         return filtered.sorted { a, b in
-            let aMatch = a.difficulty == difficulty
-            let bMatch = b.difficulty == difficulty
-            if aMatch != bMatch { return aMatch }
+            // 1. Exact frequency match first
+            let aFreqMatch = a.daysPerWeek == targetDays
+            let bFreqMatch = b.daysPerWeek == targetDays
+            if aFreqMatch != bFreqMatch { return aFreqMatch }
+
+            // 2. Difficulty match second
+            let aDiffMatch = a.difficulty == difficulty
+            let bDiffMatch = b.difficulty == difficulty
+            if aDiffMatch != bDiffMatch { return aDiffMatch }
+
+            // 3. Closest frequency
+            let aDist = abs(a.daysPerWeek - targetDays)
+            let bDist = abs(b.daysPerWeek - targetDays)
+            if aDist != bDist { return aDist < bDist }
+
             return a.daysPerWeek < b.daysPerWeek
+        }
+    }
+
+    // MARK: - Training Frequency Options
+
+    private let trainingFrequencyOptions: [(days: Int, icon: String, title: String, subtitle: String)] = [
+        (3, "3.circle.fill", "3 Days/Week", "Classic split — great for building the habit with plenty of recovery"),
+        (4, "4.circle.fill", "4 Days/Week", "Upper/lower or push/pull — solid balance of volume and rest"),
+        (5, "5.circle.fill", "5 Days/Week", "High frequency training — for those ready to commit"),
+        (6, "6.circle.fill", "6 Days/Week", "Push/pull/legs twice per week — maximum volume for advanced athletes"),
+    ]
+
+    // MARK: - Goal Builder Helpers
+
+    private var goalBuilderHasContent: Bool {
+        switch goalBuilderType {
+        case .weight:
+            let trimmed = goalBuilderExercise.trimmingCharacters(in: .whitespacesAndNewlines)
+            return !trimmed.isEmpty && (Double(goalBuilderTargetText) ?? 0) > 0
+        case .consistency:
+            return goalBuilderDaysPerWeek > 0
+        default:
+            return false
+        }
+    }
+
+    private func applyPreset(_ preset: GoalPreset) {
+        goalBuilderType = preset.goalType
+        if preset.goalType == .weight {
+            goalBuilderExercise = preset.exerciseName ?? ""
+            goalBuilderTargetText = String(Int(preset.targetValue))
+        } else if preset.goalType == .consistency {
+            goalBuilderDaysPerWeek = Int(preset.targetValue)
         }
     }
 
@@ -388,10 +597,8 @@ struct OnboardingView: View {
                 await browserVM.materializeProgram(program)
             }
 
-            // Create goal from preset if selected
-            if let preset = selectedGoalPreset {
-                await createGoalFromPreset(preset, userId: userId)
-            }
+            // Create goal from builder if filled in
+            await createGoalFromBuilder(userId: userId)
 
             onComplete()
         } catch {
@@ -399,10 +606,16 @@ struct OnboardingView: View {
         }
     }
 
-    private func createGoalFromPreset(_ preset: GoalPreset, userId: UUID) async {
-        // Find the exercise ID if this is an exercise-specific goal
-        var exerciseId: UUID?
-        if let exerciseName = preset.exerciseName {
+    private func createGoalFromBuilder(userId: UUID) async {
+        guard goalBuilderHasContent else { return }
+
+        switch goalBuilderType {
+        case .weight:
+            guard let targetValue = Double(goalBuilderTargetText), targetValue > 0 else { return }
+            let exerciseName = goalBuilderExercise.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !exerciseName.isEmpty else { return }
+
+            var exerciseId: UUID?
             let exercises: [Exercise]? = try? await supabase.from("exercises")
                 .select()
                 .ilike("name", pattern: exerciseName)
@@ -410,31 +623,64 @@ struct OnboardingView: View {
                 .execute()
                 .value
             exerciseId = exercises?.first?.id
+
+            _ = try? await GoalService().createGoal(
+                userId: userId,
+                goalType: .weight,
+                exerciseId: exerciseId,
+                exerciseName: exerciseName,
+                targetValue: targetValue,
+                startingValue: 0,
+                isEstimated1RM: false,
+                unit: "lbs",
+                targetDate: Calendar.current.date(byAdding: .day, value: 90, to: Date())
+            )
+
+        case .consistency:
+            _ = try? await GoalService().createGoal(
+                userId: userId,
+                goalType: .consistency,
+                exerciseId: nil,
+                exerciseName: nil,
+                targetValue: Double(goalBuilderDaysPerWeek),
+                startingValue: 0,
+                isEstimated1RM: false,
+                unit: "sessions/week",
+                targetDate: Calendar.current.date(byAdding: .day, value: 90, to: Date())
+            )
+
+        default:
+            break
         }
-
-        let unit: String = {
-            switch preset.goalType {
-            case .weight: return "lbs"
-            case .reps: return "reps"
-            case .consistency: return "sessions/week"
-            default: return "lbs"
-            }
-        }()
-
-        _ = try? await GoalService().createGoal(
-            userId: userId,
-            goalType: preset.goalType,
-            exerciseId: exerciseId,
-            exerciseName: preset.exerciseName,
-            targetValue: preset.targetValue,
-            startingValue: 0,
-            isEstimated1RM: false,
-            unit: unit,
-            targetDate: Calendar.current.date(byAdding: .day, value: 90, to: Date())
-        )
     }
 
     // MARK: - Components
+
+    @ViewBuilder
+    private func goalTypeButton(type: GoalType, label: String, icon: String) -> some View {
+        let isSelected = goalBuilderType == type
+        Button {
+            goalBuilderType = type
+        } label: {
+            VStack(spacing: RQSpacing.xs) {
+                Image(systemName: icon)
+                    .font(.system(size: 20))
+                    .foregroundColor(isSelected ? RQColors.accent : RQColors.textTertiary)
+                Text(label)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(isSelected ? RQColors.textPrimary : RQColors.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(RQSpacing.md)
+            .background(isSelected ? RQColors.accent.opacity(0.1) : RQColors.surfaceTertiary)
+            .cornerRadius(RQRadius.small)
+            .overlay(
+                RoundedRectangle(cornerRadius: RQRadius.small)
+                    .stroke(isSelected ? RQColors.accent : Color.clear, lineWidth: 1)
+            )
+        }
+    }
 
     private func onboardingOption(icon: String, title: String, subtitle: String, isSelected: Bool) -> some View {
         HStack(spacing: RQSpacing.lg) {
@@ -479,12 +725,17 @@ struct OnboardingView: View {
                         HStack(spacing: RQSpacing.sm) {
                             Text("\(program.daysPerWeek) days/week")
                                 .font(RQTypography.caption)
-                                .foregroundColor(RQColors.textSecondary)
+                                .foregroundColor(program.daysPerWeek == trainingDaysPerWeek ? RQColors.accent : RQColors.textSecondary)
                             Text("\u{00B7}")
                                 .foregroundColor(RQColors.textTertiary)
                             Text(program.difficulty.displayName)
                                 .font(RQTypography.caption)
                                 .foregroundColor(RQColors.textSecondary)
+                            if program.daysPerWeek == trainingDaysPerWeek {
+                                Text("· Best fit")
+                                    .font(RQTypography.caption)
+                                    .foregroundColor(RQColors.accent)
+                            }
                         }
                     }
                     Spacer()
