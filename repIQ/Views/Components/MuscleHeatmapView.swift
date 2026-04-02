@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Displays a simplified body silhouette with muscle groups highlighted
+/// Displays an anatomically-shaped body silhouette with muscle groups highlighted
 /// based on training volume (sets completed per muscle group).
 struct MuscleHeatmapView: View {
     /// Maps muscle group name (lowercase) → sets completed this session
@@ -110,107 +110,149 @@ private struct FrontBodyView: View {
 
     var body: some View {
         Canvas { ctx, _ in
-            // Body outline — simplified silhouette shapes
-            drawBodyOutline(ctx: ctx, scale: scale)
-
-            // Muscle highlights
-            drawMuscleRegion(ctx: ctx, scale: scale, rect: CGRect(x: 29, y: 31, width: 42, height: 32),
-                             muscle: "chest", cornerRadius: 6)
-            drawMuscleRegion(ctx: ctx, scale: scale, rect: CGRect(x: 15, y: 28, width: 18, height: 18),
-                             muscle: "shoulders", cornerRadius: 9)
-            drawMuscleRegion(ctx: ctx, scale: scale, rect: CGRect(x: 67, y: 28, width: 18, height: 18),
-                             muscle: "shoulders", cornerRadius: 9)
-            drawMuscleRegion(ctx: ctx, scale: scale, rect: CGRect(x: 11, y: 48, width: 16, height: 30),
-                             muscle: "biceps", cornerRadius: 5)
-            drawMuscleRegion(ctx: ctx, scale: scale, rect: CGRect(x: 73, y: 48, width: 16, height: 30),
-                             muscle: "biceps", cornerRadius: 5)
-            drawMuscleRegion(ctx: ctx, scale: scale, rect: CGRect(x: 12, y: 79, width: 14, height: 26),
-                             muscle: "forearms", cornerRadius: 4)
-            drawMuscleRegion(ctx: ctx, scale: scale, rect: CGRect(x: 74, y: 79, width: 14, height: 26),
-                             muscle: "forearms", cornerRadius: 4)
-            drawMuscleRegion(ctx: ctx, scale: scale, rect: CGRect(x: 31, y: 63, width: 38, height: 40),
-                             muscle: "abs", cornerRadius: 5)
-            drawMuscleRegion(ctx: ctx, scale: scale, rect: CGRect(x: 22, y: 118, width: 25, height: 55),
-                             muscle: "quads", cornerRadius: 7)
-            drawMuscleRegion(ctx: ctx, scale: scale, rect: CGRect(x: 53, y: 118, width: 25, height: 55),
-                             muscle: "quads", cornerRadius: 7)
-            drawMuscleRegion(ctx: ctx, scale: scale, rect: CGRect(x: 23, y: 177, width: 23, height: 42),
-                             muscle: "calves", cornerRadius: 5)
-            drawMuscleRegion(ctx: ctx, scale: scale, rect: CGRect(x: 54, y: 177, width: 23, height: 42),
-                             muscle: "calves", cornerRadius: 5)
+            drawSilhouette(ctx: ctx)
+            drawMuscles(ctx: ctx)
         }
     }
 
-    private func drawBodyOutline(ctx: GraphicsContext, scale: CGFloat) {
-        let fillColor = Color(hex: "1A1A1A")
-        let strokeColor = Color(hex: "333333")
+    // MARK: Silhouette
+
+    private func drawSilhouette(ctx: GraphicsContext) {
+        // Torso first (background layer)
+        let torso = torsoPath()
+        ctx.fill(torso, with: .color(kBodyFill))
+        ctx.stroke(torso, with: .color(kBodyStroke), lineWidth: 0.8)
 
         // Head
-        let head = Path(ellipseIn: CGRect(x: 38, y: 2, width: 24, height: 24).scaled(by: scale))
-        ctx.fill(head, with: .color(fillColor))
-        ctx.stroke(head, with: .color(strokeColor), lineWidth: 0.8)
-
+        bodyEllipse(ctx, x: 38, y: 2, w: 24, h: 26)
         // Neck
-        let neck = Path(CGRect(x: 46, y: 25, width: 8, height: 8).scaled(by: scale))
-        ctx.fill(neck, with: .color(fillColor))
+        bodyEllipse(ctx, x: 46, y: 26, w: 8, h: 8)
 
-        // Left upper arm
-        let leftUArm = roundedRectPath(rect: CGRect(x: 10, y: 28, width: 20, height: 52).scaled(by: scale), radius: 8 * scale)
-        ctx.fill(leftUArm, with: .color(fillColor))
-        ctx.stroke(leftUArm, with: .color(strokeColor), lineWidth: 0.8)
+        // Deltoid caps (overlap torso shoulders)
+        bodyEllipse(ctx, x: 12, y: 28, w: 20, h: 17)
+        bodyEllipse(ctx, x: 68, y: 28, w: 20, h: 17)
 
-        // Right upper arm
-        let rightUArm = roundedRectPath(rect: CGRect(x: 70, y: 28, width: 20, height: 52).scaled(by: scale), radius: 8 * scale)
-        ctx.fill(rightUArm, with: .color(fillColor))
-        ctx.stroke(rightUArm, with: .color(strokeColor), lineWidth: 0.8)
+        // Upper arms
+        bodyEllipse(ctx, x: 9, y: 40, w: 18, h: 44)
+        bodyEllipse(ctx, x: 73, y: 40, w: 18, h: 44)
 
-        // Left forearm
-        let leftFArm = roundedRectPath(rect: CGRect(x: 11, y: 79, width: 17, height: 30).scaled(by: scale), radius: 6 * scale)
-        ctx.fill(leftFArm, with: .color(fillColor))
-        ctx.stroke(leftFArm, with: .color(strokeColor), lineWidth: 0.8)
+        // Forearms
+        bodyEllipse(ctx, x: 10, y: 82, w: 16, h: 28)
+        bodyEllipse(ctx, x: 74, y: 82, w: 16, h: 28)
 
-        // Right forearm
-        let rightFArm = roundedRectPath(rect: CGRect(x: 72, y: 79, width: 17, height: 30).scaled(by: scale), radius: 6 * scale)
-        ctx.fill(rightFArm, with: .color(fillColor))
-        ctx.stroke(rightFArm, with: .color(strokeColor), lineWidth: 0.8)
+        // Hands
+        bodyEllipse(ctx, x: 12, y: 108, w: 13, h: 9)
+        bodyEllipse(ctx, x: 75, y: 108, w: 13, h: 9)
 
-        // Torso
-        let torso = roundedRectPath(rect: CGRect(x: 27, y: 27, width: 46, height: 78).scaled(by: scale), radius: 10 * scale)
-        ctx.fill(torso, with: .color(fillColor))
-        ctx.stroke(torso, with: .color(strokeColor), lineWidth: 0.8)
+        // Hip bridge
+        bodyEllipse(ctx, x: 21, y: 103, w: 58, h: 16)
 
-        // Hips
-        let hips = roundedRectPath(rect: CGRect(x: 22, y: 103, width: 56, height: 18).scaled(by: scale), radius: 6 * scale)
-        ctx.fill(hips, with: .color(fillColor))
+        // Thighs
+        bodyEllipse(ctx, x: 21, y: 113, w: 26, h: 60)
+        bodyEllipse(ctx, x: 53, y: 113, w: 26, h: 60)
 
-        // Left thigh
-        let leftThigh = roundedRectPath(rect: CGRect(x: 22, y: 115, width: 26, height: 62).scaled(by: scale), radius: 8 * scale)
-        ctx.fill(leftThigh, with: .color(fillColor))
-        ctx.stroke(leftThigh, with: .color(strokeColor), lineWidth: 0.8)
+        // Knees
+        bodyEllipse(ctx, x: 22, y: 169, w: 24, h: 11)
+        bodyEllipse(ctx, x: 54, y: 169, w: 24, h: 11)
 
-        // Right thigh
-        let rightThigh = roundedRectPath(rect: CGRect(x: 52, y: 115, width: 26, height: 62).scaled(by: scale), radius: 8 * scale)
-        ctx.fill(rightThigh, with: .color(fillColor))
-        ctx.stroke(rightThigh, with: .color(strokeColor), lineWidth: 0.8)
+        // Calves
+        bodyEllipse(ctx, x: 22, y: 178, w: 23, h: 40)
+        bodyEllipse(ctx, x: 55, y: 178, w: 23, h: 40)
 
-        // Left calf
-        let leftCalf = roundedRectPath(rect: CGRect(x: 23, y: 174, width: 24, height: 46).scaled(by: scale), radius: 6 * scale)
-        ctx.fill(leftCalf, with: .color(fillColor))
-        ctx.stroke(leftCalf, with: .color(strokeColor), lineWidth: 0.8)
-
-        // Right calf
-        let rightCalf = roundedRectPath(rect: CGRect(x: 53, y: 174, width: 24, height: 46).scaled(by: scale), radius: 6 * scale)
-        ctx.fill(rightCalf, with: .color(fillColor))
-        ctx.stroke(rightCalf, with: .color(strokeColor), lineWidth: 0.8)
+        // Feet
+        bodyEllipse(ctx, x: 21, y: 215, w: 24, h: 8)
+        bodyEllipse(ctx, x: 55, y: 215, w: 24, h: 8)
     }
 
-    private func drawMuscleRegion(ctx: GraphicsContext, scale: CGFloat, rect: CGRect, muscle: String, cornerRadius: CGFloat) {
+    // MARK: Muscles
+
+    private func drawMuscles(ctx: GraphicsContext) {
+        // Chest (two pecs)
+        muscleEllipse(ctx, x: 29, y: 34, w: 20, h: 22, muscle: "chest")
+        muscleEllipse(ctx, x: 51, y: 34, w: 20, h: 22, muscle: "chest")
+
+        // Shoulders (front deltoids)
+        muscleEllipse(ctx, x: 13, y: 29, w: 17, h: 15, muscle: "shoulders")
+        muscleEllipse(ctx, x: 70, y: 29, w: 17, h: 15, muscle: "shoulders")
+
+        // Biceps
+        muscleEllipse(ctx, x: 10, y: 47, w: 13, h: 28, muscle: "biceps")
+        muscleEllipse(ctx, x: 77, y: 47, w: 13, h: 28, muscle: "biceps")
+
+        // Forearms
+        muscleEllipse(ctx, x: 11, y: 84, w: 11, h: 22, muscle: "forearms")
+        muscleEllipse(ctx, x: 78, y: 84, w: 11, h: 22, muscle: "forearms")
+
+        // Abs (6-pack segments)
+        absSegments(ctx)
+
+        // Quads
+        muscleEllipse(ctx, x: 23, y: 118, w: 22, h: 50, muscle: "quads")
+        muscleEllipse(ctx, x: 55, y: 118, w: 22, h: 50, muscle: "quads")
+
+        // Calves
+        muscleEllipse(ctx, x: 24, y: 180, w: 17, h: 34, muscle: "calves")
+        muscleEllipse(ctx, x: 59, y: 180, w: 17, h: 34, muscle: "calves")
+    }
+
+    // 6-pack style abs: 3 rows of 2 oval segments
+    private func absSegments(_ ctx: GraphicsContext) {
+        let sets = muscleVolume["abs"] ?? 0
+        guard sets > 0 else { return }
+        let opacity = muscleOpacity(sets)
+        let color = (RQColors.muscleGroupColors["abs"] ?? RQColors.accent).opacity(opacity)
+        for row in 0..<3 {
+            let y: CGFloat = 60 + CGFloat(row) * 14
+            let leftPath = Path(ellipseIn: CGRect(x: sc(35), y: sc(y), width: sc(12), height: sc(11)))
+            let rightPath = Path(ellipseIn: CGRect(x: sc(53), y: sc(y), width: sc(12), height: sc(11)))
+            ctx.fill(leftPath, with: .color(color))
+            ctx.fill(rightPath, with: .color(color))
+        }
+    }
+
+    // MARK: Torso path — V-taper: broad shoulders, narrow waist, slight hip flare
+
+    private func torsoPath() -> Path {
+        var p = Path()
+        p.move(to: sp(55, 30))
+        // Right shoulder
+        p.addQuadCurve(to: sp(73, 40), control: sp(70, 30))
+        // Right armpit
+        p.addQuadCurve(to: sp(73, 58), control: sp(78, 50))
+        // Right side to waist
+        p.addQuadCurve(to: sp(68, 88), control: sp(73, 72))
+        // Right hip flare
+        p.addQuadCurve(to: sp(72, 106), control: sp(68, 98))
+        // Bottom
+        p.addLine(to: sp(28, 106))
+        // Left hip
+        p.addQuadCurve(to: sp(32, 88), control: sp(32, 98))
+        // Left waist
+        p.addQuadCurve(to: sp(27, 58), control: sp(27, 72))
+        // Left armpit
+        p.addQuadCurve(to: sp(27, 40), control: sp(22, 50))
+        // Left shoulder back to neck
+        p.addQuadCurve(to: sp(45, 30), control: sp(30, 30))
+        p.closeSubpath()
+        return p
+    }
+
+    // MARK: Helpers
+
+    private func sc(_ v: CGFloat) -> CGFloat { v * scale }
+    private func sp(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: x * scale, y: y * scale) }
+
+    private func bodyEllipse(_ ctx: GraphicsContext, x: CGFloat, y: CGFloat, w: CGFloat, h: CGFloat) {
+        let path = Path(ellipseIn: CGRect(x: sc(x), y: sc(y), width: sc(w), height: sc(h)))
+        ctx.fill(path, with: .color(kBodyFill))
+        ctx.stroke(path, with: .color(kBodyStroke), lineWidth: 0.8)
+    }
+
+    private func muscleEllipse(_ ctx: GraphicsContext, x: CGFloat, y: CGFloat, w: CGFloat, h: CGFloat, muscle: String) {
         let sets = muscleVolume[muscle] ?? 0
         guard sets > 0 else { return }
-        let baseColor = RQColors.muscleGroupColors[muscle] ?? RQColors.accent
-        let opacity = min(0.25 + Double(sets) * 0.15, 0.85)
-        let path = roundedRectPath(rect: rect.scaled(by: scale), radius: cornerRadius * scale)
-        ctx.fill(path, with: .color(baseColor.opacity(opacity)))
+        let color = (RQColors.muscleGroupColors[muscle] ?? RQColors.accent).opacity(muscleOpacity(sets))
+        ctx.fill(Path(ellipseIn: CGRect(x: sc(x), y: sc(y), width: sc(w), height: sc(h))), with: .color(color))
     }
 }
 
@@ -222,108 +264,129 @@ private struct BackBodyView: View {
 
     var body: some View {
         Canvas { ctx, _ in
-            drawBodyOutline(ctx: ctx, scale: scale)
-
-            drawMuscleRegion(ctx: ctx, scale: scale, rect: CGRect(x: 30, y: 28, width: 40, height: 26),
-                             muscle: "back", cornerRadius: 6)
-            drawMuscleRegion(ctx: ctx, scale: scale, rect: CGRect(x: 20, y: 52, width: 22, height: 42),
-                             muscle: "back", cornerRadius: 6)
-            drawMuscleRegion(ctx: ctx, scale: scale, rect: CGRect(x: 58, y: 52, width: 22, height: 42),
-                             muscle: "back", cornerRadius: 6)
-            drawMuscleRegion(ctx: ctx, scale: scale, rect: CGRect(x: 11, y: 48, width: 16, height: 30),
-                             muscle: "triceps", cornerRadius: 5)
-            drawMuscleRegion(ctx: ctx, scale: scale, rect: CGRect(x: 73, y: 48, width: 16, height: 30),
-                             muscle: "triceps", cornerRadius: 5)
-            drawMuscleRegion(ctx: ctx, scale: scale, rect: CGRect(x: 12, y: 79, width: 14, height: 26),
-                             muscle: "forearms", cornerRadius: 4)
-            drawMuscleRegion(ctx: ctx, scale: scale, rect: CGRect(x: 74, y: 79, width: 14, height: 26),
-                             muscle: "forearms", cornerRadius: 4)
-            drawMuscleRegion(ctx: ctx, scale: scale, rect: CGRect(x: 22, y: 103, width: 27, height: 20),
-                             muscle: "glutes", cornerRadius: 5)
-            drawMuscleRegion(ctx: ctx, scale: scale, rect: CGRect(x: 51, y: 103, width: 27, height: 20),
-                             muscle: "glutes", cornerRadius: 5)
-            drawMuscleRegion(ctx: ctx, scale: scale, rect: CGRect(x: 22, y: 118, width: 25, height: 55),
-                             muscle: "hamstrings", cornerRadius: 7)
-            drawMuscleRegion(ctx: ctx, scale: scale, rect: CGRect(x: 53, y: 118, width: 25, height: 55),
-                             muscle: "hamstrings", cornerRadius: 7)
-            drawMuscleRegion(ctx: ctx, scale: scale, rect: CGRect(x: 23, y: 177, width: 23, height: 42),
-                             muscle: "calves", cornerRadius: 5)
-            drawMuscleRegion(ctx: ctx, scale: scale, rect: CGRect(x: 54, y: 177, width: 23, height: 42),
-                             muscle: "calves", cornerRadius: 5)
+            drawSilhouette(ctx: ctx)
+            drawMuscles(ctx: ctx)
         }
     }
 
-    private func drawBodyOutline(ctx: GraphicsContext, scale: CGFloat) {
-        let fillColor = Color(hex: "1A1A1A")
-        let strokeColor = Color(hex: "333333")
+    // MARK: Silhouette (mirrors front)
 
-        let head = Path(ellipseIn: CGRect(x: 38, y: 2, width: 24, height: 24).scaled(by: scale))
-        ctx.fill(head, with: .color(fillColor))
-        ctx.stroke(head, with: .color(strokeColor), lineWidth: 0.8)
+    private func drawSilhouette(ctx: GraphicsContext) {
+        let torso = torsoPath()
+        ctx.fill(torso, with: .color(kBodyFill))
+        ctx.stroke(torso, with: .color(kBodyStroke), lineWidth: 0.8)
 
-        let neck = Path(CGRect(x: 46, y: 25, width: 8, height: 8).scaled(by: scale))
-        ctx.fill(neck, with: .color(fillColor))
+        bodyEllipse(ctx, x: 38, y: 2, w: 24, h: 26)
+        bodyEllipse(ctx, x: 46, y: 26, w: 8, h: 8)
 
-        let leftUArm = roundedRectPath(rect: CGRect(x: 10, y: 28, width: 20, height: 52).scaled(by: scale), radius: 8 * scale)
-        ctx.fill(leftUArm, with: .color(fillColor))
-        ctx.stroke(leftUArm, with: .color(strokeColor), lineWidth: 0.8)
+        bodyEllipse(ctx, x: 12, y: 28, w: 20, h: 17)
+        bodyEllipse(ctx, x: 68, y: 28, w: 20, h: 17)
 
-        let rightUArm = roundedRectPath(rect: CGRect(x: 70, y: 28, width: 20, height: 52).scaled(by: scale), radius: 8 * scale)
-        ctx.fill(rightUArm, with: .color(fillColor))
-        ctx.stroke(rightUArm, with: .color(strokeColor), lineWidth: 0.8)
+        bodyEllipse(ctx, x: 9, y: 40, w: 18, h: 44)
+        bodyEllipse(ctx, x: 73, y: 40, w: 18, h: 44)
 
-        let leftFArm = roundedRectPath(rect: CGRect(x: 11, y: 79, width: 17, height: 30).scaled(by: scale), radius: 6 * scale)
-        ctx.fill(leftFArm, with: .color(fillColor))
-        ctx.stroke(leftFArm, with: .color(strokeColor), lineWidth: 0.8)
+        bodyEllipse(ctx, x: 10, y: 82, w: 16, h: 28)
+        bodyEllipse(ctx, x: 74, y: 82, w: 16, h: 28)
 
-        let rightFArm = roundedRectPath(rect: CGRect(x: 72, y: 79, width: 17, height: 30).scaled(by: scale), radius: 6 * scale)
-        ctx.fill(rightFArm, with: .color(fillColor))
-        ctx.stroke(rightFArm, with: .color(strokeColor), lineWidth: 0.8)
+        bodyEllipse(ctx, x: 12, y: 108, w: 13, h: 9)
+        bodyEllipse(ctx, x: 75, y: 108, w: 13, h: 9)
 
-        let torso = roundedRectPath(rect: CGRect(x: 27, y: 27, width: 46, height: 78).scaled(by: scale), radius: 10 * scale)
-        ctx.fill(torso, with: .color(fillColor))
-        ctx.stroke(torso, with: .color(strokeColor), lineWidth: 0.8)
+        bodyEllipse(ctx, x: 21, y: 103, w: 58, h: 16)
 
-        let hips = roundedRectPath(rect: CGRect(x: 22, y: 103, width: 56, height: 20).scaled(by: scale), radius: 6 * scale)
-        ctx.fill(hips, with: .color(fillColor))
+        bodyEllipse(ctx, x: 21, y: 113, w: 26, h: 60)
+        bodyEllipse(ctx, x: 53, y: 113, w: 26, h: 60)
 
-        let leftThigh = roundedRectPath(rect: CGRect(x: 22, y: 115, width: 26, height: 62).scaled(by: scale), radius: 8 * scale)
-        ctx.fill(leftThigh, with: .color(fillColor))
-        ctx.stroke(leftThigh, with: .color(strokeColor), lineWidth: 0.8)
+        bodyEllipse(ctx, x: 22, y: 169, w: 24, h: 11)
+        bodyEllipse(ctx, x: 54, y: 169, w: 24, h: 11)
 
-        let rightThigh = roundedRectPath(rect: CGRect(x: 52, y: 115, width: 26, height: 62).scaled(by: scale), radius: 8 * scale)
-        ctx.fill(rightThigh, with: .color(fillColor))
-        ctx.stroke(rightThigh, with: .color(strokeColor), lineWidth: 0.8)
+        bodyEllipse(ctx, x: 22, y: 178, w: 23, h: 40)
+        bodyEllipse(ctx, x: 55, y: 178, w: 23, h: 40)
 
-        let leftCalf = roundedRectPath(rect: CGRect(x: 23, y: 174, width: 24, height: 46).scaled(by: scale), radius: 6 * scale)
-        ctx.fill(leftCalf, with: .color(fillColor))
-        ctx.stroke(leftCalf, with: .color(strokeColor), lineWidth: 0.8)
-
-        let rightCalf = roundedRectPath(rect: CGRect(x: 53, y: 174, width: 24, height: 46).scaled(by: scale), radius: 6 * scale)
-        ctx.fill(rightCalf, with: .color(fillColor))
-        ctx.stroke(rightCalf, with: .color(strokeColor), lineWidth: 0.8)
+        bodyEllipse(ctx, x: 21, y: 215, w: 24, h: 8)
+        bodyEllipse(ctx, x: 55, y: 215, w: 24, h: 8)
     }
 
-    private func drawMuscleRegion(ctx: GraphicsContext, scale: CGFloat, rect: CGRect, muscle: String, cornerRadius: CGFloat) {
+    // MARK: Muscles
+
+    private func drawMuscles(ctx: GraphicsContext) {
+        // Trapezius
+        muscleEllipse(ctx, x: 30, y: 28, w: 40, h: 20, muscle: "back")
+        // Lats (left + right)
+        muscleEllipse(ctx, x: 21, y: 46, w: 22, h: 42, muscle: "back")
+        muscleEllipse(ctx, x: 57, y: 46, w: 22, h: 42, muscle: "back")
+        // Lower back
+        muscleEllipse(ctx, x: 36, y: 85, w: 28, h: 16, muscle: "back")
+
+        // Rear deltoids
+        muscleEllipse(ctx, x: 13, y: 29, w: 17, h: 15, muscle: "shoulders")
+        muscleEllipse(ctx, x: 70, y: 29, w: 17, h: 15, muscle: "shoulders")
+
+        // Triceps
+        muscleEllipse(ctx, x: 10, y: 47, w: 13, h: 28, muscle: "triceps")
+        muscleEllipse(ctx, x: 77, y: 47, w: 13, h: 28, muscle: "triceps")
+
+        // Forearms (back)
+        muscleEllipse(ctx, x: 11, y: 84, w: 11, h: 22, muscle: "forearms")
+        muscleEllipse(ctx, x: 78, y: 84, w: 11, h: 22, muscle: "forearms")
+
+        // Glutes
+        muscleEllipse(ctx, x: 22, y: 104, w: 26, h: 20, muscle: "glutes")
+        muscleEllipse(ctx, x: 52, y: 104, w: 26, h: 20, muscle: "glutes")
+
+        // Hamstrings
+        muscleEllipse(ctx, x: 23, y: 118, w: 22, h: 48, muscle: "hamstrings")
+        muscleEllipse(ctx, x: 55, y: 118, w: 22, h: 48, muscle: "hamstrings")
+
+        // Calves (back)
+        muscleEllipse(ctx, x: 24, y: 180, w: 17, h: 34, muscle: "calves")
+        muscleEllipse(ctx, x: 59, y: 180, w: 17, h: 34, muscle: "calves")
+    }
+
+    // MARK: Torso path (same shape as front — symmetric silhouette)
+
+    private func torsoPath() -> Path {
+        var p = Path()
+        p.move(to: sp(55, 30))
+        p.addQuadCurve(to: sp(73, 40), control: sp(70, 30))
+        p.addQuadCurve(to: sp(73, 58), control: sp(78, 50))
+        p.addQuadCurve(to: sp(68, 88), control: sp(73, 72))
+        p.addQuadCurve(to: sp(72, 106), control: sp(68, 98))
+        p.addLine(to: sp(28, 106))
+        p.addQuadCurve(to: sp(32, 88), control: sp(32, 98))
+        p.addQuadCurve(to: sp(27, 58), control: sp(27, 72))
+        p.addQuadCurve(to: sp(27, 40), control: sp(22, 50))
+        p.addQuadCurve(to: sp(45, 30), control: sp(30, 30))
+        p.closeSubpath()
+        return p
+    }
+
+    // MARK: Helpers
+
+    private func sc(_ v: CGFloat) -> CGFloat { v * scale }
+    private func sp(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: x * scale, y: y * scale) }
+
+    private func bodyEllipse(_ ctx: GraphicsContext, x: CGFloat, y: CGFloat, w: CGFloat, h: CGFloat) {
+        let path = Path(ellipseIn: CGRect(x: sc(x), y: sc(y), width: sc(w), height: sc(h)))
+        ctx.fill(path, with: .color(kBodyFill))
+        ctx.stroke(path, with: .color(kBodyStroke), lineWidth: 0.8)
+    }
+
+    private func muscleEllipse(_ ctx: GraphicsContext, x: CGFloat, y: CGFloat, w: CGFloat, h: CGFloat, muscle: String) {
         let sets = muscleVolume[muscle] ?? 0
         guard sets > 0 else { return }
-        let baseColor = RQColors.muscleGroupColors[muscle] ?? RQColors.accent
-        let opacity = min(0.25 + Double(sets) * 0.15, 0.85)
-        let path = roundedRectPath(rect: rect.scaled(by: scale), radius: cornerRadius * scale)
-        ctx.fill(path, with: .color(baseColor.opacity(opacity)))
+        let color = (RQColors.muscleGroupColors[muscle] ?? RQColors.accent).opacity(muscleOpacity(sets))
+        ctx.fill(Path(ellipseIn: CGRect(x: sc(x), y: sc(y), width: sc(w), height: sc(h))), with: .color(color))
     }
 }
 
-// MARK: - Shared Drawing Helpers
+// MARK: - Shared Constants
 
-private func roundedRectPath(rect: CGRect, radius: CGFloat) -> Path {
-    Path(roundedRect: rect, cornerRadius: radius)
-}
+private let kBodyFill = Color(hex: "1C1C2E")
+private let kBodyStroke = Color(hex: "3C3C5C")
 
-private extension CGRect {
-    func scaled(by factor: CGFloat) -> CGRect {
-        CGRect(x: minX * factor, y: minY * factor, width: width * factor, height: height * factor)
-    }
+/// Intensity from set count: 0.30 at 1 set → 0.85 at 5+ sets
+private func muscleOpacity(_ sets: Int) -> Double {
+    min(0.30 + Double(sets - 1) * 0.14, 0.85)
 }
 
 // MARK: - Flow Layout (wrapping HStack)
