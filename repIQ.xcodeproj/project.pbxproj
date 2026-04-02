@@ -11,6 +11,7 @@
 		059E37882F6670B30051D387 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 059E37872F6670B30051D387 /* SwiftUI.framework */; };
 		059E37932F6670B40051D387 /* repIQWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 059E37832F6670B30051D387 /* repIQWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		05F2098D2F57CBE700E0AE4C /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = AABB00022F57000100000002 /* Supabase */; };
+		AABB00052F57000100000005 /* MuscleMap in Frameworks */ = {isa = PBXBuildFile; productRef = AABB00042F57000100000004 /* MuscleMap */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -85,6 +86,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				05F2098D2F57CBE700E0AE4C /* Supabase in Frameworks */,
+				AABB00052F57000100000005 /* MuscleMap in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -164,6 +166,7 @@
 			name = repIQ;
 			packageProductDependencies = (
 				AABB00022F57000100000002 /* Supabase */,
+				AABB00042F57000100000004 /* MuscleMap */,
 			);
 			productName = repIQ;
 			productReference = 05F208252F56CC0D00E0AE4C /* repIQ.app */;
@@ -198,6 +201,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				AABB00012F57000100000001 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+				AABB00032F57000100000003 /* XCRemoteSwiftPackageReference "MuscleMap" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 05F208262F56CC0D00E0AE4C /* Products */;
@@ -533,6 +537,14 @@
 				minimumVersion = 2.0.0;
 			};
 		};
+		AABB00032F57000100000003 /* XCRemoteSwiftPackageReference "MuscleMap" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/melihcolpan/MuscleMap";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.6.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -540,6 +552,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = AABB00012F57000100000001 /* XCRemoteSwiftPackageReference "supabase-swift" */;
 			productName = Supabase;
+		};
+		AABB00042F57000100000004 /* MuscleMap */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AABB00032F57000100000003 /* XCRemoteSwiftPackageReference "MuscleMap" */;
+			productName = MuscleMap;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
