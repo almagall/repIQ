@@ -8,6 +8,7 @@ struct SessionDetailView: View {
     @State private var editedSets: [UUID: EditableSet] = [:]
     @State private var editedDate: Date = Date()
     @State private var isSaving = false
+    @State private var showSummary = false
 
     private let workoutService = WorkoutService()
 
@@ -105,6 +106,12 @@ struct SessionDetailView: View {
                 } else {
                     Menu {
                         Button {
+                            showSummary = true
+                        } label: {
+                            Label("View Summary", systemImage: "chart.bar.doc.horizontal")
+                        }
+
+                        Button {
                             enterEditMode()
                         } label: {
                             Label("Edit Workout", systemImage: "pencil")
@@ -128,6 +135,15 @@ struct SessionDetailView: View {
         }
         .task {
             await viewModel.loadSessionDetail(sessionId: sessionId)
+        }
+        .fullScreenCover(isPresented: $showSummary) {
+            if let detail = viewModel.sessionDetail {
+                let name = viewModel.templateName(for: detail.session) ?? ""
+                let day = viewModel.dayName(for: detail.session) ?? ""
+                WorkoutSummaryView(summary: detail.buildSummaryData(workoutName: name, dayName: day)) {
+                    showSummary = false
+                }
+            }
         }
     }
 

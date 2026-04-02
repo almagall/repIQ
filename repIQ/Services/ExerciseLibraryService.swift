@@ -45,6 +45,19 @@ struct ExerciseLibraryService: Sendable {
         return Dictionary(uniqueKeysWithValues: exercises.map { ($0.id, $0.name) })
     }
 
+    /// Fetches both name and muscle group for a set of exercise IDs in a single query.
+    func fetchExerciseNamesAndMuscleGroups(_ ids: [UUID]) async throws -> (names: [UUID: String], muscleGroups: [UUID: String]) {
+        guard !ids.isEmpty else { return ([:], [:]) }
+        let exercises: [Exercise] = try await supabase.from("exercises")
+            .select()
+            .in("id", values: ids.map(\.uuidString))
+            .execute()
+            .value
+        let names = Dictionary(uniqueKeysWithValues: exercises.map { ($0.id, $0.name) })
+        let muscleGroups = Dictionary(uniqueKeysWithValues: exercises.map { ($0.id, $0.muscleGroup) })
+        return (names, muscleGroups)
+    }
+
     func createCustomExercise(
         userId: UUID,
         name: String,
