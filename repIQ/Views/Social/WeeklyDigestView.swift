@@ -253,7 +253,7 @@ struct WeeklyDigestView: View {
     private func topPerformerName(_ digest: WeeklyDigest) -> String {
         if let performerId = digest.topPerformerId {
             let friend = viewModel.friends.first { $0.friendId == performerId }
-            return friend?.friendProfile?.displayName ?? "—"
+            return friend?.friendProfile?.username ?? "—"
         }
         return "—"
     }
