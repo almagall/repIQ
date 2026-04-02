@@ -421,21 +421,21 @@ struct OnboardingView: View {
                     step: "1",
                     icon: "figure.strengthtraining.traditional",
                     title: "Baseline Sessions",
-                    description: "Your first workout for each exercise establishes a baseline. Pick a comfortable weight and focus on form. No targets yet — just log what you do."
+                    description: "Each exercise in your program starts without targets. Your first session per exercise is a baseline — use a weight you can control and focus on form. On a typical weekly program this means your first full week feels like an introduction. From your second session with each exercise onward, personalized targets kick in."
                 )
 
                 howItWorksCard(
                     step: "2",
                     icon: "chart.line.uptrend.xyaxis",
                     title: "Smart Targets Appear",
-                    description: "Starting from your second session, repIQ generates personalized weight, rep, and RPE targets for every set based on your actual performance."
+                    description: "From your second session per exercise, repIQ generates weight, rep, and RPE targets. RPE (Rate of Perceived Exertion) is a 1–10 effort scale — RPE 8 means roughly 2 reps left before failure. A target might read: 185 lbs × 8 reps @ RPE 8. Everything is calibrated to your actual performance, not generic charts."
                 )
 
                 howItWorksCard(
                     step: "3",
                     icon: "arrow.up.right.circle",
                     title: "Automatic Progression",
-                    description: "The app tracks your trends and adjusts. Improving? It pushes you forward. Plateauing? It adapts. Need recovery? It suggests a deload."
+                    description: "The engine adapts to your goal. For hypertrophy, it adds reps first and bumps the weight once you hit your rep ceiling — a double-progression model. For strength, it drives weight up each week using ramping sets that increase load and intensity. If fatigue builds in your RPE data or performance drops, it schedules a deload week so you recover before pushing harder."
                 )
             }
 
