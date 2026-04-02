@@ -266,7 +266,7 @@ struct ProgressionRaceView: View {
     // MARK: - Helpers
 
     private var friendName: String {
-        friend.friendProfile?.displayName ?? "Friend"
+        friend.friendProfile?.username ?? "Friend"
     }
 
     private func loadCommonExercises() async {

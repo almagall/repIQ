@@ -193,21 +193,15 @@ struct MatchmakingView: View {
                         .fill(RQColors.accent.opacity(0.2))
                         .frame(width: 44, height: 44)
                         .overlay(
-                            Text(String((match.profile.displayName ?? "?").prefix(1)).uppercased())
+                            Text(String((match.profile.username ?? "?").prefix(1)).uppercased())
                                 .font(RQTypography.headline)
                                 .foregroundColor(RQColors.accent)
                         )
 
                     VStack(alignment: .leading, spacing: RQSpacing.xxs) {
-                        Text(match.profile.displayName ?? "User")
+                        Text(match.profile.username ?? "User")
                             .font(RQTypography.headline)
                             .foregroundColor(RQColors.textPrimary)
-
-                        if let username = match.profile.username {
-                            Text("@\(username)")
-                                .font(RQTypography.caption)
-                                .foregroundColor(RQColors.textTertiary)
-                        }
                     }
 
                     Spacer()

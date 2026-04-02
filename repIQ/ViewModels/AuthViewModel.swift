@@ -7,7 +7,6 @@ import CryptoKit
 final class AuthViewModel {
     var email = ""
     var password = ""
-    var displayName = ""
     var username = ""
     var isSignUp = false
     var isLoading = false
@@ -23,7 +22,7 @@ final class AuthViewModel {
         let emailValid = email.contains("@") && email.contains(".")
         let passwordValid = password.count >= 6
         if isSignUp {
-            return emailValid && passwordValid && !displayName.isEmpty && isUsernameValid
+            return emailValid && passwordValid && isUsernameValid
         }
         return emailValid && passwordValid
     }
@@ -62,7 +61,6 @@ final class AuthViewModel {
             try await authService.signUp(
                 email: email,
                 password: password,
-                displayName: displayName,
                 username: username.isEmpty ? nil : username
             )
             // If email confirmation is enabled, session won't be set yet.

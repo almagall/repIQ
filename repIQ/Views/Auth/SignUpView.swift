@@ -16,18 +16,6 @@ struct SignUpView: View {
 
     private var signUpForm: some View {
         VStack(spacing: RQSpacing.xl) {
-            // Display Name
-            VStack(alignment: .leading, spacing: RQSpacing.sm) {
-                Text("Name")
-                    .font(RQTypography.subheadline)
-                    .foregroundColor(RQColors.textSecondary)
-                RQTextField(
-                    placeholder: "Your name",
-                    text: $viewModel.displayName,
-                    autocapitalization: .words
-                )
-            }
-
             // Username
             VStack(alignment: .leading, spacing: RQSpacing.sm) {
                 Text("Username")

@@ -92,7 +92,7 @@ struct ChallengesView: View {
                     Text(challenge.challengeType.displayName)
                         .font(RQTypography.headline)
                         .foregroundColor(RQColors.textPrimary)
-                    Text("from \(challenge.challengerProfile?.displayName ?? "Someone")")
+                    Text("from \(challenge.challengerProfile?.username ?? "Someone")")
                         .font(RQTypography.caption)
                         .foregroundColor(RQColors.textTertiary)
                 }
@@ -146,8 +146,8 @@ struct ChallengesView: View {
         let myScore = isChallenger ? challenge.challengerScore : challenge.challengedScore
         let theirScore = isChallenger ? challenge.challengedScore : challenge.challengerScore
         let opponentName = isChallenger
-            ? (challenge.challengedProfile?.displayName ?? "Opponent")
-            : (challenge.challengerProfile?.displayName ?? "Opponent")
+            ? (challenge.challengedProfile?.username ?? "Opponent")
+            : (challenge.challengerProfile?.username ?? "Opponent")
         let winning = myScore > theirScore
 
         return VStack(alignment: .leading, spacing: RQSpacing.md) {
@@ -236,7 +236,7 @@ struct ChallengesView: View {
                 Text(challenge.challengeType.displayName)
                     .font(RQTypography.headline)
                     .foregroundColor(RQColors.textPrimary)
-                Text("Sent to \(challenge.challengedProfile?.displayName ?? "Someone")")
+                Text("Sent to \(challenge.challengedProfile?.username ?? "Someone")")
                     .font(RQTypography.caption)
                     .foregroundColor(RQColors.textTertiary)
             }
@@ -443,12 +443,12 @@ struct CreateChallengeView: View {
                                         .fill(RQColors.accent.opacity(0.2))
                                         .frame(width: 32, height: 32)
                                         .overlay(
-                                            Text(String((friendship.friendProfile?.displayName ?? "?").prefix(1)).uppercased())
+                                            Text(String((friendship.friendProfile?.username ?? "?").prefix(1)).uppercased())
                                                 .font(.system(size: 12, weight: .bold))
                                                 .foregroundColor(RQColors.accent)
                                         )
 
-                                    Text(friendship.friendProfile?.displayName ?? "Friend")
+                                    Text(friendship.friendProfile?.username ?? "Friend")
                                         .font(RQTypography.body)
                                         .foregroundColor(RQColors.textPrimary)
 

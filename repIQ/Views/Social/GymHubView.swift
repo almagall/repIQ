@@ -170,14 +170,14 @@ struct GymHubView: View {
                     .fill(RQColors.accent.opacity(0.2))
                     .frame(width: 40, height: 40)
                     .overlay(
-                        Text(String((member.username ?? member.displayName ?? "?").prefix(1)).uppercased())
+                        Text(String((member.username ?? "?").prefix(1)).uppercased())
                             .font(RQTypography.caption)
                             .fontWeight(.bold)
                             .foregroundColor(RQColors.accent)
                     )
 
                 VStack(alignment: .leading, spacing: RQSpacing.xxs) {
-                    Text(member.username ?? member.displayName ?? "User")
+                    Text(member.username ?? "User")
                         .font(RQTypography.body)
                         .fontWeight(.medium)
                         .foregroundColor(RQColors.textPrimary)
@@ -276,7 +276,7 @@ struct GymHubView: View {
                                 .foregroundColor(RQColors.accent)
                         )
 
-                    Text(item.userProfile?.username ?? item.userProfile?.displayName ?? "User")
+                    Text(item.userProfile?.username ?? "User")
                         .font(RQTypography.caption)
                         .fontWeight(.semibold)
                         .foregroundColor(RQColors.textPrimary)

@@ -15,7 +15,6 @@ enum WeightUnit: String, Codable, CaseIterable {
 struct Profile: Codable, Identifiable, Sendable {
     let id: UUID
     var email: String
-    var displayName: String?
     var username: String?
     var bio: String?
     var weightUnit: WeightUnit?
@@ -28,7 +27,6 @@ struct Profile: Codable, Identifiable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case id, email, username, bio
-        case displayName = "display_name"
         case weightUnit = "weight_unit"
         case restTimerDefault = "rest_timer_default"
         case hasCompletedOnboarding = "has_completed_onboarding"

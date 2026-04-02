@@ -150,7 +150,7 @@ struct ExerciseTipsView: View {
                     Spacer()
 
                     // Author
-                    Text(tip.userProfile?.displayName ?? "User")
+                    Text(tip.userProfile?.username ?? "User")
                         .font(RQTypography.caption)
                         .foregroundColor(RQColors.textTertiary)
                 }
