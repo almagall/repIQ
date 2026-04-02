@@ -324,4 +324,32 @@ struct WorkoutService: Sendable {
 
         return Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0.name) })
     }
+
+    /// Fetches personal records set during a specific session.
+    func fetchSessionPRs(sessionId: UUID) async throws -> [PersonalRecord] {
+        try await supabase.from("personal_records")
+            .select()
+            .eq("session_id", value: sessionId.uuidString)
+            .execute()
+            .value
+    }
+
+    /// Fetches training mode per exercise for a workout day. Returns empty dict if workoutDayId is nil.
+    func fetchExerciseTrainingModes(workoutDayId: UUID?, exerciseIds: [UUID]) async throws -> [UUID: TrainingMode] {
+        guard let dayId = workoutDayId, !exerciseIds.isEmpty else { return [:] }
+
+        struct ModeRow: Decodable {
+            let exercise_id: UUID
+            let training_mode: TrainingMode
+        }
+
+        let rows: [ModeRow] = try await supabase.from("workout_day_exercises")
+            .select("exercise_id, training_mode")
+            .eq("workout_day_id", value: dayId.uuidString)
+            .in("exercise_id", values: exerciseIds.map(\.uuidString))
+            .execute()
+            .value
+
+        return Dictionary(uniqueKeysWithValues: rows.map { ($0.exercise_id, $0.training_mode) })
+    }
 }

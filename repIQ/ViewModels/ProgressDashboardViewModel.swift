@@ -194,13 +194,25 @@ final class ProgressDashboardViewModel {
         do {
             let detail = try await workoutService.fetchSessionDetail(sessionId: sessionId)
             let exerciseIds = Array(Set(detail.sets.map(\.exerciseId)))
-            let (names, muscleGroups) = try await exerciseService.fetchExerciseNamesAndMuscleGroups(exerciseIds)
+
+            async let exerciseTask = exerciseService.fetchExerciseNamesAndMuscleGroups(exerciseIds)
+            async let prsTask = workoutService.fetchSessionPRs(sessionId: sessionId)
+            async let modesTask = workoutService.fetchExerciseTrainingModes(
+                workoutDayId: detail.session.workoutDayId,
+                exerciseIds: exerciseIds
+            )
+
+            let (names, muscleGroups) = try await exerciseTask
+            let prs = try await prsTask
+            let modes = try await modesTask
 
             sessionDetail = SessionWithSets(
                 session: detail.session,
                 sets: detail.sets,
                 exerciseNames: names,
-                exerciseMuscleGroups: muscleGroups
+                exerciseMuscleGroups: muscleGroups,
+                exerciseTrainingModes: modes,
+                sessionPRs: prs
             )
         } catch {
             // Silently handle

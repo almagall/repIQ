@@ -5,12 +5,23 @@ struct SessionWithSets: Identifiable, Sendable {
     let sets: [WorkoutSet]
     let exerciseNames: [UUID: String]
     let exerciseMuscleGroups: [UUID: String]
+    let exerciseTrainingModes: [UUID: TrainingMode]
+    let sessionPRs: [PersonalRecord]
 
-    init(session: WorkoutSession, sets: [WorkoutSet], exerciseNames: [UUID: String], exerciseMuscleGroups: [UUID: String] = [:]) {
+    init(
+        session: WorkoutSession,
+        sets: [WorkoutSet],
+        exerciseNames: [UUID: String],
+        exerciseMuscleGroups: [UUID: String] = [:],
+        exerciseTrainingModes: [UUID: TrainingMode] = [:],
+        sessionPRs: [PersonalRecord] = []
+    ) {
         self.session = session
         self.sets = sets
         self.exerciseNames = exerciseNames
         self.exerciseMuscleGroups = exerciseMuscleGroups
+        self.exerciseTrainingModes = exerciseTrainingModes
+        self.sessionPRs = sessionPRs
     }
 
     var id: UUID { session.id }
@@ -51,7 +62,7 @@ struct SessionWithSets: Identifiable, Sendable {
                 id: group.exerciseId,
                 name: group.name,
                 muscleGroup: exerciseMuscleGroups[group.exerciseId] ?? "",
-                trainingMode: .hypertrophy,
+                trainingMode: exerciseTrainingModes[group.exerciseId] ?? .hypertrophy,
                 setsCompleted: workingSets.count,
                 totalVolume: workingSets.reduce(0) { $0 + $1.volume },
                 topWeight: workingSets.map(\.weight).max() ?? 0,
@@ -59,13 +70,26 @@ struct SessionWithSets: Identifiable, Sendable {
             )
         }
 
-        let prSummaries: [PRSummary] = sets.filter(\.isPR).map { set in
-            PRSummary(
-                exerciseName: exerciseNames[set.exerciseId] ?? "Unknown",
-                recordType: .weight,
-                value: set.weight,
-                previousValue: nil
-            )
+        // Use real PRs from personal_records if available; fall back to WorkoutSet.isPR flags
+        let prSummaries: [PRSummary]
+        if !sessionPRs.isEmpty {
+            prSummaries = sessionPRs.map { pr in
+                PRSummary(
+                    exerciseName: exerciseNames[pr.exerciseId] ?? "Unknown",
+                    recordType: pr.recordType,
+                    value: pr.value,
+                    previousValue: nil
+                )
+            }
+        } else {
+            prSummaries = sets.filter(\.isPR).map { set in
+                PRSummary(
+                    exerciseName: exerciseNames[set.exerciseId] ?? "Unknown",
+                    recordType: .weight,
+                    value: set.weight,
+                    previousValue: nil
+                )
+            }
         }
 
         var data = WorkoutSummaryData(
