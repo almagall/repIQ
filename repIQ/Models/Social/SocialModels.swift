@@ -82,6 +82,7 @@ struct SocialProfile: Codable, Identifiable, Sendable {
     var experienceLevel: String?
     var preferredFrequency: Int?
     var gymName: String?
+    var gymAddress: String?
     var gymPlaceId: String?
     var gymLatitude: Double?
     var gymLongitude: Double?
@@ -103,6 +104,7 @@ struct SocialProfile: Codable, Identifiable, Sendable {
         case experienceLevel = "experience_level"
         case preferredFrequency = "preferred_frequency"
         case gymName = "gym_name"
+        case gymAddress = "gym_address"
         case gymPlaceId = "gym_place_id"
         case gymLatitude = "gym_latitude"
         case gymLongitude = "gym_longitude"

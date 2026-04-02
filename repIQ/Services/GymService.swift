@@ -46,12 +46,13 @@ struct GymService: Sendable {
             .execute()
     }
 
-    /// Fetches all users at the same gym (by place ID), excluding the current user.
+    /// Fetches public users at the same gym (by place ID), excluding the current user.
     func fetchGymMembers(placeId: String, excludeUserId: UUID) async throws -> [SocialProfile] {
         try await supabase.from("profiles")
             .select()
             .eq("gym_place_id", value: placeId)
             .neq("id", value: excludeUserId.uuidString)
+            .eq("privacy_level", value: PrivacyLevel.public_.rawValue)
             .execute()
             .value
     }
