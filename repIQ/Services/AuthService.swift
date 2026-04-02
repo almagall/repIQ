@@ -3,19 +3,29 @@ import Supabase
 import AuthenticationServices
 
 struct AuthService: Sendable {
-    func signUp(email: String, password: String, displayName: String?) async throws {
+    func signUp(email: String, password: String, displayName: String?, username: String?) async throws {
+        // Pass both fields in auth metadata so the DB trigger can pick them up.
+        var metadata: [String: AnyJSON] = [:]
+        if let displayName { metadata["display_name"] = .string(displayName) }
+        if let username { metadata["username"] = .string(username.lowercased()) }
+
         let response = try await supabase.auth.signUp(
             email: email,
             password: password,
-            data: displayName.map { ["display_name": .string($0)] } ?? [:]
+            data: metadata
         )
         // Profile is auto-created by the database trigger.
-        // Update display_name if provided.
-        if let displayName, let userId = response.session?.user.id {
-            try await supabase.from("profiles")
-                .update(["display_name": displayName])
-                .eq("id", value: userId.uuidString)
-                .execute()
+        // If email confirmation is disabled and we have an immediate session, also patch directly.
+        if let userId = response.session?.user.id {
+            var updates: [String: String] = [:]
+            if let displayName { updates["display_name"] = displayName }
+            if let username { updates["username"] = username.lowercased() }
+            if !updates.isEmpty {
+                try await supabase.from("profiles")
+                    .update(updates)
+                    .eq("id", value: userId.uuidString)
+                    .execute()
+            }
         }
     }
 

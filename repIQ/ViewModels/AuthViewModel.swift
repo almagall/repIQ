@@ -8,6 +8,7 @@ final class AuthViewModel {
     var email = ""
     var password = ""
     var displayName = ""
+    var username = ""
     var isSignUp = false
     var isLoading = false
     var errorMessage: String?
@@ -22,9 +23,16 @@ final class AuthViewModel {
         let emailValid = email.contains("@") && email.contains(".")
         let passwordValid = password.count >= 6
         if isSignUp {
-            return emailValid && passwordValid && !displayName.isEmpty
+            return emailValid && passwordValid && !displayName.isEmpty && isUsernameValid
         }
         return emailValid && passwordValid
+    }
+
+    var isUsernameValid: Bool {
+        let trimmed = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 3, trimmed.count <= 20 else { return false }
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_"))
+        return trimmed.unicodeScalars.allSatisfy { allowed.contains($0) }
     }
 
     func signIn() async {
@@ -54,7 +62,8 @@ final class AuthViewModel {
             try await authService.signUp(
                 email: email,
                 password: password,
-                displayName: displayName
+                displayName: displayName,
+                username: username.isEmpty ? nil : username
             )
             // If email confirmation is enabled, session won't be set yet.
             // Check if we got a session — if not, the user needs to confirm email.
@@ -132,6 +141,8 @@ final class AuthViewModel {
             return "Invalid email or password."
         } else if message.contains("already registered") || message.contains("already been registered") {
             return "An account with this email already exists."
+        } else if message.contains("username") && (message.contains("unique") || message.contains("duplicate") || message.contains("already")) {
+            return "That username is already taken. Please choose another."
         } else if message.contains("network") || message.contains("connection") {
             return "Network error. Please check your connection."
         } else if message.contains("weak password") {

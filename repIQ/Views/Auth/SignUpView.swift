@@ -28,6 +28,23 @@ struct SignUpView: View {
                 )
             }
 
+            // Username
+            VStack(alignment: .leading, spacing: RQSpacing.sm) {
+                Text("Username")
+                    .font(RQTypography.subheadline)
+                    .foregroundColor(RQColors.textSecondary)
+                RQTextField(
+                    placeholder: "letters, numbers, underscores",
+                    text: $viewModel.username,
+                    autocapitalization: .never
+                )
+                if !viewModel.username.isEmpty && !viewModel.isUsernameValid {
+                    Text("3–20 characters · letters, numbers, and underscores only")
+                        .font(RQTypography.caption)
+                        .foregroundColor(RQColors.textTertiary)
+                }
+            }
+
             // Email
             VStack(alignment: .leading, spacing: RQSpacing.sm) {
                 Text("Email")
