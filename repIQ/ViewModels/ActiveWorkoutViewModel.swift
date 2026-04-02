@@ -494,9 +494,14 @@ final class ActiveWorkoutViewModel {
             }
 
             let duration = Int(Date().timeIntervalSince(startTime))
+
+            // If the workout was backdated (startedAt is before today),
+            // use startedAt as the completion date so it shows up on the correct day.
+            let isBackdated = !Calendar.current.isDateInToday(startTime)
             try await workoutService.completeSession(
                 sessionId: sessionId,
-                durationSeconds: duration
+                durationSeconds: duration,
+                completionDate: isBackdated ? startTime : nil
             )
 
             // Build exercise summaries

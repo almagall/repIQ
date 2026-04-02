@@ -9,6 +9,7 @@ struct ProfileView: View {
     @State private var isSavingSocial = false
     @State private var gymName: String?
     @State private var gymAddress: String?
+    @State private var showSignOutConfirmation = false
 
     private let restTimerOptions = [60, 90, 120, 150, 180, 210, 240]
 
@@ -151,9 +152,19 @@ struct ProfileView: View {
 
                     // Sign Out
                     RQButton(title: "Sign Out", style: .destructive) {
-                        Task { await viewModel.signOut() }
+                        showSignOutConfirmation = true
                     }
                     .padding(.top, RQSpacing.lg)
+                    .confirmationDialog(
+                        "Are you sure you want to sign out?",
+                        isPresented: $showSignOutConfirmation,
+                        titleVisibility: .visible
+                    ) {
+                        Button("Sign Out", role: .destructive) {
+                            Task { await viewModel.signOut() }
+                        }
+                        Button("Cancel", role: .cancel) {}
+                    }
                 }
                 .padding(.horizontal, RQSpacing.screenHorizontal)
                 .padding(.top, RQSpacing.lg)

@@ -169,10 +169,13 @@ struct WorkoutService: Sendable {
     }
 
     /// Updates session status to completed with timestamps.
+    /// When `completionDate` is provided (e.g. for backdated workouts), it is used
+    /// instead of the current time for `completed_at`.
     func completeSession(
         sessionId: UUID,
         durationSeconds: Int,
-        notes: String? = nil
+        notes: String? = nil,
+        completionDate: Date? = nil
     ) async throws {
         struct UpdateSession: Encodable {
             let status: String
@@ -186,7 +189,7 @@ struct WorkoutService: Sendable {
 
         let payload = UpdateSession(
             status: "completed",
-            completed_at: formatter.string(from: Date()),
+            completed_at: formatter.string(from: completionDate ?? Date()),
             duration_seconds: durationSeconds,
             notes: notes
         )
