@@ -3,11 +3,11 @@ import Supabase
 
 // MARK: - Helper Structs for Progress Queries
 
-private struct ProgressCountRow: Decodable, Sendable { let count: Int }
-private struct ProgressProfileRow: Decodable, Sendable { let current_streak: Int; let longest_streak: Int }
-private struct ProgressVolumeRow: Decodable, Sendable { let total_volume: Double }
-private struct ProgressExerciseRow: Decodable, Sendable { let exercise_id: UUID }
-private struct ProgressMuscleRow: Decodable, Sendable { let muscle_group: String }
+nonisolated private struct ProgressCountRow: Decodable, Sendable { let count: Int }
+nonisolated private struct ProgressProfileRow: Decodable, Sendable { let current_streak: Int; let longest_streak: Int }
+nonisolated private struct ProgressVolumeRow: Decodable, Sendable { let total_volume: Double }
+nonisolated private struct ProgressExerciseRow: Decodable, Sendable { let exercise_id: UUID }
+nonisolated private struct ProgressMuscleRow: Decodable, Sendable { let muscle_group: String }
 
 /// Manages IQ points, streaks, leagues, and badges.
 /// No gems, no streak freezes — all rewards are earned through actual training.

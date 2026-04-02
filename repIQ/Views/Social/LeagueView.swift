@@ -43,7 +43,7 @@ struct LeagueView: View {
 
                 // Total IQ
                 VStack(alignment: .trailing, spacing: RQSpacing.xxs) {
-                    Text("\(viewModel.totalIQ ?? 0)")
+                    Text("\(viewModel.totalIQ)")
                         .font(RQTypography.numbers)
                         .foregroundColor(RQColors.accent)
                     Text("TOTAL IQ")
