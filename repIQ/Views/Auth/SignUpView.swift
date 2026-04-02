@@ -5,6 +5,16 @@ struct SignUpView: View {
     @Bindable var viewModel: AuthViewModel
 
     var body: some View {
+        if viewModel.successMessage != nil {
+            emailConfirmationView
+        } else {
+            signUpForm
+        }
+    }
+
+    // MARK: - Sign Up Form
+
+    private var signUpForm: some View {
         VStack(spacing: RQSpacing.xl) {
             // Display Name
             VStack(alignment: .leading, spacing: RQSpacing.sm) {
@@ -41,18 +51,6 @@ struct SignUpView: View {
                     text: $viewModel.password,
                     isSecure: true
                 )
-            }
-
-            // Success
-            if let success = viewModel.successMessage {
-                Text(success)
-                    .font(RQTypography.footnote)
-                    .foregroundColor(RQColors.success)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, RQSpacing.md)
-                    .padding(.vertical, RQSpacing.sm)
-                    .background(RQColors.success.opacity(0.1))
-                    .cornerRadius(RQRadius.small)
             }
 
             // Error
@@ -117,5 +115,67 @@ struct SignUpView: View {
                 .font(RQTypography.subheadline)
             }
         }
+    }
+
+    // MARK: - Email Confirmation Screen
+
+    private var emailConfirmationView: some View {
+        VStack(spacing: RQSpacing.xl) {
+            Spacer()
+
+            // Icon
+            ZStack {
+                Circle()
+                    .fill(RQColors.accent.opacity(0.1))
+                    .frame(width: 96, height: 96)
+                Image(systemName: "envelope.badge.fill")
+                    .font(.system(size: 40))
+                    .foregroundColor(RQColors.accent)
+            }
+
+            // Copy
+            VStack(spacing: RQSpacing.sm) {
+                Text("Check your inbox")
+                    .font(RQTypography.title2)
+                    .foregroundColor(RQColors.textPrimary)
+
+                Text("We sent a confirmation link to")
+                    .font(RQTypography.body)
+                    .foregroundColor(RQColors.textSecondary)
+
+                Text(viewModel.email)
+                    .font(RQTypography.body)
+                    .fontWeight(.semibold)
+                    .foregroundColor(RQColors.accent)
+
+                Text("Tap the link in the email to activate your account, then come back and sign in.")
+                    .font(RQTypography.subheadline)
+                    .foregroundColor(RQColors.textTertiary)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, RQSpacing.xs)
+            }
+
+            Spacer()
+
+            // Back to Sign In
+            RQButton(title: "Go to Sign In") {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    viewModel.successMessage = nil
+                    viewModel.isSignUp = false
+                    viewModel.password = ""
+                }
+            }
+
+            // Didn't receive it note
+            Text("Didn't get it? Check your spam folder.")
+                .font(RQTypography.caption)
+                .foregroundColor(RQColors.textTertiary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(.horizontal, RQSpacing.screenHorizontal)
+        .transition(.asymmetric(
+            insertion: .move(edge: .trailing).combined(with: .opacity),
+            removal: .move(edge: .leading).combined(with: .opacity)
+        ))
     }
 }
