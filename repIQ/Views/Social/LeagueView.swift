@@ -43,7 +43,7 @@ struct LeagueView: View {
 
                 // Total IQ
                 VStack(alignment: .trailing, spacing: RQSpacing.xxs) {
-                    Text("\(viewModel.totalIQ)")
+                    Text("\(viewModel.totalIQ ?? 0)")
                         .font(RQTypography.numbers)
                         .foregroundColor(RQColors.accent)
                     Text("TOTAL IQ")
@@ -221,18 +221,12 @@ struct LeagueView: View {
                 Text(isUser ? "You" : (user.username ?? "User"))
                     .font(RQTypography.headline)
                     .foregroundColor(isUser ? RQColors.accent : RQColors.textPrimary)
-
-                if let username = user.username {
-                    Text("@\(username)")
-                        .font(RQTypography.label)
-                        .foregroundColor(RQColors.textTertiary)
-                }
             }
 
             Spacer()
 
             // IQ
-            Text("\(user.totalIQ)")
+            Text("\(user.totalIQ ?? 0)")
                 .font(RQTypography.numbersSmall)
                 .foregroundColor(isUser ? RQColors.accent : RQColors.textPrimary)
 

@@ -28,7 +28,7 @@ struct NudgeService: Sendable {
 
         // Rule 1: Friends hit PRs — motivate the user
         if friendPRCount > 0 {
-            let friendNames = friendProfiles.prefix(3).compactMap(\.displayName).joined(separator: ", ")
+            let friendNames = friendProfiles.prefix(3).compactMap(\.username).joined(separator: ", ")
             nudges.append(CoachingNudge(
                 id: UUID(),
                 icon: "star.fill",
