@@ -7,43 +7,32 @@ struct MuscleHeatmapView: View {
     /// Maps muscle group name (lowercase) → sets completed this session
     let muscleVolume: [String: Int]
 
-    @State private var showFront = true
-
     var body: some View {
         VStack(spacing: RQSpacing.md) {
-            // Front / Back toggle
-            HStack(spacing: 0) {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) { showFront = true }
-                } label: {
-                    Text("Front")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(showFront ? .black : RQColors.textSecondary)
+            // Front + Back diagrams side by side
+            HStack(spacing: RQSpacing.sm) {
+                VStack(spacing: RQSpacing.xxs) {
+                    BodyView(gender: .male, side: .front)
+                        .heatmap(heatmapData, colorScale: .workout)
+                        .bodyStyle(.neon)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
-                        .background(showFront ? RQColors.accent : Color.clear)
+                        .frame(height: 240)
+                    Text("Front")
+                        .font(RQTypography.caption)
+                        .foregroundColor(RQColors.textTertiary)
                 }
 
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) { showFront = false }
-                } label: {
-                    Text("Back")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(!showFront ? .black : RQColors.textSecondary)
+                VStack(spacing: RQSpacing.xxs) {
+                    BodyView(gender: .male, side: .back)
+                        .heatmap(heatmapData, colorScale: .workout)
+                        .bodyStyle(.neon)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
-                        .background(!showFront ? RQColors.accent : Color.clear)
+                        .frame(height: 240)
+                    Text("Back")
+                        .font(RQTypography.caption)
+                        .foregroundColor(RQColors.textTertiary)
                 }
             }
-            .background(RQColors.surfaceTertiary)
-            .cornerRadius(RQRadius.medium)
-
-            // Anatomical body diagram
-            BodyView(gender: .male, side: showFront ? .front : .back)
-                .heatmap(heatmapData, colorScale: .workout)
-                .bodyStyle(.neon)
-                .animated(duration: 0.3)
-                .frame(height: 280)
 
             // Legend
             muscleLegend
