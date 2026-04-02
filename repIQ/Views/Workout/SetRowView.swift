@@ -50,7 +50,7 @@ struct SetRowView: View {
                 // Ghost row — per-set target (decision + previous set) or previous fallback
                 if let target = progressionTarget {
                     // Compute mode-aware per-set target from progression decision + this set's previous data
-                    let (targetW, targetR, targetRPE) = ActiveWorkoutViewModel.perSetTarget(
+                    let (targetW, targetR, _) = ActiveWorkoutViewModel.perSetTarget(
                         decision: target, previousSet: previousSet,
                         trainingMode: trainingMode, setPosition: setPosition,
                         totalSets: totalWorkingSets, equipment: equipment
