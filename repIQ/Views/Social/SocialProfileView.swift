@@ -82,13 +82,13 @@ struct SocialProfileView: View {
                 .fill(RQColors.accent.opacity(0.2))
                 .frame(width: 80, height: 80)
                 .overlay(
-                    Text(String((viewModel.socialProfile?.displayName ?? "?").prefix(1)).uppercased())
+                    Text(String((viewModel.socialProfile?.username ?? "?").prefix(1)).uppercased())
                         .font(.system(size: 32, weight: .bold))
                         .foregroundColor(RQColors.accent)
                 )
 
-            if let displayName = viewModel.socialProfile?.displayName {
-                Text(displayName)
+            if let username = viewModel.socialProfile?.username {
+                Text(username)
                     .font(RQTypography.title2)
                     .foregroundColor(RQColors.textPrimary)
             }

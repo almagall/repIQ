@@ -14,7 +14,6 @@ struct ProfileService: Sendable {
     func updateProfile(_ profile: Profile) async throws {
         try await supabase.from("profiles")
             .update([
-                "display_name": profile.displayName ?? "",
                 "weight_unit": profile.safeWeightUnit.rawValue,
                 "rest_timer_default": "\(profile.safeRestTimer)"
             ])

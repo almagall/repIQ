@@ -65,7 +65,6 @@ enum LeagueTier: String, Codable, Sendable, CaseIterable {
 struct SocialProfile: Codable, Identifiable, Sendable {
     let id: UUID
     var email: String
-    var displayName: String?
     var weightUnit: WeightUnit?
     var restTimerDefault: Int?
     var createdAt: Date
@@ -89,7 +88,6 @@ struct SocialProfile: Codable, Identifiable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case id, email, bio, username
-        case displayName = "display_name"
         case weightUnit = "weight_unit"
         case restTimerDefault = "rest_timer_default"
         case createdAt = "created_at"

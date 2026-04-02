@@ -247,20 +247,12 @@ struct FriendsView: View {
 
                         ForEach(gymMembers) { member in
                             HStack(spacing: RQSpacing.md) {
-                                profileAvatar(name: member.username ?? member.displayName ?? "?", size: 36)
+                                profileAvatar(name: member.username ?? "?", size: 36)
 
                                 VStack(alignment: .leading, spacing: RQSpacing.xxs) {
-                                    Text(member.username ?? member.displayName ?? "User")
+                                    Text(member.username ?? "User")
                                         .font(RQTypography.body)
                                         .foregroundColor(RQColors.textPrimary)
-
-                                    if let username = member.username, !username.isEmpty,
-                                       let display = member.displayName, !display.isEmpty,
-                                       username != display {
-                                        Text(display)
-                                            .font(RQTypography.caption)
-                                            .foregroundColor(RQColors.textTertiary)
-                                    }
                                 }
 
                                 Spacer()
@@ -350,7 +342,7 @@ struct FriendsView: View {
 
     private func searchResultRow(_ user: SocialProfile) -> some View {
         let isFriend = viewModel.friendIds.contains(user.id)
-        let name = user.displayName?.isEmpty == false ? user.displayName! : user.username ?? "User"
+        let name = user.username ?? "User"
 
         return RQCard {
             HStack(spacing: RQSpacing.md) {
@@ -441,13 +433,7 @@ struct FriendsView: View {
     }
 
     private func friendDisplayName(_ friendship: Friendship) -> String {
-        if let display = friendship.friendProfile?.displayName, !display.isEmpty {
-            return display
-        }
-        if let username = friendship.friendProfile?.username, !username.isEmpty {
-            return username
-        }
-        return "User"
+        friendship.friendProfile?.username ?? "User"
     }
 
     private func emptyState(icon: String, title: String, message: String) -> some View {

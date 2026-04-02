@@ -211,14 +211,14 @@ struct LeagueView: View {
                 .fill(isUser ? RQColors.accent.opacity(0.3) : RQColors.surfaceTertiary)
                 .frame(width: 36, height: 36)
                 .overlay(
-                    Text(String((user.displayName ?? "?").prefix(1)).uppercased())
+                    Text(String((user.username ?? "?").prefix(1)).uppercased())
                         .font(.system(size: 14, weight: .bold))
                         .foregroundColor(isUser ? RQColors.accent : RQColors.textSecondary)
                 )
 
             // Name
             VStack(alignment: .leading, spacing: RQSpacing.xxs) {
-                Text(isUser ? "You" : (user.displayName ?? "User"))
+                Text(isUser ? "You" : (user.username ?? "User"))
                     .font(RQTypography.headline)
                     .foregroundColor(isUser ? RQColors.accent : RQColors.textPrimary)
 

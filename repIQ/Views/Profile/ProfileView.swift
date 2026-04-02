@@ -34,7 +34,7 @@ struct ProfileView: View {
                                         .font(RQTypography.headline)
                                         .foregroundColor(RQColors.textPrimary)
                                 } else {
-                                    Text(viewModel.profile?.displayName ?? "User")
+                                    Text("User")
                                         .font(RQTypography.headline)
                                         .foregroundColor(RQColors.textPrimary)
                                 }

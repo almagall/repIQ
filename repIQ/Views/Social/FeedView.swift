@@ -342,13 +342,13 @@ struct FeedView: View {
                             .fill(RQColors.surfaceTertiary)
                             .frame(width: 24, height: 24)
                             .overlay(
-                                Text(String((comment.userProfile?.displayName ?? "?").prefix(1)).uppercased())
+                                Text(String((comment.userProfile?.username ?? "?").prefix(1)).uppercased())
                                     .font(.system(size: 9, weight: .bold))
                                     .foregroundColor(RQColors.textSecondary)
                             )
 
                         VStack(alignment: .leading, spacing: RQSpacing.xxs) {
-                            Text(comment.userProfile?.displayName ?? "User")
+                            Text(comment.userProfile?.username ?? "User")
                                 .font(RQTypography.caption)
                                 .fontWeight(.semibold)
                                 .foregroundColor(RQColors.textPrimary)
@@ -462,13 +462,7 @@ struct FeedView: View {
     }
 
     private func displayName(for item: FeedItem) -> String {
-        if let username = item.userProfile?.username, !username.isEmpty {
-            return username
-        }
-        if let displayName = item.userProfile?.displayName, !displayName.isEmpty {
-            return displayName
-        }
-        return "User"
+        item.userProfile?.username ?? "User"
     }
 
     private func avatarInitial(for item: FeedItem) -> String {

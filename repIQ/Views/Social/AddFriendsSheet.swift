@@ -112,7 +112,7 @@ struct AddFriendsSheet: View {
 
     private func searchResultRow(_ user: SocialProfile) -> some View {
         let isFriend = viewModel.friendIds.contains(user.id)
-        let name = user.displayName?.isEmpty == false ? user.displayName! : user.username ?? "User"
+        let name = user.username ?? "User"
 
         return HStack(spacing: RQSpacing.md) {
             profileAvatar(name: name, size: 44)
@@ -234,9 +234,6 @@ struct AddFriendsSheet: View {
     }
 
     private func requestDisplayName(_ request: Friendship) -> String {
-        if let display = request.friendProfile?.displayName, !display.isEmpty {
-            return display
-        }
         if let username = request.friendProfile?.username, !username.isEmpty {
             return username
         }
