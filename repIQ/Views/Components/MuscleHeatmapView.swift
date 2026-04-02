@@ -146,12 +146,12 @@ private struct FrontBodyView: View {
         let strokeColor = Color(hex: "333333")
 
         // Head
-        var head = Path(ellipseIn: CGRect(x: 38, y: 2, width: 24, height: 24).scaled(by: scale))
+        let head = Path(ellipseIn: CGRect(x: 38, y: 2, width: 24, height: 24).scaled(by: scale))
         ctx.fill(head, with: .color(fillColor))
         ctx.stroke(head, with: .color(strokeColor), lineWidth: 0.8)
 
         // Neck
-        var neck = Path(CGRect(x: 46, y: 25, width: 8, height: 8).scaled(by: scale))
+        let neck = Path(CGRect(x: 46, y: 25, width: 8, height: 8).scaled(by: scale))
         ctx.fill(neck, with: .color(fillColor))
 
         // Left upper arm
@@ -257,11 +257,11 @@ private struct BackBodyView: View {
         let fillColor = Color(hex: "1A1A1A")
         let strokeColor = Color(hex: "333333")
 
-        var head = Path(ellipseIn: CGRect(x: 38, y: 2, width: 24, height: 24).scaled(by: scale))
+        let head = Path(ellipseIn: CGRect(x: 38, y: 2, width: 24, height: 24).scaled(by: scale))
         ctx.fill(head, with: .color(fillColor))
         ctx.stroke(head, with: .color(strokeColor), lineWidth: 0.8)
 
-        var neck = Path(CGRect(x: 46, y: 25, width: 8, height: 8).scaled(by: scale))
+        let neck = Path(CGRect(x: 46, y: 25, width: 8, height: 8).scaled(by: scale))
         ctx.fill(neck, with: .color(fillColor))
 
         let leftUArm = roundedRectPath(rect: CGRect(x: 10, y: 28, width: 20, height: 52).scaled(by: scale), radius: 8 * scale)

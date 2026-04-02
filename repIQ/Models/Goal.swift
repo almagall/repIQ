@@ -63,7 +63,7 @@ enum PaceStatus {
     }
 }
 
-struct Goal: Codable, Identifiable, Sendable {
+struct Goal: Codable, Identifiable, Sendable, Equatable {
     let id: UUID
     let userId: UUID
     var goalType: GoalType
