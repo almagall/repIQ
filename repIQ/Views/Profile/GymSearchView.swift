@@ -240,7 +240,9 @@ struct GymSearchView: View {
         isSaving = true
         let name = item.name ?? "Unknown Gym"
         let address = formatAddress(item) ?? ""
-        let placeId = "\(name)_\(item.placemark.coordinate.latitude)_\(item.placemark.coordinate.longitude)"
+        let lat = String(format: "%.4f", item.placemark.coordinate.latitude)
+        let lon = String(format: "%.4f", item.placemark.coordinate.longitude)
+        let placeId = "\(name)_\(lat)_\(lon)"
 
         do {
             guard let userId = try? await supabase.auth.session.user.id else { return }
