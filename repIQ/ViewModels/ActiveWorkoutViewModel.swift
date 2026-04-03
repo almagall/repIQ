@@ -16,6 +16,9 @@ final class ActiveWorkoutViewModel {
     // MARK: - Completion State
     var showFinishConfirmation = false
     var showAbandonConfirmation = false
+    var isCompleting = false
+    var completionSets = 0
+    var completionDuration = 0
     var workoutSummary: WorkoutSummaryData?
 
     // MARK: - Exercise Substitution
@@ -488,6 +491,12 @@ final class ActiveWorkoutViewModel {
 
     func completeWorkout() async {
         guard let sessionId else { return }
+
+        // Immediately show completion overlay and freeze the timer
+        completionSets = totalCompletedSets
+        completionDuration = elapsedSeconds
+        isCompleting = true
+        timerTask?.cancel()
         isLoading = true
 
         do {
@@ -737,6 +746,7 @@ final class ActiveWorkoutViewModel {
 
         } catch {
             errorMessage = "Failed to complete workout: \(error.localizedDescription)"
+            isCompleting = false
         }
         isLoading = false
     }

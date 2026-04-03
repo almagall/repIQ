@@ -42,8 +42,15 @@ struct ActiveWorkoutView: View {
                 if viewModel.isLoading && viewModel.exercises.isEmpty {
                     LoadingOverlay(message: "Starting workout...")
                 }
+
+                // Workout complete transition overlay
+                if viewModel.isCompleting {
+                    workoutCompleteOverlay
+                        .transition(.opacity)
+                }
             }
             .animation(.spring(response: 0.35), value: viewModel.prCelebration != nil)
+            .animation(.easeInOut(duration: 0.3), value: viewModel.isCompleting)
             .background(RQColors.background)
             .navigationBarTitleDisplayMode(.inline)
             .toolbarColorScheme(.dark, for: .navigationBar)
@@ -521,6 +528,71 @@ struct ActiveWorkoutView: View {
             get: { viewModel.workoutSummary },
             set: { viewModel.workoutSummary = $0 }
         )
+    }
+
+    // MARK: - Workout Complete Overlay
+
+    private var workoutCompleteOverlay: some View {
+        ZStack {
+            RQColors.background.ignoresSafeArea()
+
+            VStack(spacing: RQSpacing.xl) {
+                Spacer()
+
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 72))
+                    .foregroundColor(RQColors.success)
+                    .symbolEffect(.bounce, value: viewModel.isCompleting)
+
+                Text("Workout Complete!")
+                    .font(RQTypography.title)
+                    .foregroundColor(RQColors.textPrimary)
+
+                // Frozen stats
+                HStack(spacing: RQSpacing.xxxl) {
+                    VStack(spacing: RQSpacing.xxs) {
+                        Text(formatDuration(viewModel.completionDuration))
+                            .font(.system(size: 20, weight: .bold, design: .monospaced))
+                            .foregroundColor(RQColors.textPrimary)
+                        Text("Duration")
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.textTertiary)
+                    }
+
+                    VStack(spacing: RQSpacing.xxs) {
+                        Text("\(viewModel.completionSets)")
+                            .font(.system(size: 20, weight: .bold, design: .monospaced))
+                            .foregroundColor(RQColors.textPrimary)
+                        Text("Sets")
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.textTertiary)
+                    }
+                }
+                .padding(.top, RQSpacing.sm)
+
+                Spacer()
+
+                // Loading indicator
+                VStack(spacing: RQSpacing.sm) {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: RQColors.accent))
+                    Text("Preparing your summary...")
+                        .font(RQTypography.caption)
+                        .foregroundColor(RQColors.textTertiary)
+                }
+                .padding(.bottom, RQSpacing.xxxl)
+            }
+        }
+    }
+
+    private func formatDuration(_ seconds: Int) -> String {
+        let h = seconds / 3600
+        let m = (seconds % 3600) / 60
+        let s = seconds % 60
+        if h > 0 {
+            return String(format: "%d:%02d:%02d", h, m, s)
+        }
+        return String(format: "%d:%02d", m, s)
     }
 }
 
