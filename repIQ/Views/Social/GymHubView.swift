@@ -7,7 +7,7 @@ struct GymHubView: View {
     @State private var gymName: String?
     @State private var gymAddress: String?
     @State private var gymPlaceId: String?
-    @State private var gymMembers: [SocialProfile] = []
+    @State private var gymMembers: [GymService.GymMember] = []
     @State private var gymFeedItems: [FeedItem] = []
     @State private var isLoadingMembers = false
     @State private var isLoadingFeed = false
@@ -162,7 +162,7 @@ struct GymHubView: View {
         }
     }
 
-    private func memberCard(_ member: SocialProfile) -> some View {
+    private func memberCard(_ member: GymService.GymMember) -> some View {
         RQCard {
             HStack(spacing: RQSpacing.md) {
                 // Avatar
