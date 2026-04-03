@@ -96,6 +96,10 @@ final class ActiveWorkoutViewModel {
         totalCompletedSets > 0
     }
 
+    var isWorkoutComplete: Bool {
+        !exercises.isEmpty && exercises.allSatisfy(\.isAllSetsCompleted)
+    }
+
     var restTimerDisplay: String {
         let minutes = restTimerRemaining / 60
         let seconds = restTimerRemaining % 60

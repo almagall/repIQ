@@ -93,11 +93,27 @@ struct ActiveWorkoutView: View {
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Finish") {
+                    Button {
                         viewModel.showFinishConfirmation = true
+                    } label: {
+                        if viewModel.isWorkoutComplete {
+                            HStack(spacing: 4) {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 12, weight: .bold))
+                                Text("Finish")
+                            }
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 6)
+                            .background(RQColors.success)
+                            .cornerRadius(RQRadius.large)
+                        } else {
+                            Text("Finish")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(RQColors.textTertiary)
+                        }
                     }
-                    .font(RQTypography.headline)
-                    .foregroundColor(RQColors.success)
                 }
             }
             .alert("Finish Workout?", isPresented: $viewModel.showFinishConfirmation) {
