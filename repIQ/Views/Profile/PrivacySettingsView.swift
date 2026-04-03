@@ -2,10 +2,10 @@ import SwiftUI
 import Supabase
 
 struct PrivacySettingsView: View {
-    @State private var viewModel = SocialViewModel()
     @State private var selectedPrivacy: PrivacyLevel = .friendsOnly
     @State private var isSaving = false
     @State private var saveSuccess = false
+    @State private var isLoading = true
 
     var body: some View {
         ScrollView {
@@ -22,35 +22,43 @@ struct PrivacySettingsView: View {
                             .font(RQTypography.caption)
                             .foregroundColor(RQColors.textTertiary)
 
-                        ForEach(PrivacyLevel.allCases, id: \.self) { level in
-                            privacyOption(level)
+                        if isLoading {
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, RQSpacing.md)
+                        } else {
+                            ForEach(PrivacyLevel.allCases, id: \.self) { level in
+                                privacyOption(level)
+                            }
                         }
                     }
                 }
 
-                // Save button
-                Button {
-                    Task { await savePrivacy() }
-                } label: {
-                    HStack {
-                        if isSaving {
-                            ProgressView()
-                                .tint(RQColors.background)
-                        } else if saveSuccess {
-                            Image(systemName: "checkmark")
-                            Text("Saved")
-                        } else {
-                            Text("Save")
+                if !isLoading {
+                    // Save button
+                    Button {
+                        Task { await savePrivacy() }
+                    } label: {
+                        HStack {
+                            if isSaving {
+                                ProgressView()
+                                    .tint(RQColors.background)
+                            } else if saveSuccess {
+                                Image(systemName: "checkmark")
+                                Text("Saved")
+                            } else {
+                                Text("Save")
+                            }
                         }
+                        .font(RQTypography.headline)
+                        .foregroundColor(RQColors.background)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, RQSpacing.md)
+                        .background(RQColors.accent)
+                        .cornerRadius(RQRadius.medium)
                     }
-                    .font(RQTypography.headline)
-                    .foregroundColor(RQColors.background)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, RQSpacing.md)
-                    .background(RQColors.accent)
-                    .cornerRadius(RQRadius.medium)
+                    .disabled(isSaving)
                 }
-                .disabled(isSaving)
             }
             .padding(.horizontal, RQSpacing.screenHorizontal)
             .padding(.top, RQSpacing.lg)
@@ -61,10 +69,7 @@ struct PrivacySettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
         .task {
-            await viewModel.loadSocialData()
-            if let profile = viewModel.socialProfile {
-                selectedPrivacy = profile.privacyLevel ?? .friendsOnly
-            }
+            await loadPrivacy()
         }
     }
 
@@ -116,20 +121,49 @@ struct PrivacySettingsView: View {
         }
     }
 
+    // MARK: - Data
+
+    private func loadPrivacy() async {
+        guard let userId = try? await supabase.auth.session.user.id else { return }
+
+        struct Row: Decodable {
+            let privacy_level: String?
+        }
+
+        if let row: Row = try? await supabase.from("profiles")
+            .select("privacy_level")
+            .eq("id", value: userId.uuidString)
+            .single()
+            .execute()
+            .value,
+           let raw = row.privacy_level,
+           let level = PrivacyLevel(rawValue: raw) {
+            selectedPrivacy = level
+        }
+        isLoading = false
+    }
+
     private func savePrivacy() async {
         guard let userId = try? await supabase.auth.session.user.id else { return }
         isSaving = true
         saveSuccess = false
+
+        struct Payload: Encodable {
+            let privacy_level: String
+        }
+
         do {
-            try await SocialService().updatePrivacyLevel(userId: userId, privacyLevel: selectedPrivacy)
-            viewModel.socialProfile?.privacyLevel = selectedPrivacy
+            try await supabase.from("profiles")
+                .update(Payload(privacy_level: selectedPrivacy.rawValue))
+                .eq("id", value: userId.uuidString)
+                .execute()
             saveSuccess = true
             Task {
                 try? await Task.sleep(for: .seconds(2))
                 saveSuccess = false
             }
         } catch {
-            // Save failed — leave saveSuccess false so the button shows "Save" again
+            // Update failed — button stays on "Save"
         }
         isSaving = false
     }
