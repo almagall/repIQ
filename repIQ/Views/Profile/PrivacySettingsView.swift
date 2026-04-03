@@ -1,4 +1,5 @@
 import SwiftUI
+import Supabase
 
 struct PrivacySettingsView: View {
     @State private var viewModel = SocialViewModel()
