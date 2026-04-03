@@ -8,7 +8,7 @@ struct FriendsView: View {
     @State private var searchResults: [SocialProfile] = []
     @State private var isSearching = false
     @State private var selectedTab: FriendsTab = .friends
-    @State private var gymMembers: [SocialProfile] = []
+    @State private var gymMembers: [GymService.GymMember] = []
     @State private var isLoadingGymMembers = false
 
     enum FriendsTab: String, CaseIterable {
