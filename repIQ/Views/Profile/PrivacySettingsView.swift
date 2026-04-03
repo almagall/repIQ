@@ -116,18 +116,20 @@ struct PrivacySettingsView: View {
     }
 
     private func savePrivacy() async {
+        guard let userId = try? await supabase.auth.session.user.id else { return }
         isSaving = true
         saveSuccess = false
-        await viewModel.updateProfile(
-            username: viewModel.socialProfile?.username,
-            bio: viewModel.socialProfile?.bio,
-            privacyLevel: selectedPrivacy
-        )
-        isSaving = false
-        saveSuccess = true
-        Task {
-            try? await Task.sleep(for: .seconds(2))
-            saveSuccess = false
+        do {
+            try await SocialService().updatePrivacyLevel(userId: userId, privacyLevel: selectedPrivacy)
+            viewModel.socialProfile?.privacyLevel = selectedPrivacy
+            saveSuccess = true
+            Task {
+                try? await Task.sleep(for: .seconds(2))
+                saveSuccess = false
+            }
+        } catch {
+            // Save failed — leave saveSuccess false so the button shows "Save" again
         }
+        isSaving = false
     }
 }

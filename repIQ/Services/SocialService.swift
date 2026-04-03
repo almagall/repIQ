@@ -34,6 +34,14 @@ struct SocialService: Sendable {
             .execute()
     }
 
+    /// Updates only the privacy level on the user's profile.
+    func updatePrivacyLevel(userId: UUID, privacyLevel: PrivacyLevel) async throws {
+        try await supabase.from("profiles")
+            .update(["privacy_level": privacyLevel.rawValue])
+            .eq("id", value: userId.uuidString)
+            .execute()
+    }
+
     /// Searches users by username.
     func searchUsers(query: String, currentUserId: UUID) async throws -> [SocialProfile] {
         guard !query.isEmpty else { return [] }
