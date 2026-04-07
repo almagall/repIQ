@@ -20,6 +20,7 @@ final class ActiveWorkoutViewModel {
     var completionSets = 0
     var completionDuration = 0
     var workoutSummary: WorkoutSummaryData?
+    var setFeedback: [UUID: SetFeedback] = [:]
 
     // MARK: - Exercise Substitution
     var showExerciseSubstitution = false
@@ -733,6 +734,14 @@ final class ActiveWorkoutViewModel {
             summary.workoutName = dayName.isEmpty ? templateName : "\(templateName) — \(dayName)"
             summary.dayName = dayName
             summary.workoutDate = startTime
+
+            // Compute performance grades from set feedback
+            let allFeedbacks = Array(setFeedback.values)
+            summary.performanceGrade = SetFeedbackEngine.computeSessionGrade(feedbacks: allFeedbacks)
+            summary.exercisePerformanceGrades = SetFeedbackEngine.computeExerciseGrades(
+                exercises: exercises, feedbacks: setFeedback
+            )
+
             workoutSummary = summary
 
             timerTask?.cancel()
@@ -910,6 +919,35 @@ final class ActiveWorkoutViewModel {
             }
         }
 
+        // Compute coaching feedback for working sets
+        if completedSet.setType == .working {
+            let exercise = exercises[exerciseIndex]
+            let workingSets = exercise.sets.filter { $0.setType == .working }
+            let setPosition = workingSets.firstIndex(where: { $0.id == completedSet.id }) ?? 0
+            let prevSet = previousSets.first?.first(where: { $0.setNumber == completedSet.setNumber })
+            let (tgtW, tgtR, tgtRPE) = Self.perSetTarget(
+                decision: exercise.progressionTarget,
+                previousSet: prevSet,
+                trainingMode: exercise.trainingMode,
+                setPosition: setPosition,
+                totalSets: exercise.targetSets,
+                equipment: exercise.equipment
+            )
+            let fb = SetFeedbackEngine.computeFeedback(
+                setId: completedSet.id,
+                actualWeight: completedSet.weight,
+                actualReps: completedSet.reps,
+                actualRPE: completedSet.rpe,
+                targetWeight: tgtW,
+                targetReps: tgtR,
+                targetRPE: tgtRPE,
+                decision: exercise.progressionTarget?.decision,
+                isBodyweightOnly: exercise.isBodyweightOnly,
+                hasTarget: exercise.progressionTarget != nil
+            )
+            setFeedback[completedSet.id] = fb
+        }
+
         // Start elapsed timer on first confirmed set
         if !timerStarted {
             startTime = Date()
@@ -961,6 +999,7 @@ final class ActiveWorkoutViewModel {
             try await workoutService.deleteSet(id: savedId)
             exercises[exerciseIndex].sets[setIndex].isCompleted = false
             exercises[exerciseIndex].sets[setIndex].savedSetId = nil
+            setFeedback.removeValue(forKey: set.id)
         } catch {
             errorMessage = "Failed to undo set."
         }

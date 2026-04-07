@@ -8,6 +8,8 @@ struct SetRowView: View {
     var progressionTarget: ProgressionTarget? = nil
     var setPosition: Int = 0
     @FocusState private var focusedField: Field?
+    @State private var feedbackExpanded = false
+    @State private var feedbackMinimized = false
 
     private enum Field {
         case weight, reps
@@ -299,6 +301,19 @@ struct SetRowView: View {
                     .padding(.leading, 32)
                     .padding(.top, RQSpacing.xxs)
                     .onTapGesture { showNotes = true }
+                }
+
+                // Coaching feedback chip (working sets only)
+                if set.isCompleted, set.setType == .working,
+                   let feedback = viewModel.setFeedback[set.id] {
+                    SetFeedbackChipView(
+                        feedback: feedback,
+                        isExpanded: $feedbackExpanded,
+                        isMinimized: $feedbackMinimized
+                    )
+                    .padding(.leading, 32)
+                    .padding(.top, RQSpacing.xxs)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
             .padding(.vertical, RQSpacing.xs)

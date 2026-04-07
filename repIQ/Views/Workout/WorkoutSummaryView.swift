@@ -123,6 +123,11 @@ struct WorkoutSummaryView: View {
                     )
                 }
 
+                // Performance Grade
+                if let grade = summary.performanceGrade, grade.totalGradedSets > 0 {
+                    performanceGradeSection(grade)
+                }
+
                 // Streak
                 if summary.currentStreak > 0 {
                     gamificationSection
@@ -200,6 +205,72 @@ struct WorkoutSummaryView: View {
     }
 
     // MARK: - Gamification
+
+    private func performanceGradeSection(_ grade: SessionPerformanceGrade) -> some View {
+        RQCard {
+            VStack(spacing: RQSpacing.md) {
+                // Grade icon + label
+                Image(systemName: grade.level.icon)
+                    .font(.system(size: 32))
+                    .foregroundColor(grade.level.color)
+
+                Text(grade.level.displayName)
+                    .font(RQTypography.title3)
+                    .foregroundColor(grade.level.color)
+
+                Text(grade.summary)
+                    .font(RQTypography.caption)
+                    .foregroundColor(RQColors.textSecondary)
+
+                // Stacked bar
+                GeometryReader { geo in
+                    let total = max(grade.totalGradedSets, 1)
+                    HStack(spacing: 2) {
+                        if grade.setsExceeded > 0 {
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(SetOutcome.exceeded.color)
+                                .frame(width: geo.size.width * CGFloat(grade.setsExceeded) / CGFloat(total))
+                        }
+                        if grade.setsOnTarget > 0 {
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(SetOutcome.onTarget.color)
+                                .frame(width: geo.size.width * CGFloat(grade.setsOnTarget) / CGFloat(total))
+                        }
+                        if grade.setsSlightlyBelow > 0 {
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(SetOutcome.slightlyBelow.color)
+                                .frame(width: geo.size.width * CGFloat(grade.setsSlightlyBelow) / CGFloat(total))
+                        }
+                        if grade.setsWellBelow > 0 {
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(SetOutcome.wellBelow.color)
+                                .frame(width: geo.size.width * CGFloat(grade.setsWellBelow) / CGFloat(total))
+                        }
+                    }
+                }
+                .frame(height: 8)
+
+                // Legend
+                HStack(spacing: RQSpacing.md) {
+                    if grade.setsExceeded > 0 { gradeLegendItem(count: grade.setsExceeded, outcome: .exceeded) }
+                    if grade.setsOnTarget > 0 { gradeLegendItem(count: grade.setsOnTarget, outcome: .onTarget) }
+                    if grade.setsSlightlyBelow > 0 { gradeLegendItem(count: grade.setsSlightlyBelow, outcome: .slightlyBelow) }
+                    if grade.setsWellBelow > 0 { gradeLegendItem(count: grade.setsWellBelow, outcome: .wellBelow) }
+                }
+            }
+        }
+    }
+
+    private func gradeLegendItem(count: Int, outcome: SetOutcome) -> some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(outcome.color)
+                .frame(width: 6, height: 6)
+            Text("\(count) \(outcome.label.lowercased())")
+                .font(.system(size: 10))
+                .foregroundColor(RQColors.textTertiary)
+        }
+    }
 
     private var gamificationSection: some View {
         RQCard {

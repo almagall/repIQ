@@ -130,6 +130,10 @@ struct WorkoutSummaryData: Identifiable {
     var longestStreak: Int = 0
     var newBadges: [Badge] = []
 
+    // Performance grade
+    var performanceGrade: SessionPerformanceGrade?
+    var exercisePerformanceGrades: [ExercisePerformanceGrade] = []
+
     // Context for sharing
     var workoutName: String = ""
     var dayName: String = ""
