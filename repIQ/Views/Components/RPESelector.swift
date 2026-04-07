@@ -5,7 +5,7 @@ struct RPESelector: View {
     var trainingMode: TrainingMode = .hypertrophy
     var compact: Bool = false
 
-    private let rpeValues: [Double] = [6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0]
+    private let rpeValues: [Double] = [6.0, 7.0, 8.0, 9.0, 10.0]
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {

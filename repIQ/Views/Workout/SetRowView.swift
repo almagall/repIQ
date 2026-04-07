@@ -431,12 +431,10 @@ struct SetRowView: View {
         }
     }
 
-    private let rpeValues: [Double] = stride(from: 1.0, through: 10.0, by: 0.5).map { $0 }
+    private let rpeValues: [Double] = Array(stride(from: 1.0, through: 10.0, by: 1.0))
 
     private func formatRPE(_ value: Double) -> String {
-        value.truncatingRemainder(dividingBy: 1) == 0
-            ? String(format: "%.0f", value)
-            : String(format: "%.1f", value)
+        String(format: "%.0f", value)
     }
 
     private func formatWeight(_ weight: Double) -> String {
