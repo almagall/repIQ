@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Supabase
 
 @main
 struct repIQApp: App {
@@ -37,6 +38,10 @@ struct repIQApp: App {
         WindowGroup {
             RootView()
                 .preferredColorScheme(.dark)
+                .onOpenURL { url in
+                    // Handle Supabase auth callback (email confirmation, OAuth)
+                    Task { _ = try? await supabase.auth.session(from: url) }
+                }
         }
     }
 }

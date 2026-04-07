@@ -98,11 +98,6 @@ struct SignUpView: View {
             .frame(height: 50)
             .cornerRadius(RQRadius.medium)
 
-            // Google Sign In
-            GoogleSignInButton {
-                Task { await viewModel.signInWithGoogle() }
-            }
-
             // Switch to Sign In
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
@@ -153,11 +148,17 @@ struct SignUpView: View {
                     .fontWeight(.semibold)
                     .foregroundColor(RQColors.accent)
 
-                Text("Tap the link in the email to activate your account, then come back and sign in.")
+                Text("Tap the link in the email to activate your account. Once confirmed, come back here and sign in.")
                     .font(RQTypography.subheadline)
                     .foregroundColor(RQColors.textTertiary)
                     .multilineTextAlignment(.center)
                     .padding(.top, RQSpacing.xs)
+
+                Text("The confirmation page may show a blank screen — that's normal. Just return to the app.")
+                    .font(RQTypography.caption)
+                    .foregroundColor(RQColors.textTertiary)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, RQSpacing.xxs)
             }
 
             Spacer()

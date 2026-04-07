@@ -11,7 +11,8 @@ struct AuthService: Sendable {
         let response = try await supabase.auth.signUp(
             email: email,
             password: password,
-            data: metadata
+            data: metadata,
+            redirectTo: SupabaseConfig.redirectURL
         )
         // Profile is auto-created by the database trigger.
         // If email confirmation is disabled and we have an immediate session, also patch directly.
