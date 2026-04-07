@@ -776,8 +776,10 @@ final class ActiveWorkoutViewModel {
 
         let set = exercises[exerciseIndex].sets[setIndex]
         guard !set.isCompleted, !set.isSaving else { return }
-        guard set.weight > 0, set.reps > 0 else {
-            errorMessage = "Enter weight and reps before completing."
+        let isBodyweight = exercises[exerciseIndex].isBodyweightOnly
+        let needsWeight = !isBodyweight && set.weight <= 0
+        guard !needsWeight, set.reps > 0 else {
+            errorMessage = isBodyweight ? "Enter reps before completing." : "Enter weight and reps before completing."
             return
         }
 
