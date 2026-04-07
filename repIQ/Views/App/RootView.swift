@@ -19,6 +19,7 @@ final class AppState {
                 isLoading = false
             case .signedIn:
                 isAuthenticated = true
+                await syncUsernameFromMetadata()
                 await checkOnboarding()
             case .signedOut:
                 isAuthenticated = false
@@ -27,6 +28,31 @@ final class AppState {
                 break
             }
         }
+    }
+
+    /// If the user signed up with a username in metadata but the profile
+    /// doesn't have it yet (e.g. email confirmation delayed the UPDATE),
+    /// patch it now on first sign-in.
+    private func syncUsernameFromMetadata() async {
+        guard let session = try? await supabase.auth.session else { return }
+        let userId = session.user.id
+        guard let metaUsername = session.user.userMetadata["username"]?.stringValue,
+              !metaUsername.isEmpty else { return }
+
+        struct Row: Decodable { let username: String? }
+        guard let row: Row = try? await supabase.from("profiles")
+            .select("username")
+            .eq("id", value: userId.uuidString)
+            .single()
+            .execute()
+            .value,
+              row.username == nil || row.username?.isEmpty == true
+        else { return }
+
+        try? await supabase.from("profiles")
+            .update(["username": metaUsername])
+            .eq("id", value: userId.uuidString)
+            .execute()
     }
 
     private func checkOnboarding() async {

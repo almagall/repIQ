@@ -12,9 +12,11 @@ struct OnboardingView: View {
     @State private var goalBuilderTargetText: String = ""
     @State private var goalBuilderDaysPerWeek: Int = 3
     @State private var isCreatingTemplate = false
+    @State private var showGymSearch = false
+    @State private var selectedGymName: String?
     var onComplete: () -> Void
 
-    private let totalSteps = 6
+    private let totalSteps = 7
 
     var body: some View {
         ZStack {
@@ -39,7 +41,8 @@ struct OnboardingView: View {
                     frequencyStep.tag(2)
                     programStep.tag(3)
                     goalBuilderStep.tag(4)
-                    howItWorksStep.tag(5)
+                    gymStep.tag(5)
+                    howItWorksStep.tag(6)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .animation(.easeInOut(duration: 0.3), value: currentStep)
@@ -405,7 +408,95 @@ struct OnboardingView: View {
         }
     }
 
-    // MARK: - Step 6: How It Works
+    // MARK: - Step 6: Set Your Gym
+
+    private var gymStep: some View {
+        VStack(spacing: RQSpacing.xxxl) {
+            Spacer()
+
+            VStack(spacing: RQSpacing.md) {
+                Image(systemName: "building.2.fill")
+                    .font(.system(size: 44))
+                    .foregroundColor(RQColors.accent)
+
+                Text("Set Your Gym")
+                    .font(RQTypography.largeTitle)
+                    .foregroundColor(RQColors.accent)
+
+                Text("Connect with other lifters training at the same gym. See their workouts, PRs, and add them as friends.")
+                    .font(RQTypography.body)
+                    .foregroundColor(RQColors.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, RQSpacing.lg)
+            }
+
+            if let name = selectedGymName {
+                RQCard {
+                    HStack(spacing: RQSpacing.md) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(RQColors.success)
+                        Text(name)
+                            .font(RQTypography.headline)
+                            .foregroundColor(RQColors.textPrimary)
+                        Spacer()
+                    }
+                }
+                .padding(.horizontal, RQSpacing.screenHorizontal)
+            }
+
+            Spacer()
+
+            VStack(spacing: RQSpacing.sm) {
+                RQButton(title: selectedGymName != nil ? "Continue" : "Find Your Gym") {
+                    if selectedGymName != nil {
+                        withAnimation { currentStep = 6 }
+                    } else {
+                        showGymSearch = true
+                    }
+                }
+
+                if selectedGymName == nil {
+                    Button {
+                        withAnimation { currentStep = 6 }
+                    } label: {
+                        Text("Skip for Now")
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.textTertiary)
+                    }
+                }
+
+                HStack(spacing: RQSpacing.md) {
+                    RQButton(title: "Back", style: .secondary) {
+                        withAnimation { currentStep = 4 }
+                    }
+                }
+            }
+            .padding(.horizontal, RQSpacing.screenHorizontal)
+            .padding(.bottom, RQSpacing.xxxl)
+        }
+        .sheet(isPresented: $showGymSearch) {
+            NavigationStack {
+                GymSearchView()
+                    .onDisappear {
+                        // Reload gym name after search view closes
+                        Task {
+                            guard let userId = try? await supabase.auth.session.user.id else { return }
+                            struct GymRow: Decodable { let gym_name: String? }
+                            if let row: GymRow = try? await supabase.from("profiles")
+                                .select("gym_name")
+                                .eq("id", value: userId.uuidString)
+                                .single()
+                                .execute()
+                                .value {
+                                selectedGymName = row.gym_name
+                            }
+                        }
+                    }
+            }
+        }
+    }
+
+    // MARK: - Step 7: How It Works
 
     private var howItWorksStep: some View {
         ScrollView {
