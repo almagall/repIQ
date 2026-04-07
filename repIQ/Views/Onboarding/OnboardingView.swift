@@ -387,6 +387,7 @@ struct OnboardingView: View {
                         withAnimation { currentStep = 3 }
                     }
                     RQButton(title: goalBuilderHasContent ? "Set Goal" : "Continue") {
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                         withAnimation { currentStep = 5 }
                     }
                 }
@@ -407,6 +408,7 @@ struct OnboardingView: View {
     // MARK: - Step 6: How It Works
 
     private var howItWorksStep: some View {
+        ScrollView {
         VStack(spacing: RQSpacing.xxxl) {
             Spacer()
 
@@ -450,6 +452,10 @@ struct OnboardingView: View {
             .padding(.bottom, RQSpacing.xxxl)
         }
         .padding(.horizontal, RQSpacing.screenHorizontal)
+        }
+        .onAppear {
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        }
     }
 
     // MARK: - Goal Presets (used as example chips in builder)
