@@ -159,6 +159,23 @@ struct ExerciseLogView: View {
                 }
 
                 HStack(spacing: RQSpacing.xs) {
+                    // Training mode badge
+                    Text(exercise.trainingMode.displayName.uppercased())
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(modeColorFor(exercise.trainingMode))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(modeColorFor(exercise.trainingMode).opacity(0.15))
+                        .cornerRadius(RQRadius.small)
+
+                    Text(exercise.repRangeDisplay + " reps")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(modeColorFor(exercise.trainingMode))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(modeColorFor(exercise.trainingMode).opacity(0.1))
+                        .cornerRadius(RQRadius.small)
+
                     Text(exercise.equipment.capitalized)
                         .font(RQTypography.caption)
                         .foregroundColor(RQColors.textTertiary)
@@ -370,8 +387,7 @@ struct ExerciseLogView: View {
                 Spacer()
 
                 if exercise.progressionTarget == nil {
-                    let range = exercise.trainingMode.repRange
-                    Text("\(range.lowerBound)-\(range.upperBound) reps")
+                    Text("\(exercise.repRangeDisplay) reps")
                         .font(RQTypography.caption)
                         .foregroundColor(RQColors.textTertiary)
 
@@ -692,6 +708,7 @@ struct ExerciseLogView: View {
     private func baselineBanner(_ exercise: ExerciseLogEntry) -> some View {
         let isBodyweight = exercise.isBodyweightOnly
         let mode = exercise.trainingMode
+        let repRange = exercise.repRangeDisplay
 
         let title: String
         let guidance: String
@@ -699,16 +716,16 @@ struct ExerciseLogView: View {
 
         if isBodyweight {
             title = "Bodyweight Baseline"
-            guidance = "Perform as many controlled reps as you can. Leave 2-3 reps in reserve — don't go to complete failure. The app tracks your rep count to generate progression targets."
-            repBadge = nil
+            guidance = "Aim for \(repRange) controlled reps. Leave 2-3 reps in reserve — don't go to complete failure. The app tracks your rep count to generate progression targets."
+            repBadge = "\(repRange) reps"
         } else if mode == .strength {
             title = "Strength Baseline"
-            guidance = "Start lighter and build up weight across sets toward a challenging top set of 3-5 reps. Your last set should feel heavy but not a max effort (RPE 7-8). The app will use your top set to calibrate future targets."
-            repBadge = "3-5 reps"
+            guidance = "Start lighter and build up weight across sets toward a challenging top set of \(repRange) reps. Your last set should feel heavy but not a max effort (RPE 7-8). The app will use your top set to calibrate future targets."
+            repBadge = "\(repRange) reps"
         } else {
             title = "Hypertrophy Baseline"
-            guidance = "Choose a weight you can control for 10-15 reps with 2-3 reps left in the tank (RPE 7-8). Use the same weight for all sets. It's okay if reps drop on later sets — that's normal fatigue."
-            repBadge = "10-15 reps"
+            guidance = "Choose a weight you can control for \(repRange) reps with 2-3 reps left in the tank (RPE 7-8). Use the same weight for all sets. It's okay if reps drop on later sets — that's normal fatigue."
+            repBadge = "\(repRange) reps"
         }
 
         return HStack(alignment: .top, spacing: RQSpacing.sm) {
@@ -748,6 +765,10 @@ struct ExerciseLogView: View {
 
     private var modeColor: Color {
         exercise?.trainingMode == .hypertrophy ? RQColors.hypertrophy : RQColors.strength
+    }
+
+    private func modeColorFor(_ mode: TrainingMode) -> Color {
+        mode == .hypertrophy ? RQColors.hypertrophy : RQColors.strength
     }
 
     /// Returns the previous session's set data for a given set type and position within that group.

@@ -98,6 +98,21 @@ struct ExerciseLogEntry: Identifiable {
         equipment == "bodyweight" && !useAddedWeight
     }
 
+    /// The effective rep range for this exercise, taking into account the training
+    /// mode's default range and any optional rep cap.
+    var effectiveRepRange: ClosedRange<Int> {
+        let modeRange = trainingMode.repRange
+        let lower = modeRange.lowerBound
+        let upper = max(repCap ?? modeRange.upperBound, lower)
+        return lower...upper
+    }
+
+    /// Human-readable rep range label (e.g. "10-15" or "10").
+    var repRangeDisplay: String {
+        let r = effectiveRepRange
+        return r.lowerBound == r.upperBound ? "\(r.lowerBound)" : "\(r.lowerBound)-\(r.upperBound)"
+    }
+
     /// The superset group index, if this exercise is part of a superset.
     var supersetGroup: Int?
 

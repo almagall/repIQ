@@ -35,6 +35,10 @@ struct SetRowView: View {
         viewModel.exercises[safe: exerciseIndex]?.isBodyweightOnly ?? false
     }
 
+    private var repRangeDisplay: String {
+        viewModel.exercises[safe: exerciseIndex]?.repRangeDisplay ?? "10-15"
+    }
+
     private var showPlateBreakdown: Bool {
         (equipment == "barbell" || equipment == "smith_machine") && (set?.weight ?? 0) > AppConstants.Defaults.barWeight
     }
@@ -127,15 +131,15 @@ struct SetRowView: View {
 
                         Group {
                             if isBodyweightOnly {
-                                Text("Max controlled reps @ RPE 7-8")
+                                Text("Aim for \(repRangeDisplay) reps @ RPE 7-8")
                             } else if trainingMode == .strength {
                                 if setPosition >= totalWorkingSets - 1 {
-                                    Text("Top set — challenging @ RPE 7-8")
+                                    Text("Top set — \(repRangeDisplay) reps @ RPE 7-8")
                                 } else {
-                                    Text("Build up — lighter than your top set")
+                                    Text("Build up — lighter than top set")
                                 }
                             } else {
-                                Text("Aim for 10-15 reps @ RPE 7-8")
+                                Text("Aim for \(repRangeDisplay) reps @ RPE 7-8")
                             }
                         }
                         .font(.system(size: 10))
