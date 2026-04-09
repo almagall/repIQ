@@ -924,7 +924,7 @@ final class ActiveWorkoutViewModel {
             let exercise = exercises[exerciseIndex]
             let workingSets = exercise.sets.filter { $0.setType == .working }
             let setPosition = workingSets.firstIndex(where: { $0.id == completedSet.id }) ?? 0
-            let prevSet = previousSets.first?.first(where: { $0.setNumber == completedSet.setNumber })
+            let prevSet = exercise.previousSets.first?.first(where: { $0.setNumber == completedSet.setNumber })
             let (tgtW, tgtR, tgtRPE) = Self.perSetTarget(
                 decision: exercise.progressionTarget,
                 previousSet: prevSet,
@@ -1000,6 +1000,7 @@ final class ActiveWorkoutViewModel {
             exercises[exerciseIndex].sets[setIndex].isCompleted = false
             exercises[exerciseIndex].sets[setIndex].savedSetId = nil
             setFeedback.removeValue(forKey: set.id)
+            saveWorkoutState()
         } catch {
             errorMessage = "Failed to undo set."
         }
@@ -1259,6 +1260,9 @@ final class ActiveWorkoutViewModel {
         timerStarted = true
         UIApplication.shared.isIdleTimerDisabled = true
     }
+
+    /// Public entry point for starting auto-save (used by recovery flow).
+    func startAutoSavePublic() { startAutoSave() }
 
     /// Starts periodic auto-save (every 30 seconds).
     private func startAutoSave() {

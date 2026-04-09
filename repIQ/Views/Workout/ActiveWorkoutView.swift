@@ -5,6 +5,7 @@ struct ActiveWorkoutView: View {
     let onDismiss: () -> Void
 
     @Environment(WorkoutCoordinator.self) private var coordinator
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         NavigationStack {
@@ -168,10 +169,17 @@ struct ActiveWorkoutView: View {
                 }
             }
             .task {
+                // Skip if already restored from saved state
+                guard viewModel.sessionId == nil else { return }
                 if let template = coordinator.selectedTemplate,
                    let day = coordinator.selectedWorkoutDay {
                     let date = coordinator.selectedWorkoutDate ?? Date()
                     await viewModel.startWorkout(template: template, day: day, date: date)
+                }
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                if newPhase == .background || newPhase == .inactive {
+                    viewModel.saveWorkoutState()
                 }
             }
             .interactiveDismissDisabled()
