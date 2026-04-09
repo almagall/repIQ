@@ -116,6 +116,34 @@ struct SetRowView: View {
                         Spacer()
                     }
                     .padding(.bottom, 2)
+                } else if progressionTarget == nil && !set.isCompleted {
+                    // Baseline hint — no target and no previous data
+                    HStack(spacing: RQSpacing.xs) {
+                        Spacer().frame(width: 32)
+
+                        Image(systemName: "scope")
+                            .font(.system(size: 9))
+                            .foregroundColor(RQColors.accent.opacity(0.5))
+
+                        Group {
+                            if isBodyweightOnly {
+                                Text("Max controlled reps @ RPE 7-8")
+                            } else if trainingMode == .strength {
+                                if setPosition >= totalWorkingSets - 1 {
+                                    Text("Top set — challenging @ RPE 7-8")
+                                } else {
+                                    Text("Build up — lighter than your top set")
+                                }
+                            } else {
+                                Text("Aim for 10-15 reps @ RPE 7-8")
+                            }
+                        }
+                        .font(.system(size: 10))
+                        .foregroundColor(RQColors.accent.opacity(0.5))
+
+                        Spacer()
+                    }
+                    .padding(.bottom, 2)
                 }
 
                 // Fill target button — one-tap to match target/previous values

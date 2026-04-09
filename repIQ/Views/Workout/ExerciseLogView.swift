@@ -690,33 +690,53 @@ struct ExerciseLogView: View {
     }
 
     private func baselineBanner(_ exercise: ExerciseLogEntry) -> some View {
-        let isBodyweight = exercise.equipment == "bodyweight"
-        let isBarbell = exercise.equipment == "barbell" || exercise.equipment == "smith_machine"
+        let isBodyweight = exercise.isBodyweightOnly
+        let mode = exercise.trainingMode
+
+        let title: String
+        let guidance: String
+        let repBadge: String?
+
+        if isBodyweight {
+            title = "Bodyweight Baseline"
+            guidance = "Perform as many controlled reps as you can. Leave 2-3 reps in reserve — don't go to complete failure. The app tracks your rep count to generate progression targets."
+            repBadge = nil
+        } else if mode == .strength {
+            title = "Strength Baseline"
+            guidance = "Start lighter and build up weight across sets toward a challenging top set of 3-5 reps. Your last set should feel heavy but not a max effort (RPE 7-8). The app will use your top set to calibrate future targets."
+            repBadge = "3-5 reps"
+        } else {
+            title = "Hypertrophy Baseline"
+            guidance = "Choose a weight you can control for 10-15 reps with 2-3 reps left in the tank (RPE 7-8). Use the same weight for all sets. It's okay if reps drop on later sets — that's normal fatigue."
+            repBadge = "10-15 reps"
+        }
 
         return HStack(alignment: .top, spacing: RQSpacing.sm) {
             Image(systemName: "lightbulb.fill")
                 .font(.system(size: 18))
                 .foregroundColor(RQColors.accent)
 
-            VStack(alignment: .leading, spacing: RQSpacing.xs) {
-                Text("First Time Logging")
-                    .font(RQTypography.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(RQColors.accent)
+            VStack(alignment: .leading, spacing: RQSpacing.sm) {
+                HStack(spacing: RQSpacing.sm) {
+                    Text(title)
+                        .font(RQTypography.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(RQColors.accent)
 
-                if isBodyweight {
-                    Text("Log your bodyweight reps. The app will track your progress and suggest when to add weight or increase reps.")
-                        .font(RQTypography.caption)
-                        .foregroundColor(RQColors.textSecondary)
-                } else if isBarbell {
-                    Text("Start with a comfortable weight you can control with good form. Your first few sessions build a baseline for smart targets.")
-                        .font(RQTypography.caption)
-                        .foregroundColor(RQColors.textSecondary)
-                } else {
-                    Text("Pick a weight that feels manageable and focus on form. The app will use today's data to generate your targets next session.")
-                        .font(RQTypography.caption)
-                        .foregroundColor(RQColors.textSecondary)
+                    if let badge = repBadge {
+                        Text(badge)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(RQColors.accent)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(RQColors.accent.opacity(0.15))
+                            .clipShape(Capsule())
+                    }
                 }
+
+                Text(guidance)
+                    .font(RQTypography.caption)
+                    .foregroundColor(RQColors.textSecondary)
             }
         }
         .padding(RQSpacing.md)

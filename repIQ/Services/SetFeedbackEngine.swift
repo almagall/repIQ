@@ -14,17 +14,30 @@ struct SetFeedbackEngine {
         targetReps: Int,
         targetRPE: Double,
         decision: ProgressionDecision?,
+        trainingMode: TrainingMode,
         isBodyweightOnly: Bool,
         hasTarget: Bool
     ) -> SetFeedback {
 
-        // Baseline: no progression target exists
+        // Baseline: no progression target exists — mode-specific guidance
         guard hasTarget else {
+            let headline: String
+            let detail: String
+            if isBodyweightOnly {
+                headline = "Baseline recorded — \(actualReps) reps logged"
+                detail = "The app will track your rep progression and suggest when to add weight or push for more."
+            } else if trainingMode == .strength {
+                headline = "Baseline recorded — \(formatDelta(actualWeight)) × \(actualReps)"
+                detail = "The app will build your ramping sets from this. Next session you'll see mode-specific targets that build to a challenging top set."
+            } else {
+                headline = "Baseline recorded — \(formatDelta(actualWeight)) × \(actualReps)"
+                detail = "Aim for similar or slightly more next session. The app will generate straight-set targets based on your performance."
+            }
             return SetFeedback(
                 id: setId,
                 outcome: .onTarget,
-                headline: "Baseline recorded",
-                detail: "This establishes your starting point. Personalized targets will appear next session.",
+                headline: headline,
+                detail: detail,
                 weightDelta: 0,
                 repsDelta: 0,
                 rpeDelta: nil,

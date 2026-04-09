@@ -133,6 +133,8 @@ struct WorkoutSummaryData: Identifiable {
     // Performance grade
     var performanceGrade: SessionPerformanceGrade?
     var exercisePerformanceGrades: [ExercisePerformanceGrade] = []
+    var baselineHypertrophyCount: Int = 0
+    var baselineStrengthCount: Int = 0
 
     // Context for sharing
     var workoutName: String = ""

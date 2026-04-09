@@ -133,8 +133,8 @@ struct WorkoutSummaryView: View {
                     gamificationSection
                 }
 
-                // First workout baseline message (streak of 1 = first ever workout)
-                if summary.currentStreak == 1 {
+                // Baseline recorded — shows when there are any baseline exercises in this session
+                if summary.baselineHypertrophyCount + summary.baselineStrengthCount > 0 {
                     baselineRecordedCard
                 }
 
@@ -305,13 +305,22 @@ struct WorkoutSummaryView: View {
                         .font(RQTypography.headline)
                         .foregroundColor(RQColors.accent)
 
-                    let exerciseCount = summary.exerciseSummaries.count
-                    Text("The app now knows your starting point for \(exerciseCount) exercise\(exerciseCount == 1 ? "" : "s"). Next time, you will see personalized targets based on today's performance.")
+                    Text(baselineMessage)
                         .font(RQTypography.caption)
                         .foregroundColor(RQColors.textSecondary)
                 }
             }
         }
+    }
+
+    private var baselineMessage: String {
+        let h = summary.baselineHypertrophyCount
+        let s = summary.baselineStrengthCount
+        var parts: [String] = []
+        if h > 0 { parts.append("\(h) hypertrophy exercise\(h == 1 ? "" : "s")") }
+        if s > 0 { parts.append("\(s) strength exercise\(s == 1 ? "" : "s")") }
+        let exerciseList = parts.joined(separator: " and ")
+        return "Baseline recorded for \(exerciseList). Personalized targets will appear next session based on today's performance."
     }
 
     // MARK: - Components

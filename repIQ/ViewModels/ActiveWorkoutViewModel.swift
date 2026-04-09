@@ -742,6 +742,11 @@ final class ActiveWorkoutViewModel {
                 exercises: exercises, feedbacks: setFeedback
             )
 
+            // Count baseline exercises (no progression target = first time logging)
+            let baselineExercises = exercises.filter { $0.progressionTarget == nil && $0.sets.contains(where: { $0.isCompleted && $0.setType == .working }) }
+            summary.baselineHypertrophyCount = baselineExercises.filter { $0.trainingMode == .hypertrophy }.count
+            summary.baselineStrengthCount = baselineExercises.filter { $0.trainingMode == .strength }.count
+
             workoutSummary = summary
 
             timerTask?.cancel()
@@ -942,6 +947,7 @@ final class ActiveWorkoutViewModel {
                 targetReps: tgtR,
                 targetRPE: tgtRPE,
                 decision: exercise.progressionTarget?.decision,
+                trainingMode: exercise.trainingMode,
                 isBodyweightOnly: exercise.isBodyweightOnly,
                 hasTarget: exercise.progressionTarget != nil
             )
