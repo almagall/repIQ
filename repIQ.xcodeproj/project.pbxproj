@@ -7,63 +7,15 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		059E37862F6670B30051D387 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 059E37852F6670B30051D387 /* WidgetKit.framework */; };
-		059E37882F6670B30051D387 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 059E37872F6670B30051D387 /* SwiftUI.framework */; };
-		059E37932F6670B40051D387 /* repIQWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 059E37832F6670B30051D387 /* repIQWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		05F2098D2F57CBE700E0AE4C /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = AABB00022F57000100000002 /* Supabase */; };
 		AABB00052F57000100000005 /* MuscleMap in Frameworks */ = {isa = PBXBuildFile; productRef = AABB00042F57000100000004 /* MuscleMap */; };
 /* End PBXBuildFile section */
 
-/* Begin PBXContainerItemProxy section */
-		059E37912F6670B40051D387 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 05F2081D2F56CC0D00E0AE4C /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 059E37822F6670B30051D387;
-			remoteInfo = repIQWidgetExtension;
-		};
-/* End PBXContainerItemProxy section */
-
-/* Begin PBXCopyFilesBuildPhase section */
-		059E37982F6670B40051D387 /* Embed Foundation Extensions */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 13;
-			files = (
-				059E37932F6670B40051D387 /* repIQWidgetExtension.appex in Embed Foundation Extensions */,
-			);
-			name = "Embed Foundation Extensions";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXCopyFilesBuildPhase section */
-
 /* Begin PBXFileReference section */
-		059E37832F6670B30051D387 /* repIQWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = repIQWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		059E37852F6670B30051D387 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
-		059E37872F6670B30051D387 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		05F208252F56CC0D00E0AE4C /* repIQ.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = repIQ.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		059E37942F6670B40051D387 /* Exceptions for "repIQWidget" folder in "repIQWidgetExtension" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Info.plist,
-			);
-			target = 059E37822F6670B30051D387 /* repIQWidgetExtension */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		059E37892F6670B30051D387 /* repIQWidget */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				059E37942F6670B40051D387 /* Exceptions for "repIQWidget" folder in "repIQWidgetExtension" target */,
-			);
-			path = repIQWidget;
-			sourceTree = "<group>";
-		};
 		05F208272F56CC0D00E0AE4C /* repIQ */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = repIQ;
@@ -72,15 +24,6 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		059E37802F6670B30051D387 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				059E37882F6670B30051D387 /* SwiftUI.framework in Frameworks */,
-				059E37862F6670B30051D387 /* WidgetKit.framework in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		05F208222F56CC0D00E0AE4C /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -93,21 +36,10 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		059E37842F6670B30051D387 /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-				059E37852F6670B30051D387 /* WidgetKit.framework */,
-				059E37872F6670B30051D387 /* SwiftUI.framework */,
-			);
-			name = Frameworks;
-			sourceTree = "<group>";
-		};
 		05F2081C2F56CC0D00E0AE4C = {
 			isa = PBXGroup;
 			children = (
 				05F208272F56CC0D00E0AE4C /* repIQ */,
-				059E37892F6670B30051D387 /* repIQWidget */,
-				059E37842F6670B30051D387 /* Frameworks */,
 				05F208262F56CC0D00E0AE4C /* Products */,
 			);
 			sourceTree = "<group>";
@@ -116,7 +48,6 @@
 			isa = PBXGroup;
 			children = (
 				05F208252F56CC0D00E0AE4C /* repIQ.app */,
-				059E37832F6670B30051D387 /* repIQWidgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -124,28 +55,6 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		059E37822F6670B30051D387 /* repIQWidgetExtension */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 059E37952F6670B40051D387 /* Build configuration list for PBXNativeTarget "repIQWidgetExtension" */;
-			buildPhases = (
-				059E377F2F6670B30051D387 /* Sources */,
-				059E37802F6670B30051D387 /* Frameworks */,
-				059E37812F6670B30051D387 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
-				059E37892F6670B30051D387 /* repIQWidget */,
-			);
-			name = repIQWidgetExtension;
-			packageProductDependencies = (
-			);
-			productName = repIQWidgetExtension;
-			productReference = 059E37832F6670B30051D387 /* repIQWidgetExtension.appex */;
-			productType = "com.apple.product-type.app-extension";
-		};
 		05F208242F56CC0D00E0AE4C /* repIQ */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 05F208302F56CC0E00E0AE4C /* Build configuration list for PBXNativeTarget "repIQ" */;
@@ -153,12 +62,10 @@
 				05F208212F56CC0D00E0AE4C /* Sources */,
 				05F208222F56CC0D00E0AE4C /* Frameworks */,
 				05F208232F56CC0D00E0AE4C /* Resources */,
-				059E37982F6670B40051D387 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				059E37922F6670B40051D387 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				05F208272F56CC0D00E0AE4C /* repIQ */,
@@ -182,9 +89,6 @@
 				LastSwiftUpdateCheck = 2620;
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
-					059E37822F6670B30051D387 = {
-						CreatedOnToolsVersion = 26.2;
-					};
 					05F208242F56CC0D00E0AE4C = {
 						CreatedOnToolsVersion = 26.2;
 					};
@@ -209,19 +113,11 @@
 			projectRoot = "";
 			targets = (
 				05F208242F56CC0D00E0AE4C /* repIQ */,
-				059E37822F6670B30051D387 /* repIQWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		059E37812F6670B30051D387 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		05F208232F56CC0D00E0AE4C /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -232,13 +128,6 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		059E377F2F6670B30051D387 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		05F208212F56CC0D00E0AE4C /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -248,73 +137,7 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
-/* Begin PBXTargetDependency section */
-		059E37922F6670B40051D387 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 059E37822F6670B30051D387 /* repIQWidgetExtension */;
-			targetProxy = 059E37912F6670B40051D387 /* PBXContainerItemProxy */;
-		};
-/* End PBXTargetDependency section */
-
 /* Begin XCBuildConfiguration section */
-		059E37962F6670B40051D387 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = repIQWidget/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = repIQWidget;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.repiq.repIQ.repIQWidget;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SKIP_INSTALL = YES;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		059E37972F6670B40051D387 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = repIQWidget/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = repIQWidget;
-				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.repiq.repIQ.repIQWidget;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SKIP_INSTALL = YES;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Release;
-		};
 		05F2082E2F56CC0E00E0AE4C /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -440,9 +263,12 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
+				DEVELOPMENT_TEAM = A6A68RW9W3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = repIQ/Info.plist;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -471,9 +297,12 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
+				DEVELOPMENT_TEAM = A6A68RW9W3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = repIQ/Info.plist;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -499,15 +328,6 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		059E37952F6670B40051D387 /* Build configuration list for PBXNativeTarget "repIQWidgetExtension" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				059E37962F6670B40051D387 /* Debug */,
-				059E37972F6670B40051D387 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		05F208202F56CC0D00E0AE4C /* Build configuration list for PBXProject "repIQ" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

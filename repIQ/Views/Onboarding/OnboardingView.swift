@@ -447,21 +447,9 @@ struct OnboardingView: View {
             Spacer()
 
             VStack(spacing: RQSpacing.sm) {
-                RQButton(title: selectedGymName != nil ? "Continue" : "Find Your Gym") {
-                    if selectedGymName != nil {
-                        withAnimation { currentStep = 6 }
-                    } else {
-                        showGymSearch = true
-                    }
-                }
-
                 if selectedGymName == nil {
-                    Button {
-                        withAnimation { currentStep = 6 }
-                    } label: {
-                        Text("Skip for Now")
-                            .font(RQTypography.caption)
-                            .foregroundColor(RQColors.textTertiary)
+                    RQButton(title: "Find Your Gym") {
+                        showGymSearch = true
                     }
                 }
 
@@ -469,6 +457,15 @@ struct OnboardingView: View {
                     RQButton(title: "Back", style: .secondary) {
                         withAnimation { currentStep = 4 }
                     }
+                    RQButton(title: selectedGymName != nil ? "Continue" : "Skip") {
+                        withAnimation { currentStep = 6 }
+                    }
+                }
+
+                if selectedGymName == nil {
+                    Text("You can set your gym anytime from the profile tab")
+                        .font(RQTypography.caption)
+                        .foregroundColor(RQColors.textTertiary)
                 }
             }
             .padding(.horizontal, RQSpacing.screenHorizontal)
@@ -477,8 +474,15 @@ struct OnboardingView: View {
         .sheet(isPresented: $showGymSearch) {
             NavigationStack {
                 GymSearchView()
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button("Close") {
+                                showGymSearch = false
+                            }
+                            .foregroundColor(RQColors.accent)
+                        }
+                    }
                     .onDisappear {
-                        // Reload gym name after search view closes
                         Task {
                             guard let userId = try? await supabase.auth.session.user.id else { return }
                             struct GymRow: Decodable { let gym_name: String? }
