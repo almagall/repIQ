@@ -123,14 +123,6 @@ struct ActiveWorkoutView: View {
                         }
                     }
                 }
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") {
-                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                    }
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(RQColors.accent)
-                }
             }
             .alert("Finish Workout?", isPresented: $viewModel.showFinishConfirmation) {
                 Button("Finish", role: .none) {

@@ -195,7 +195,7 @@ struct ExerciseLogView: View {
                 }
 
                 // Add Weight toggle for bodyweight exercises
-                if exercise.equipment == "bodyweight" {
+                if exercise.isBodyweightOnly || exercise.useAddedWeight {
                     Button {
                         viewModel.toggleAddedWeight(exerciseIndex: exerciseIndex)
                     } label: {

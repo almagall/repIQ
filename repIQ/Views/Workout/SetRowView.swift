@@ -206,6 +206,16 @@ struct SetRowView: View {
                             .cornerRadius(RQRadius.small)
                             .focused($focusedField, equals: .weight)
                             .disabled(set.isCompleted)
+                            .toolbar {
+                                if focusedField == .weight {
+                                    ToolbarItemGroup(placement: .keyboard) {
+                                        Spacer()
+                                        Button("Done") { focusedField = nil }
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundColor(RQColors.accent)
+                                    }
+                                }
+                            }
                             .onChange(of: weightText) { _, newValue in
                                 if let weight = Double(newValue) {
                                     viewModel.updateWeight(exerciseIndex: exerciseIndex, setIndex: setIndex, weight: weight)
@@ -228,6 +238,16 @@ struct SetRowView: View {
                         .cornerRadius(RQRadius.small)
                         .focused($focusedField, equals: .reps)
                         .disabled(set.isCompleted)
+                        .toolbar {
+                            if focusedField == .reps {
+                                ToolbarItemGroup(placement: .keyboard) {
+                                    Spacer()
+                                    Button("Done") { focusedField = nil }
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundColor(RQColors.accent)
+                                }
+                            }
+                        }
                         .onChange(of: repsText) { _, newValue in
                             if let reps = Int(newValue) {
                                 viewModel.updateReps(exerciseIndex: exerciseIndex, setIndex: setIndex, reps: reps)

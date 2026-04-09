@@ -94,8 +94,10 @@ struct ExerciseLogEntry: Identifiable {
     var useAddedWeight: Bool = false
 
     /// True when equipment is bodyweight and user hasn't opted into added weight tracking.
+    /// Case-insensitive and whitespace-tolerant to handle database inconsistencies.
     var isBodyweightOnly: Bool {
-        equipment == "bodyweight" && !useAddedWeight
+        let normalized = equipment.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return (normalized == "bodyweight" || normalized == "body_weight" || normalized == "body-weight") && !useAddedWeight
     }
 
     /// The effective rep range for this exercise, taking into account the training

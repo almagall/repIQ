@@ -25,7 +25,8 @@ struct ProgressionService: Sendable {
         }
 
         // Bodyweight exercises use rep-only progression (no e1RM)
-        if equipment == "bodyweight" {
+        let normalizedEquipment = equipment.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if normalizedEquipment == "bodyweight" || normalizedEquipment == "body_weight" || normalizedEquipment == "body-weight" {
             return calculateBodyweightTarget(
                 exerciseId: exerciseId,
                 trainingMode: trainingMode,
