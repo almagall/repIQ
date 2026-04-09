@@ -304,6 +304,23 @@ struct VolumeLandmarkData: Identifiable {
     var color: Color {
         RQColors.muscleGroupColors[muscleGroup] ?? RQColors.textTertiary
     }
+
+    /// Actionable prescription based on the current status vs landmarks.
+    /// Returns nil when the muscle is in the sweet spot (no action needed).
+    var prescription: String? {
+        switch status {
+        case .belowMEV:
+            let deficit = max(1, mev - currentWeeklySets)
+            return "Add \(deficit)-\(deficit + 2) sets/wk"
+        case .withinMAV:
+            return nil
+        case .approachingMRV:
+            return "Monitor fatigue"
+        case .aboveMRV:
+            let excess = max(1, currentWeeklySets - mrv)
+            return "Reduce \(excess)-\(excess + 2) sets/wk"
+        }
+    }
 }
 
 enum VolumeLandmarkStatus: String, Sendable {
@@ -409,6 +426,46 @@ struct StrengthPrediction {
 
     /// True if we have enough data and a reasonable fit.
     var isReliable: Bool { confidence >= 0.3 }
+}
+
+// MARK: - Top Lift Trajectory (hero card on Progress tab)
+
+struct TopLiftTrajectory: Identifiable, Sendable {
+    let exerciseId: UUID
+    let exerciseName: String
+    let muscleGroup: String
+    let sessionCount: Int
+    let currentE1RM: Double
+    let fourWeekDelta: Double
+    let fourWeekDeltaPercent: Double
+    let velocityStatus: VelocityStatus
+    let weeklyPercent: Double
+    let narrative: String
+    let sparkline: [Double] // recent e1RM values for the mini chart
+
+    var id: UUID { exerciseId }
+
+    /// Builds a one-sentence coaching narrative based on velocity and delta.
+    static func buildNarrative(status: VelocityStatus, weeklyPercent: Double, deltaPercent: Double, sessionCount: Int) -> String {
+        if sessionCount < 3 {
+            return "Building baseline — keep logging"
+        }
+        switch status {
+        case .accelerating:
+            return String(format: "Trending up +%.1f%%/wk — strong gains", weeklyPercent)
+        case .progressing:
+            return String(format: "Progressing +%.1f%%/wk — on track", weeklyPercent)
+        case .maintaining:
+            if abs(deltaPercent) < 1.0 {
+                return "Maintaining — consider a progression push"
+            }
+            return "Holding steady"
+        case .stalling:
+            return "Plateau — try variety or deload"
+        case .regressing:
+            return String(format: "Regressing %.1f%%/wk — check recovery", weeklyPercent)
+        }
+    }
 }
 
 // MARK: - Compound Synergist Map

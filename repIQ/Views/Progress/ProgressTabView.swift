@@ -22,54 +22,44 @@ struct ProgressTabView: View {
                     )
                 } else {
                     VStack(spacing: RQSpacing.xl) {
-                        // 1. Streak Banner — emotional hook
-                        streakBanner
-
-                        // 2. Consistency Score — overall training health
-                        if let score = viewModel.consistencyScore, score.overall > 0 {
-                            consistencyScoreSection
+                        // 1. Hero: Strength Trajectory — top 3 lifts with AI narrative
+                        StrengthTrajectoryCard(lifts: viewModel.topLifts) { _ in
+                            showExercisePicker = true
                         }
 
-                        // 3. Overview Stats Grid — quick health check
-                        overviewStatsGrid
+                        // 2. Streak + Consistency (merged)
+                        streakConsistencySection
 
-                        // Exercise Progress — drill-down entry
-                        exerciseProgressButton
-
-                        // 4. Weekly Volume Chart — primary trend
-                        volumeChartSection
-
-                        // 5. Smart Insights — prescriptive advice (high value)
+                        // 3. Smart Insights — prescriptive coaching (promoted from #6)
                         if !viewModel.insights.isEmpty {
                             insightsSection
                         }
 
-                        // 6. Recent PRs — reward/celebration
-                        if !viewModel.recentPRs.isEmpty {
-                            recentPRsSection
-                        }
+                        // 4. Volume Trend with 4-week baseline overlay
+                        volumeChartSection
 
-                        // 7. Push/Pull Balance
-                        if let balance = viewModel.pushPullBalance, balance.pushVolume > 0 || balance.pullVolume > 0 {
-                            pushPullSection
-                        }
-
-                        // 9. Muscle Balance — with fractional volume toggle
+                        // 5. Muscle Balance + Push/Pull (merged)
                         if !viewModel.activeMuscleDistribution.isEmpty {
                             muscleBalanceSection
                         }
 
-                        // 10. Volume Landmarks
+                        // 6. Volume Landmarks with prescriptions
                         if !viewModel.volumeLandmarks.isEmpty {
                             volumeLandmarksSection
                         }
 
-                        // 11. Training Quality — effective reps breakdown
+                        // 7. Training Quality — simplified to 3 weakest muscles
                         if !viewModel.effectiveRepsSummary.isEmpty {
                             trainingQualitySection
                         }
 
-                        // Training Frequency moved to Home page (Activity calendar)
+                        // 8. Recent PRs — celebration
+                        if !viewModel.recentPRs.isEmpty {
+                            recentPRsSection
+                        }
+
+                        // 9. Lifetime Stats Footer
+                        lifetimeStatsFooter
                     }
                     .padding(.horizontal, RQSpacing.screenHorizontal)
                     .padding(.top, RQSpacing.lg)
@@ -113,41 +103,81 @@ struct ProgressTabView: View {
 
     // Share text removed — replaced with Monthly Report Card button
 
-    // MARK: - 1. Streak Banner
+    // MARK: - 2. Streak + Consistency (merged)
 
-    private var streakBanner: some View {
-        RQCard {
-            HStack {
-                HStack(spacing: RQSpacing.md) {
-                    Image(systemName: "flame.fill")
-                        .font(.system(size: 28))
-                        .foregroundColor(streakColor)
+    private var streakConsistencySection: some View {
+        VStack(alignment: .leading, spacing: RQSpacing.md) {
+            sectionHeaderWithInfo("CONSISTENCY", topic: ProgressExplainer.consistencyScore)
 
-                    VStack(alignment: .leading, spacing: RQSpacing.xxs) {
-                        if let streak = viewModel.streakData, streak.currentStreak > 0 {
-                            Text("\(streak.currentStreak) WEEK STREAK")
-                                .font(RQTypography.numbers)
-                                .foregroundColor(RQColors.textPrimary)
-                        } else {
-                            Text("START YOUR STREAK")
-                                .font(RQTypography.headline)
-                                .foregroundColor(RQColors.textSecondary)
+            RQCard {
+                VStack(alignment: .leading, spacing: RQSpacing.lg) {
+                    // Top row: flame + streak + consistency ring
+                    HStack(spacing: RQSpacing.lg) {
+                        // Flame + streak
+                        HStack(spacing: RQSpacing.sm) {
+                            Image(systemName: "flame.fill")
+                                .font(.system(size: 22))
+                                .foregroundColor(streakColor)
+
+                            VStack(alignment: .leading, spacing: 0) {
+                                if let streak = viewModel.streakData, streak.currentStreak > 0 {
+                                    Text("\(streak.currentStreak)")
+                                        .font(RQTypography.numbers)
+                                        .foregroundColor(RQColors.textPrimary)
+                                    Text("WEEK STREAK")
+                                        .font(.system(size: 8, weight: .semibold))
+                                        .tracking(0.5)
+                                        .foregroundColor(RQColors.textTertiary)
+                                } else {
+                                    Text("—")
+                                        .font(RQTypography.numbers)
+                                        .foregroundColor(RQColors.textTertiary)
+                                    Text("NO STREAK")
+                                        .font(.system(size: 8, weight: .semibold))
+                                        .tracking(0.5)
+                                        .foregroundColor(RQColors.textTertiary)
+                                }
+                            }
                         }
 
-                        if let streak = viewModel.streakData, streak.bestStreak > 0 {
-                            Text("Best: \(streak.bestStreak) week\(streak.bestStreak == 1 ? "" : "s")")
-                                .font(RQTypography.caption)
-                                .foregroundColor(RQColors.textTertiary)
+                        Spacer()
+
+                        // Consistency ring
+                        if let score = viewModel.consistencyScore, score.overall > 0 {
+                            HStack(spacing: RQSpacing.sm) {
+                                ZStack {
+                                    Circle()
+                                        .stroke(RQColors.surfaceTertiary, lineWidth: 4)
+                                        .frame(width: 48, height: 48)
+                                    Circle()
+                                        .trim(from: 0, to: Double(score.overall) / 100.0)
+                                        .stroke(
+                                            score.grade.color,
+                                            style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                                        )
+                                        .frame(width: 48, height: 48)
+                                        .rotationEffect(.degrees(-90))
+                                    Text("\(score.overall)")
+                                        .font(.system(size: 14, weight: .bold, design: .monospaced))
+                                        .foregroundColor(RQColors.textPrimary)
+                                }
+
+                                VStack(alignment: .leading, spacing: 0) {
+                                    Text(score.grade.displayName.uppercased())
+                                        .font(.system(size: 10, weight: .bold))
+                                        .tracking(0.5)
+                                        .foregroundColor(score.grade.color)
+                                    Text("8-week score")
+                                        .font(.system(size: 9))
+                                        .foregroundColor(RQColors.textTertiary)
+                                }
+                            }
                         }
                     }
-                }
 
-                Spacer()
-
-                if let streak = viewModel.streakData, streak.currentStreak >= 4 {
-                    Text("\(streak.currentStreak)")
-                        .font(RQTypography.title1)
-                        .foregroundColor(RQColors.accent.opacity(0.2))
+                    // Heatmap
+                    ConsistencyHeatmap(dailyData: viewModel.frequencyData)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }
@@ -162,146 +192,40 @@ struct ProgressTabView: View {
         return RQColors.textTertiary
     }
 
-    // MARK: - 2. Consistency Score
+    // MARK: - 9. Lifetime Stats Footer (small strip)
 
-    private var consistencyScoreSection: some View {
-        VStack(alignment: .leading, spacing: RQSpacing.md) {
-            sectionHeaderWithInfo("CONSISTENCY", topic: ProgressExplainer.consistencyScore)
-
-            if let score = viewModel.consistencyScore {
-                RQCard {
-                    VStack(spacing: RQSpacing.lg) {
-                        HStack(spacing: RQSpacing.lg) {
-                            // Score ring
-                            ZStack {
-                                Circle()
-                                    .stroke(RQColors.surfaceTertiary, lineWidth: 5)
-                                    .frame(width: 68, height: 68)
-                                Circle()
-                                    .trim(from: 0, to: Double(score.overall) / 100.0)
-                                    .stroke(
-                                        score.grade.color,
-                                        style: StrokeStyle(lineWidth: 5, lineCap: .round)
-                                    )
-                                    .frame(width: 68, height: 68)
-                                    .rotationEffect(.degrees(-90))
-                                VStack(spacing: 0) {
-                                    Text("\(score.overall)")
-                                        .font(RQTypography.numbers)
-                                        .foregroundColor(RQColors.textPrimary)
-                                }
-                            }
-
-                            VStack(alignment: .leading, spacing: RQSpacing.xs) {
-                                Text(score.grade.displayName.uppercased())
-                                    .font(RQTypography.label)
-                                    .tracking(1)
-                                    .foregroundColor(score.grade.color)
-                                Text("Training consistency over the past 8 weeks")
-                                    .font(RQTypography.caption)
-                                    .foregroundColor(RQColors.textTertiary)
-                            }
-
-                            Spacer()
-                        }
-
-                        // Factor breakdown
-                        VStack(spacing: RQSpacing.sm) {
-                            consistencyFactor(label: "Frequency", value: score.frequencyScore, weight: "40%")
-                            consistencyFactor(label: "Volume Stability", value: score.volumeStabilityScore, weight: "25%")
-                            consistencyFactor(label: "Streak", value: score.streakScore, weight: "20%")
-                            consistencyFactor(label: "Recency", value: score.recencyScore, weight: "15%")
-                        }
-                    }
-                }
-            }
+    private var lifetimeStatsFooter: some View {
+        HStack(spacing: 0) {
+            lifetimeStat(value: "\(viewModel.sessions.count)", label: "WORKOUTS")
+            Divider().frame(height: 24).background(RQColors.surfaceTertiary)
+            lifetimeStat(value: formatVolumeCompact(viewModel.totalVolume), label: "TOTAL VOL")
+            Divider().frame(height: 24).background(RQColors.surfaceTertiary)
+            lifetimeStat(value: "\(viewModel.totalPRCount)", label: "PRS")
+            Divider().frame(height: 24).background(RQColors.surfaceTertiary)
+            lifetimeStat(value: "\(daysTrainingCount)", label: "DAYS")
         }
+        .padding(.vertical, RQSpacing.sm)
     }
 
-    private func consistencyFactor(label: String, value: Double, weight: String) -> some View {
-        HStack(spacing: RQSpacing.sm) {
-            Text(label)
-                .font(RQTypography.caption)
+    private func lifetimeStat(value: String, label: String) -> some View {
+        VStack(spacing: 2) {
+            Text(value)
+                .font(.system(size: 13, weight: .semibold, design: .monospaced))
                 .foregroundColor(RQColors.textSecondary)
-                .frame(width: 100, alignment: .leading)
-
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(RQColors.surfaceTertiary)
-                        .frame(height: 4)
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(factorColor(value))
-                        .frame(width: max(0, geo.size.width * value), height: 4)
-                }
-            }
-            .frame(height: 4)
-
-            Text(weight)
-                .font(RQTypography.label)
+            Text(label)
+                .font(.system(size: 8, weight: .medium))
+                .tracking(0.5)
                 .foregroundColor(RQColors.textTertiary)
-                .frame(width: 28, alignment: .trailing)
         }
+        .frame(maxWidth: .infinity)
     }
 
-    private func factorColor(_ value: Double) -> Color {
-        if value >= 0.75 { return RQColors.success }
-        if value >= 0.5 { return RQColors.accent }
-        if value >= 0.25 { return RQColors.warning }
-        return RQColors.error
-    }
-
-    // MARK: - 3. Overview Stats Grid
-
-    private var overviewStatsGrid: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: RQSpacing.md) {
-            overviewStatCard(
-                label: "WEEKLY VOLUME",
-                value: formatVolumeCompact(viewModel.weeklyVolume),
-                icon: "scalemass.fill",
-                color: RQColors.accent
-            )
-            overviewStatCard(
-                label: "WEEKLY WORKOUTS",
-                value: "\(viewModel.weeklySessionCount)",
-                icon: "figure.strengthtraining.traditional",
-                color: RQColors.accent
-            )
-            overviewStatCard(
-                label: "TOTAL VOLUME",
-                value: formatVolumeCompact(viewModel.totalVolume),
-                icon: "trophy.fill",
-                color: RQColors.accent
-            )
-            overviewStatCard(
-                label: "PERSONAL RECORDS",
-                value: "\(viewModel.totalPRCount)",
-                icon: "star.fill",
-                color: RQColors.warning
-            )
+    private var daysTrainingCount: Int {
+        guard let firstSession = viewModel.sessions.min(by: { ($0.completedAt ?? $0.startedAt) < ($1.completedAt ?? $1.startedAt) }) else {
+            return 0
         }
-    }
-
-    private func overviewStatCard(label: String, value: String, icon: String, color: Color) -> some View {
-        RQCard {
-            VStack(spacing: RQSpacing.sm) {
-                Image(systemName: icon)
-                    .font(.system(size: 18))
-                    .foregroundColor(color)
-
-                Text(value)
-                    .font(RQTypography.numbers)
-                    .foregroundColor(RQColors.textPrimary)
-
-                Text(label)
-                    .font(RQTypography.label)
-                    .textCase(.uppercase)
-                    .tracking(1)
-                    .foregroundColor(RQColors.textSecondary)
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: .infinity)
-        }
+        let startDate = firstSession.completedAt ?? firstSession.startedAt
+        return max(1, Calendar.current.dateComponents([.day], from: startDate, to: Date()).day ?? 0)
     }
 
     // MARK: - 4. Weekly Volume Chart
@@ -313,13 +237,26 @@ struct ProgressTabView: View {
             RQCard {
                 VStack(alignment: .leading, spacing: RQSpacing.md) {
                     if viewModel.volumeTrend.contains(where: { $0.totalVolume > 0 }) {
-                        Chart(viewModel.volumeTrend) { week in
-                            BarMark(
-                                x: .value("Week", week.weekStart, unit: .weekOfYear),
-                                y: .value("Volume", week.totalVolume)
-                            )
-                            .foregroundStyle(isCurrentWeek(week.weekStart) ? RQColors.accent : RQColors.textTertiary)
-                            .cornerRadius(RQRadius.small)
+                        Chart {
+                            ForEach(viewModel.volumeTrend) { week in
+                                BarMark(
+                                    x: .value("Week", week.weekStart, unit: .weekOfYear),
+                                    y: .value("Volume", week.totalVolume)
+                                )
+                                .foregroundStyle(isCurrentWeek(week.weekStart) ? RQColors.accent : RQColors.textTertiary)
+                                .cornerRadius(RQRadius.small)
+                            }
+                            // 4-week baseline reference line
+                            if let baseline = viewModel.volumeBaseline {
+                                RuleMark(y: .value("Baseline", baseline))
+                                    .foregroundStyle(RQColors.success.opacity(0.7))
+                                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                                    .annotation(position: .top, alignment: .trailing) {
+                                        Text("4wk avg")
+                                            .font(.system(size: 8, weight: .semibold))
+                                            .foregroundColor(RQColors.success.opacity(0.8))
+                                    }
+                            }
                         }
                         .chartXAxis {
                             AxisMarks(values: .stride(by: .weekOfYear, count: 2)) { value in
@@ -350,15 +287,16 @@ struct ProgressTabView: View {
                         }
                         .frame(height: 160)
 
-                        // Delta indicator
-                        if let delta = viewModel.volumeDeltaPercent {
+                        // Narrative interpretation (replaces raw % delta)
+                        if let narrative = viewModel.volumeTrendNarrative {
                             HStack(spacing: RQSpacing.xs) {
-                                Image(systemName: delta >= 0 ? "arrow.up.right" : "arrow.down.right")
-                                    .font(.system(size: 10, weight: .bold))
-                                Text(String(format: "%+.0f%% vs last week", delta))
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(RQColors.accent)
+                                Text(narrative)
                                     .font(RQTypography.caption)
+                                    .foregroundColor(RQColors.textSecondary)
                             }
-                            .foregroundColor(delta >= 0 ? RQColors.chartPositive : RQColors.chartNegative)
                         }
                     } else {
                         Text("Complete more workouts to see volume trends")
@@ -462,84 +400,7 @@ struct ProgressTabView: View {
         .frame(width: 130)
     }
 
-    // MARK: - 7. Push/Pull Balance
-
-    private var pushPullSection: some View {
-        VStack(alignment: .leading, spacing: RQSpacing.md) {
-            sectionHeaderWithInfo("PUSH / PULL BALANCE", topic: ProgressExplainer.pushPullBalance)
-
-            if let balance = viewModel.pushPullBalance {
-                RQCard {
-                    VStack(spacing: RQSpacing.lg) {
-                        // Ratio display
-                        HStack(spacing: RQSpacing.md) {
-                            Image(systemName: balance.status.icon)
-                                .font(.system(size: 22))
-                                .foregroundColor(balance.status.color)
-
-                            VStack(alignment: .leading, spacing: RQSpacing.xxs) {
-                                HStack(spacing: RQSpacing.sm) {
-                                    Text(balance.ratioString)
-                                        .font(RQTypography.numbers)
-                                        .foregroundColor(RQColors.textPrimary)
-                                    Text(balance.status.displayName.uppercased())
-                                        .font(RQTypography.label)
-                                        .tracking(0.5)
-                                        .foregroundColor(balance.status.color)
-                                }
-                                Text("Push : Pull ratio (past 30 days)")
-                                    .font(RQTypography.caption)
-                                    .foregroundColor(RQColors.textTertiary)
-                            }
-
-                            Spacer()
-                        }
-
-                        // Visual bar
-                        let total = balance.pushVolume + balance.pullVolume
-                        if total > 0 {
-                            VStack(spacing: RQSpacing.sm) {
-                                GeometryReader { geo in
-                                    HStack(spacing: 2) {
-                                        RoundedRectangle(cornerRadius: 2)
-                                            .fill(RQColors.strength)
-                                            .frame(width: max(4, geo.size.width * (balance.pushVolume / total)))
-
-                                        RoundedRectangle(cornerRadius: 2)
-                                            .fill(RQColors.accent)
-                                            .frame(width: max(4, geo.size.width * (balance.pullVolume / total)))
-                                    }
-                                }
-                                .frame(height: 10)
-
-                                HStack {
-                                    HStack(spacing: RQSpacing.xs) {
-                                        RoundedRectangle(cornerRadius: 2)
-                                            .fill(RQColors.strength)
-                                            .frame(width: 10, height: 10)
-                                        Text("Push \(balance.pushSets) sets")
-                                            .font(RQTypography.caption)
-                                            .foregroundColor(RQColors.textSecondary)
-                                    }
-                                    Spacer()
-                                    HStack(spacing: RQSpacing.xs) {
-                                        Text("Pull \(balance.pullSets) sets")
-                                            .font(RQTypography.caption)
-                                            .foregroundColor(RQColors.textSecondary)
-                                        RoundedRectangle(cornerRadius: 2)
-                                            .fill(RQColors.accent)
-                                            .frame(width: 10, height: 10)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: - 9. Muscle Group Balance
+    // MARK: - 5. Muscle Balance (with merged Push/Pull)
 
     private var muscleBalanceSection: some View {
         VStack(alignment: .leading, spacing: RQSpacing.md) {
@@ -585,7 +446,7 @@ struct ProgressTabView: View {
                         .foregroundStyle(group.color)
                         .cornerRadius(RQRadius.small)
                     }
-                    .frame(height: 180)
+                    .frame(height: 160)
 
                     if viewModel.showFractionalVolume {
                         HStack(spacing: RQSpacing.xs) {
@@ -618,6 +479,61 @@ struct ProgressTabView: View {
                             }
                         }
                     }
+
+                    // Push / Pull ratio (merged in)
+                    if let balance = viewModel.pushPullBalance,
+                       balance.pushVolume + balance.pullVolume > 0 {
+                        Divider().background(RQColors.surfaceTertiary)
+                        pushPullStrip(balance)
+                    }
+                }
+            }
+        }
+    }
+
+    private func pushPullStrip(_ balance: PushPullBalance) -> some View {
+        VStack(alignment: .leading, spacing: RQSpacing.xs) {
+            HStack(spacing: RQSpacing.sm) {
+                Image(systemName: balance.status.icon)
+                    .font(.system(size: 12))
+                    .foregroundColor(balance.status.color)
+                Text("PUSH : PULL")
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(0.5)
+                    .foregroundColor(RQColors.textTertiary)
+                Text(balance.ratioString)
+                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                    .foregroundColor(RQColors.textPrimary)
+                Spacer()
+                Text(balance.status.displayName.uppercased())
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(0.5)
+                    .foregroundColor(balance.status.color)
+            }
+
+            // Visual bar
+            let total = balance.pushVolume + balance.pullVolume
+            if total > 0 {
+                GeometryReader { geo in
+                    HStack(spacing: 2) {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(RQColors.strength)
+                            .frame(width: max(4, geo.size.width * (balance.pushVolume / total)))
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(RQColors.accent)
+                            .frame(width: max(4, geo.size.width * (balance.pullVolume / total)))
+                    }
+                }
+                .frame(height: 6)
+
+                HStack {
+                    Text("Push \(balance.pushSets)")
+                        .font(.system(size: 9))
+                        .foregroundColor(RQColors.textTertiary)
+                    Spacer()
+                    Text("Pull \(balance.pullSets)")
+                        .font(.system(size: 9))
+                        .foregroundColor(RQColors.textTertiary)
                 }
             }
         }
@@ -667,6 +583,12 @@ struct ProgressTabView: View {
                     Text(data.displayName)
                         .font(RQTypography.caption)
                         .foregroundColor(RQColors.textSecondary)
+
+                    if let prescription = data.prescription {
+                        Text("· \(prescription)")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(data.status.color)
+                    }
                 }
 
                 Spacer()
@@ -776,35 +698,59 @@ struct ProgressTabView: View {
                         }
                     }
 
-                    // Per muscle group breakdown
-                    ForEach(viewModel.effectiveRepsSummary.prefix(6)) { data in
-                        HStack(spacing: RQSpacing.sm) {
-                            RoundedRectangle(cornerRadius: 2)
-                                .fill(data.color)
-                                .frame(width: 10, height: 10)
+                    // Show only the 3 weakest muscles (most room to improve)
+                    if !viewModel.weakestEffectiveMuscles.isEmpty {
+                        Divider().background(RQColors.surfaceTertiary)
 
-                            Text(data.displayName)
-                                .font(RQTypography.caption)
-                                .foregroundColor(RQColors.textSecondary)
-                                .frame(width: 80, alignment: .leading)
-
-                            // Progress bar
-                            GeometryReader { geo in
-                                ZStack(alignment: .leading) {
-                                    RoundedRectangle(cornerRadius: 2)
-                                        .fill(RQColors.surfaceTertiary)
-                                        .frame(height: 6)
-                                    RoundedRectangle(cornerRadius: 2)
-                                        .fill(effectiveRatioColor(data.effectiveRatio))
-                                        .frame(width: max(0, geo.size.width * data.effectiveRatio), height: 6)
-                                }
-                            }
-                            .frame(height: 6)
-
-                            Text("\(data.effectiveReps)/\(data.totalReps)")
-                                .font(RQTypography.label)
+                        HStack {
+                            Text("WHERE YOU'RE LEAVING GAINS")
+                                .font(.system(size: 9, weight: .bold))
+                                .tracking(0.5)
                                 .foregroundColor(RQColors.textTertiary)
-                                .frame(width: 50, alignment: .trailing)
+                            Spacer()
+                        }
+
+                        ForEach(viewModel.weakestEffectiveMuscles) { data in
+                            HStack(spacing: RQSpacing.sm) {
+                                RoundedRectangle(cornerRadius: 2)
+                                    .fill(data.color)
+                                    .frame(width: 10, height: 10)
+
+                                Text(data.displayName)
+                                    .font(RQTypography.caption)
+                                    .foregroundColor(RQColors.textSecondary)
+                                    .frame(width: 80, alignment: .leading)
+
+                                // Progress bar
+                                GeometryReader { geo in
+                                    ZStack(alignment: .leading) {
+                                        RoundedRectangle(cornerRadius: 2)
+                                            .fill(RQColors.surfaceTertiary)
+                                            .frame(height: 6)
+                                        RoundedRectangle(cornerRadius: 2)
+                                            .fill(effectiveRatioColor(data.effectiveRatio))
+                                            .frame(width: max(0, geo.size.width * data.effectiveRatio), height: 6)
+                                    }
+                                }
+                                .frame(height: 6)
+
+                                Text("\(Int(data.effectiveRatio * 100))%")
+                                    .font(RQTypography.label)
+                                    .foregroundColor(RQColors.textTertiary)
+                                    .frame(width: 38, alignment: .trailing)
+                            }
+                        }
+
+                        // Coaching interpretation
+                        if let ratio = viewModel.overallEffectiveRatio, ratio < 0.40 {
+                            HStack(spacing: RQSpacing.xs) {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(RQColors.accent)
+                                Text("Push closer to failure on working sets (RPE 7-9) to drive more growth")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(RQColors.textTertiary)
+                            }
                         }
                     }
                 }
@@ -822,38 +768,7 @@ struct ProgressTabView: View {
     // MARK: - 12. Training Frequency Heatmap
 
     // Training Frequency removed — Activity calendar available on Home page
-
-    // MARK: - 13. Exercise Progress Entry
-
-    private var exerciseProgressButton: some View {
-        Button {
-            showExercisePicker = true
-        } label: {
-            RQCard {
-                HStack {
-                    VStack(alignment: .leading, spacing: RQSpacing.xxs) {
-                        Text("EXERCISE PROGRESS")
-                            .font(RQTypography.label)
-                            .textCase(.uppercase)
-                            .tracking(1.5)
-                            .foregroundColor(RQColors.textSecondary)
-                        Text("View per-exercise trends, velocity, and plateau detection")
-                            .font(RQTypography.caption)
-                            .foregroundColor(RQColors.textTertiary)
-                    }
-                    Spacer()
-                    Image(systemName: "chart.xyaxis.line")
-                        .font(.system(size: 20))
-                        .foregroundColor(RQColors.accent)
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(RQColors.textTertiary)
-                }
-            }
-        }
-        .buttonStyle(.plain)
-    }
-
+    // Exercise Progress entry now lives in the Strength Trajectory hero card (tap through).
     // Workout History removed — available via Home page
 
     // MARK: - Section Header Helpers

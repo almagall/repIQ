@@ -751,6 +751,165 @@ struct AnalyticsService: Sendable {
         )
     }
 
+    // MARK: - Top Lifts Trajectory
+
+    /// Fetches the user's top N most-frequently-logged exercises with their session snapshots
+    /// and a computed velocity narrative. Used for the Progress tab hero card.
+    func fetchTopLiftsTrajectory(userId: UUID, limit: Int = 3) async throws -> [TopLiftTrajectory] {
+        // Fetch all completed sessions
+        let sessions = try await workoutService.fetchAllSessions(userId: userId)
+        guard !sessions.isEmpty else { return [] }
+
+        // Fetch all working sets across all sessions
+        let sessionIds = sessions.map(\.id)
+        let allSets: [WorkoutSet] = try await supabase.from("workout_sets")
+            .select()
+            .in("session_id", values: sessionIds.map(\.uuidString))
+            .eq("set_type", value: "working")
+            .execute()
+            .value
+        guard !allSets.isEmpty else { return [] }
+
+        // Count unique sessions per exercise (session count, not set count)
+        var sessionCountByExercise: [UUID: Set<UUID>] = [:]
+        for set in allSets {
+            sessionCountByExercise[set.exerciseId, default: []].insert(set.sessionId)
+        }
+
+        // Sort exercises by session count descending
+        let topExerciseIds = sessionCountByExercise
+            .sorted { $0.value.count > $1.value.count }
+            .prefix(limit)
+            .map(\.key)
+
+        guard !topExerciseIds.isEmpty else { return [] }
+
+        // Fetch exercise names
+        let exerciseNames: [UUID: String]
+        let exerciseMuscles: [UUID: String]
+        do {
+            let (names, muscles) = try await exerciseService.fetchExerciseNamesAndMuscleGroups(topExerciseIds)
+            exerciseNames = names
+            exerciseMuscles = muscles
+        } catch {
+            exerciseNames = [:]
+            exerciseMuscles = [:]
+        }
+
+        // Build snapshots per exercise
+        let sessionMap = Dictionary(uniqueKeysWithValues: sessions.map { ($0.id, $0) })
+        var trajectories: [TopLiftTrajectory] = []
+
+        for exerciseId in topExerciseIds {
+            let exerciseSets = allSets.filter { $0.exerciseId == exerciseId }
+
+            // Group by session
+            var setsBySession: [UUID: [WorkoutSet]] = [:]
+            for set in exerciseSets {
+                setsBySession[set.sessionId, default: []].append(set)
+            }
+
+            // Build snapshots
+            var snapshots: [ExerciseSessionSnapshot] = []
+            for (sessionId, sets) in setsBySession {
+                guard let session = sessionMap[sessionId], !sets.isEmpty else { continue }
+                let date = session.completedAt ?? session.startedAt
+                let bestWeight = sets.map(\.weight).max() ?? 0
+                let bestReps = sets.map(\.reps).max() ?? 0
+                let totalVolume = sets.reduce(0.0) { $0 + $1.volume }
+                let rpeValues = sets.compactMap(\.rpe)
+                let avgRPE = rpeValues.isEmpty ? nil : rpeValues.reduce(0, +) / Double(rpeValues.count)
+                let estimated1RM = sets.map(\.estimated1RM).max() ?? 0
+                snapshots.append(ExerciseSessionSnapshot(
+                    id: sessionId,
+                    date: date,
+                    bestWeight: bestWeight,
+                    bestReps: bestReps,
+                    totalVolume: totalVolume,
+                    avgRPE: avgRPE,
+                    estimated1RM: estimated1RM,
+                    setCount: sets.count
+                ))
+            }
+            snapshots.sort { $0.date < $1.date }
+
+            guard let last = snapshots.last else { continue }
+
+            // Compute 4-week delta
+            let fourWeeksAgo = Calendar.current.date(byAdding: .day, value: -28, to: Date()) ?? Date()
+            let priorSnapshot = snapshots.reversed().first(where: { $0.date <= fourWeeksAgo })
+                ?? snapshots.first
+            let priorE1RM = priorSnapshot?.estimated1RM ?? last.estimated1RM
+            let delta = last.estimated1RM - priorE1RM
+            let deltaPercent = priorE1RM > 0 ? (delta / priorE1RM) * 100 : 0
+
+            // Compute velocity from recent vs older split
+            let velocityStatus: VelocityStatus
+            let weeklyPercent: Double
+            if snapshots.count >= 4 {
+                let splitIndex = max(snapshots.count - 3, 1)
+                let older = Array(snapshots.prefix(splitIndex))
+                let recent = Array(snapshots.suffix(from: splitIndex))
+                let olderAvg = older.map(\.estimated1RM).reduce(0, +) / Double(older.count)
+                let recentAvg = recent.map(\.estimated1RM).reduce(0, +) / Double(recent.count)
+                guard olderAvg > 0 else {
+                    velocityStatus = .maintaining
+                    weeklyPercent = 0
+                    trajectories.append(TopLiftTrajectory(
+                        exerciseId: exerciseId,
+                        exerciseName: exerciseNames[exerciseId] ?? "Exercise",
+                        muscleGroup: exerciseMuscles[exerciseId] ?? "",
+                        sessionCount: sessionCountByExercise[exerciseId]?.count ?? 0,
+                        currentE1RM: last.estimated1RM,
+                        fourWeekDelta: delta,
+                        fourWeekDeltaPercent: deltaPercent,
+                        velocityStatus: velocityStatus,
+                        weeklyPercent: weeklyPercent,
+                        narrative: TopLiftTrajectory.buildNarrative(
+                            status: velocityStatus,
+                            weeklyPercent: weeklyPercent,
+                            deltaPercent: deltaPercent,
+                            sessionCount: snapshots.count
+                        ),
+                        sparkline: snapshots.map(\.estimated1RM)
+                    ))
+                    continue
+                }
+                let percentChange = ((recentAvg - olderAvg) / olderAvg) * 100
+                let daysSpan = max(1, Double(Calendar.current.dateComponents([.day], from: older.last!.date, to: recent.last!.date).day ?? 7))
+                let weeksSpan = daysSpan / 7.0
+                weeklyPercent = weeksSpan > 0 ? percentChange / weeksSpan : 0
+                velocityStatus = VelocityStatus.from(weeklyPercent: weeklyPercent)
+            } else {
+                velocityStatus = .maintaining
+                weeklyPercent = 0
+            }
+
+            let narrative = TopLiftTrajectory.buildNarrative(
+                status: velocityStatus,
+                weeklyPercent: weeklyPercent,
+                deltaPercent: deltaPercent,
+                sessionCount: snapshots.count
+            )
+
+            trajectories.append(TopLiftTrajectory(
+                exerciseId: exerciseId,
+                exerciseName: exerciseNames[exerciseId] ?? "Exercise",
+                muscleGroup: exerciseMuscles[exerciseId] ?? "",
+                sessionCount: sessionCountByExercise[exerciseId]?.count ?? 0,
+                currentE1RM: last.estimated1RM,
+                fourWeekDelta: delta,
+                fourWeekDeltaPercent: deltaPercent,
+                velocityStatus: velocityStatus,
+                weeklyPercent: weeklyPercent,
+                narrative: narrative,
+                sparkline: snapshots.suffix(12).map(\.estimated1RM)
+            ))
+        }
+
+        return trajectories
+    }
+
     // MARK: - Helpers
 
     /// Fetches sets for multiple sessions in a single query.

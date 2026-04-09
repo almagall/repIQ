@@ -3,8 +3,8 @@ import SwiftUI
 
 struct InsightEngine {
 
-    /// Generates up to 4 actionable, prescriptive insight cards based on the user's data.
-    /// Rules are evaluated in priority order; the first 4 that match are returned.
+    /// Generates up to 6 actionable, prescriptive insight cards based on the user's data.
+    /// Rules are evaluated in priority order; the first 6 that match are returned.
     static func generateInsights(
         volumeTrend: [WeeklyVolumeSummary],
         muscleDistribution: [MuscleGroupVolume],
@@ -17,7 +17,7 @@ struct InsightEngine {
         weeklySessionCount: Int = 0
     ) -> [InsightCard] {
         var insights: [InsightCard] = []
-        let maxInsights = 4
+        let maxInsights = 6
 
         // Rule 1: Volume dropped >20% week-over-week
         if let drop = volumeDropInsight(volumeTrend: volumeTrend) {

@@ -24,6 +24,7 @@ final class ProgressDashboardViewModel {
     var pushPullBalance: PushPullBalance?
     var volumeLandmarks: [VolumeLandmarkData] = []
     var consistencyScore: ConsistencyScore?
+    var topLifts: [TopLiftTrajectory] = []
 
     // UI toggle for fractional volume
     var showFractionalVolume: Bool = false
@@ -85,6 +86,42 @@ final class ProgressDashboardViewModel {
         return Double(totalEffective) / Double(totalReps)
     }
 
+    /// 4-week moving average of weekly volume, used as the reference line on the volume chart.
+    var volumeBaseline: Double? {
+        let validWeeks = volumeTrend.suffix(4).filter { $0.totalVolume > 0 }
+        guard !validWeeks.isEmpty else { return nil }
+        return validWeeks.reduce(0) { $0 + $1.totalVolume } / Double(validWeeks.count)
+    }
+
+    /// An interpreted narrative for the volume trend (replaces the raw percent delta).
+    var volumeTrendNarrative: String? {
+        guard let baseline = volumeBaseline, baseline > 0,
+              let current = volumeTrend.last?.totalVolume else { return nil }
+        let deviation = ((current - baseline) / baseline) * 100
+        if deviation > 15 {
+            return "Volume trending up — watch recovery"
+        }
+        if deviation > 5 {
+            return "Above 4-week average — building nicely"
+        }
+        if deviation > -5 {
+            return "Within sustainable range"
+        }
+        if deviation > -15 {
+            return "Dipping below average — recovery week?"
+        }
+        return "Significant drop — time to rebuild"
+    }
+
+    /// The 3 muscles with the lowest effective rep ratio (where intensity is leaking gains).
+    var weakestEffectiveMuscles: [EffectiveRepsSummary] {
+        effectiveRepsSummary
+            .filter { $0.totalReps > 0 }
+            .sorted { $0.effectiveRatio < $1.effectiveRatio }
+            .prefix(3)
+            .map { $0 }
+    }
+
     // MARK: - Name Helpers
 
     func templateName(for session: WorkoutSession) -> String? {
@@ -121,6 +158,7 @@ final class ProgressDashboardViewModel {
             async let pushPullTask = analyticsService.fetchPushPullBalance(userId: userId, days: 30)
             async let consistencyTask = analyticsService.fetchConsistencyScore(userId: userId, weeks: 8)
             async let landmarkTask = analyticsService.fetchVolumeLandmarkData(userId: userId)
+            async let topLiftsTask = analyticsService.fetchTopLiftsTrajectory(userId: userId, limit: 3)
 
             // Await all
             let fetchedStreak = try await streakTask
@@ -136,6 +174,7 @@ final class ProgressDashboardViewModel {
             let fetchedPushPull = try await pushPullTask
             let fetchedConsistency = try await consistencyTask
             let fetchedLandmarks = try await landmarkTask
+            let fetchedTopLifts = (try? await topLiftsTask) ?? []
 
             // Update state
             streakData = fetchedStreak
@@ -151,6 +190,7 @@ final class ProgressDashboardViewModel {
             pushPullBalance = fetchedPushPull
             consistencyScore = fetchedConsistency
             volumeLandmarks = fetchedLandmarks
+            topLifts = fetchedTopLifts
 
             // Compute overview stats
             totalVolume = fetchedMilestoneData.totalVolume
