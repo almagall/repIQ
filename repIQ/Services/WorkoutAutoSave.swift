@@ -48,6 +48,7 @@ struct WorkoutAutoSave {
 /// The serializable snapshot of an active workout session.
 struct SavedWorkoutState: Codable {
     let sessionId: UUID
+    let workoutDayId: UUID?
     let templateName: String
     let dayName: String
     let startTime: Date
@@ -56,12 +57,14 @@ struct SavedWorkoutState: Codable {
 
     init(
         sessionId: UUID,
+        workoutDayId: UUID? = nil,
         templateName: String,
         dayName: String,
         startTime: Date,
         exercises: [SavedExerciseState]
     ) {
         self.sessionId = sessionId
+        self.workoutDayId = workoutDayId
         self.templateName = templateName
         self.dayName = dayName
         self.startTime = startTime

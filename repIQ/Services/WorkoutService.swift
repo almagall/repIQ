@@ -64,15 +64,37 @@ struct WorkoutService: Sendable {
 
     // MARK: - Previous Session Data
 
-    func fetchPreviousSetsForExercise(exerciseId: UUID, userId: UUID, limit: Int = 3) async throws -> [[WorkoutSet]] {
-        let sessions: [WorkoutSession] = try await supabase.from("workout_sessions")
-            .select()
-            .eq("user_id", value: userId.uuidString)
-            .eq("status", value: "completed")
-            .order("completed_at", ascending: false)
-            .limit(limit)
-            .execute()
-            .value
+    /// Fetches the most recent completed sessions for an exercise.
+    /// When `workoutDayId` is provided, only sessions from that specific workout day
+    /// are considered — this keeps the same exercise on different days (e.g., bench
+    /// press on Push A vs Push B) on independent progression histories.
+    func fetchPreviousSetsForExercise(
+        exerciseId: UUID,
+        userId: UUID,
+        workoutDayId: UUID? = nil,
+        limit: Int = 3
+    ) async throws -> [[WorkoutSet]] {
+        let sessions: [WorkoutSession]
+        if let workoutDayId {
+            sessions = try await supabase.from("workout_sessions")
+                .select()
+                .eq("user_id", value: userId.uuidString)
+                .eq("status", value: "completed")
+                .eq("workout_day_id", value: workoutDayId.uuidString)
+                .order("completed_at", ascending: false)
+                .limit(limit)
+                .execute()
+                .value
+        } else {
+            sessions = try await supabase.from("workout_sessions")
+                .select()
+                .eq("user_id", value: userId.uuidString)
+                .eq("status", value: "completed")
+                .order("completed_at", ascending: false)
+                .limit(limit)
+                .execute()
+                .value
+        }
 
         var result: [[WorkoutSet]] = []
         for session in sessions {
@@ -92,20 +114,36 @@ struct WorkoutService: Sendable {
     }
 
     /// Batch fetch previous sets for multiple exercises (avoids N+1 queries).
-    /// Returns a dictionary keyed by exerciseId with arrays of sets from the most recent completed session.
+    /// Returns a dictionary keyed by exerciseId with arrays of sets from the most recent
+    /// completed session for that workout day. When `workoutDayId` is provided, only
+    /// sessions from that specific day are considered.
     func fetchPreviousSetsForExercises(
         exerciseIds: [UUID],
-        userId: UUID
+        userId: UUID,
+        workoutDayId: UUID? = nil
     ) async throws -> [UUID: [WorkoutSet]] {
-        // Get the most recent completed session
-        let sessions: [WorkoutSession] = try await supabase.from("workout_sessions")
-            .select()
-            .eq("user_id", value: userId.uuidString)
-            .eq("status", value: "completed")
-            .order("completed_at", ascending: false)
-            .limit(1)
-            .execute()
-            .value
+        // Get the most recent completed session (optionally scoped to a workout day)
+        let sessions: [WorkoutSession]
+        if let workoutDayId {
+            sessions = try await supabase.from("workout_sessions")
+                .select()
+                .eq("user_id", value: userId.uuidString)
+                .eq("status", value: "completed")
+                .eq("workout_day_id", value: workoutDayId.uuidString)
+                .order("completed_at", ascending: false)
+                .limit(1)
+                .execute()
+                .value
+        } else {
+            sessions = try await supabase.from("workout_sessions")
+                .select()
+                .eq("user_id", value: userId.uuidString)
+                .eq("status", value: "completed")
+                .order("completed_at", ascending: false)
+                .limit(1)
+                .execute()
+                .value
+        }
 
         guard let lastSession = sessions.first else { return [:] }
 

@@ -534,11 +534,12 @@ struct ProgressionService: Sendable {
 
     // MARK: - Persistence
 
-    func saveTarget(_ target: ProgressionTarget, userId: UUID) async throws {
+    func saveTarget(_ target: ProgressionTarget, userId: UUID, workoutDayId: UUID? = nil) async throws {
         struct ProgressionLogEntry: Encodable {
             let id: UUID
             let user_id: String
             let exercise_id: String
+            let workout_day_id: String?
             let training_mode: String
             let previous_weight: Double?
             let previous_reps: Int?
@@ -556,6 +557,7 @@ struct ProgressionService: Sendable {
             id: UUID(),
             user_id: userId.uuidString,
             exercise_id: target.exerciseId.uuidString,
+            workout_day_id: workoutDayId?.uuidString,
             training_mode: target.trainingMode.rawValue,
             previous_weight: target.previousWeight,
             previous_reps: target.previousReps,
@@ -574,7 +576,14 @@ struct ProgressionService: Sendable {
             .execute()
     }
 
-    func fetchLatestTargets(userId: UUID, exerciseIds: [UUID]) async throws -> [UUID: ProgressionTarget] {
+    /// Fetches the most recent progression target for each exercise.
+    /// When `workoutDayId` is provided, only entries tagged with that day are considered —
+    /// keeping the same exercise on different days on independent progression histories.
+    func fetchLatestTargets(
+        userId: UUID,
+        exerciseIds: [UUID],
+        workoutDayId: UUID? = nil
+    ) async throws -> [UUID: ProgressionTarget] {
         guard !exerciseIds.isEmpty else { return [:] }
 
         struct ProgressionRow: Decodable {
@@ -592,13 +601,25 @@ struct ProgressionService: Sendable {
             let estimated_1rm: Double?
         }
 
-        let rows: [ProgressionRow] = try await supabase.from("progression_log")
-            .select()
-            .eq("user_id", value: userId.uuidString)
-            .in("exercise_id", values: exerciseIds.map(\.uuidString))
-            .order("created_at", ascending: false)
-            .execute()
-            .value
+        let rows: [ProgressionRow]
+        if let workoutDayId {
+            rows = try await supabase.from("progression_log")
+                .select()
+                .eq("user_id", value: userId.uuidString)
+                .eq("workout_day_id", value: workoutDayId.uuidString)
+                .in("exercise_id", values: exerciseIds.map(\.uuidString))
+                .order("created_at", ascending: false)
+                .execute()
+                .value
+        } else {
+            rows = try await supabase.from("progression_log")
+                .select()
+                .eq("user_id", value: userId.uuidString)
+                .in("exercise_id", values: exerciseIds.map(\.uuidString))
+                .order("created_at", ascending: false)
+                .execute()
+                .value
+        }
 
         var result: [UUID: ProgressionTarget] = [:]
         for row in rows {

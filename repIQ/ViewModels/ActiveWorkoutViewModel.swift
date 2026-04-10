@@ -8,6 +8,9 @@ final class ActiveWorkoutViewModel {
     var exercises: [ExerciseLogEntry] = []
     var currentExerciseIndex: Int = 0
     var sessionId: UUID?
+    /// The workout day ID for the in-progress session, used to scope previous-data
+    /// and progression-target queries by (exercise, day) instead of just exercise.
+    var currentWorkoutDayId: UUID?
     var startTime: Date = Date()
     var elapsedSeconds: Int = 0
     var isLoading = false
@@ -350,20 +353,25 @@ final class ActiveWorkoutViewModel {
                 startDate: date
             )
             sessionId = session.id
+            currentWorkoutDayId = day.id
             startTime = session.startedAt
 
             // 2. Get exercise IDs for batch fetch
             let dayExercises = day.exercises ?? []
             let exerciseIds = dayExercises.map(\.exerciseId)
 
-            // 3. Fetch previous session data and progression targets in parallel
+            // 3. Fetch previous session data and progression targets in parallel.
+            //    Scoped by workout day so the same exercise on different days
+            //    (e.g., bench press on Push A vs Push B) gets independent histories.
             async let previousDataTask = workoutService.fetchPreviousSetsForExercises(
                 exerciseIds: exerciseIds,
-                userId: userId
+                userId: userId,
+                workoutDayId: day.id
             )
             async let targetsTask = progressionService.fetchLatestTargets(
                 userId: userId,
-                exerciseIds: exerciseIds
+                exerciseIds: exerciseIds,
+                workoutDayId: day.id
             )
 
             let previousData = try await previousDataTask
@@ -578,12 +586,14 @@ final class ActiveWorkoutViewModel {
                     }
                 }
 
-                // Calculate next targets
+                // Calculate next targets — scoped to this workout day so the same
+                // exercise on different days has independent progression.
                 // The current session is already marked completed, so
                 // fetchPreviousSetsForExercise includes it automatically.
                 let recentSessions = (try? await workoutService.fetchPreviousSetsForExercise(
                     exerciseId: exercise.exerciseId,
                     userId: userId,
+                    workoutDayId: currentWorkoutDayId,
                     limit: 3
                 )) ?? []
 
@@ -594,7 +604,7 @@ final class ActiveWorkoutViewModel {
                     recentSessions: recentSessions,
                     repCap: exercise.repCap
                 ) {
-                    try? await progressionService.saveTarget(target, userId: userId)
+                    try? await progressionService.saveTarget(target, userId: userId, workoutDayId: currentWorkoutDayId)
 
                     allDecisions.append(ProgressionSummary(
                         exerciseName: exercise.exerciseName,
@@ -1216,6 +1226,7 @@ final class ActiveWorkoutViewModel {
 
         let state = SavedWorkoutState(
             sessionId: sessionId,
+            workoutDayId: currentWorkoutDayId,
             templateName: templateName,
             dayName: dayName,
             startTime: startTime,
@@ -1227,6 +1238,7 @@ final class ActiveWorkoutViewModel {
     /// Restores workout state from a saved snapshot (crash recovery).
     func restoreFromSavedState(_ state: SavedWorkoutState) {
         sessionId = state.sessionId
+        currentWorkoutDayId = state.workoutDayId
         templateName = state.templateName
         dayName = state.dayName
         startTime = state.startTime
@@ -1297,12 +1309,14 @@ final class ActiveWorkoutViewModel {
 
         let original = exercises[exerciseIndex]
 
-        // Fetch previous session data for the NEW exercise (if user has logged it before)
+        // Fetch previous session data for the NEW exercise (if user has logged it before
+        // on this same workout day)
         var previousSets: [WorkoutSet] = []
         if let userId = try? await supabase.auth.session.user.id {
             let history = (try? await workoutService.fetchPreviousSetsForExercise(
                 exerciseId: newExercise.id,
                 userId: userId,
+                workoutDayId: currentWorkoutDayId,
                 limit: 1
             )) ?? []
             previousSets = history.first ?? []
