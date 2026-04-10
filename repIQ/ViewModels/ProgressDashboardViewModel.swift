@@ -25,6 +25,7 @@ final class ProgressDashboardViewModel {
     var volumeLandmarks: [VolumeLandmarkData] = []
     var consistencyScore: ConsistencyScore?
     var topLifts: [TopLiftTrajectory] = []
+    var monthlyStats: MonthlyStats?
 
     // UI toggle for fractional volume
     var showFractionalVolume: Bool = false
@@ -158,7 +159,8 @@ final class ProgressDashboardViewModel {
             async let pushPullTask = analyticsService.fetchPushPullBalance(userId: userId, days: 30)
             async let consistencyTask = analyticsService.fetchConsistencyScore(userId: userId, weeks: 8)
             async let landmarkTask = analyticsService.fetchVolumeLandmarkData(userId: userId)
-            async let topLiftsTask = analyticsService.fetchTopLiftsTrajectory(userId: userId, limit: 3)
+            async let topLiftsTask = analyticsService.fetchTopLiftsTrajectory(userId: userId, limit: 5)
+            async let monthlyStatsTask = analyticsService.fetchMonthlyStats(userId: userId)
 
             // Await all
             let fetchedStreak = try await streakTask
@@ -175,6 +177,7 @@ final class ProgressDashboardViewModel {
             let fetchedConsistency = try await consistencyTask
             let fetchedLandmarks = try await landmarkTask
             let fetchedTopLifts = (try? await topLiftsTask) ?? []
+            let fetchedMonthlyStats = try? await monthlyStatsTask
 
             // Update state
             streakData = fetchedStreak
@@ -191,6 +194,7 @@ final class ProgressDashboardViewModel {
             consistencyScore = fetchedConsistency
             volumeLandmarks = fetchedLandmarks
             topLifts = fetchedTopLifts
+            monthlyStats = fetchedMonthlyStats
 
             // Compute overview stats
             totalVolume = fetchedMilestoneData.totalVolume

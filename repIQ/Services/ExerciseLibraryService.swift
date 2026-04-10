@@ -58,6 +58,27 @@ struct ExerciseLibraryService: Sendable {
         return (names, muscleGroups)
     }
 
+    /// Fetches name + muscle group + equipment + isCompound for a batch.
+    /// Used by the Strength Trajectory selector to prefer compound lifts.
+    func fetchExerciseDetails(_ ids: [UUID]) async throws -> (
+        names: [UUID: String],
+        muscleGroups: [UUID: String],
+        equipment: [UUID: String],
+        isCompound: [UUID: Bool]
+    ) {
+        guard !ids.isEmpty else { return ([:], [:], [:], [:]) }
+        let exercises: [Exercise] = try await supabase.from("exercises")
+            .select()
+            .in("id", values: ids.map(\.uuidString))
+            .execute()
+            .value
+        let names = Dictionary(uniqueKeysWithValues: exercises.map { ($0.id, $0.name) })
+        let muscleGroups = Dictionary(uniqueKeysWithValues: exercises.map { ($0.id, $0.muscleGroup) })
+        let equipment = Dictionary(uniqueKeysWithValues: exercises.map { ($0.id, $0.equipment) })
+        let isCompound = Dictionary(uniqueKeysWithValues: exercises.map { ($0.id, $0.isCompound) })
+        return (names, muscleGroups, equipment, isCompound)
+    }
+
     func createCustomExercise(
         userId: UUID,
         name: String,

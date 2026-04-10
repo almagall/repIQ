@@ -751,11 +751,79 @@ struct AnalyticsService: Sendable {
         )
     }
 
+    // MARK: - Monthly Stats
+
+    /// Fetches stats for the current calendar month: workouts, PRs, sets, average RPE.
+    /// Used by the Progress tab header to give users an at-a-glance "how was my month".
+    func fetchMonthlyStats(userId: UUID) async throws -> MonthlyStats {
+        let calendar = Calendar.current
+        guard let monthStart = calendar.dateInterval(of: .month, for: Date())?.start else {
+            return MonthlyStats(workouts: 0, prCount: 0, totalSets: 0, avgRPE: nil)
+        }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let monthStartString = formatter.string(from: monthStart)
+
+        // Sessions completed this month
+        let sessions: [WorkoutSession] = try await supabase.from("workout_sessions")
+            .select()
+            .eq("user_id", value: userId.uuidString)
+            .eq("status", value: "completed")
+            .gte("completed_at", value: monthStartString)
+            .execute()
+            .value
+
+        let workouts = sessions.count
+
+        // PRs achieved this month
+        struct PRRow: Decodable { let id: UUID }
+        let prRows: [PRRow] = (try? await supabase.from("personal_records")
+            .select("id")
+            .eq("user_id", value: userId.uuidString)
+            .gte("achieved_at", value: monthStartString)
+            .execute()
+            .value) ?? []
+        let prCount = prRows.count
+
+        // Working sets logged this month
+        var totalSets = 0
+        var rpeSum = 0.0
+        var rpeCount = 0
+        if !sessions.isEmpty {
+            let sessionIds = sessions.map(\.id)
+            let sets: [WorkoutSet] = (try? await supabase.from("workout_sets")
+                .select()
+                .in("session_id", values: sessionIds.map(\.uuidString))
+                .eq("set_type", value: "working")
+                .execute()
+                .value) ?? []
+            totalSets = sets.count
+            for set in sets {
+                if let rpe = set.rpe {
+                    rpeSum += rpe
+                    rpeCount += 1
+                }
+            }
+        }
+        let avgRPE = rpeCount > 0 ? rpeSum / Double(rpeCount) : nil
+
+        return MonthlyStats(
+            workouts: workouts,
+            prCount: prCount,
+            totalSets: totalSets,
+            avgRPE: avgRPE
+        )
+    }
+
     // MARK: - Top Lifts Trajectory
 
     /// Fetches the user's top N most-frequently-logged exercises with their session snapshots
     /// and a computed velocity narrative. Used for the Progress tab hero card.
-    func fetchTopLiftsTrajectory(userId: UUID, limit: Int = 3) async throws -> [TopLiftTrajectory] {
+    ///
+    /// Selection logic: prefers compound lifts (multi-joint movements with meaningful
+    /// e1RM tracking) over isolation movements. A user's bench press progress matters
+    /// more than their cable fly progress, even if the cable fly has more sessions.
+    func fetchTopLiftsTrajectory(userId: UUID, limit: Int = 5) async throws -> [TopLiftTrajectory] {
         // Fetch all completed sessions
         let sessions = try await workoutService.fetchAllSessions(userId: userId)
         guard !sessions.isEmpty else { return [] }
@@ -776,25 +844,47 @@ struct AnalyticsService: Sendable {
             sessionCountByExercise[set.exerciseId, default: []].insert(set.sessionId)
         }
 
-        // Sort exercises by session count descending
-        let topExerciseIds = sessionCountByExercise
-            .sorted { $0.value.count > $1.value.count }
-            .prefix(limit)
-            .map(\.key)
+        // Need at least 2 sessions to be a meaningful trajectory candidate.
+        let candidateExerciseIds = sessionCountByExercise
+            .filter { $0.value.count >= 2 }
+            .keys
+            .map { $0 }
 
-        guard !topExerciseIds.isEmpty else { return [] }
+        guard !candidateExerciseIds.isEmpty else { return [] }
 
-        // Fetch exercise names
+        // Fetch exercise names + equipment + muscle groups + isCompound for ranking
         let exerciseNames: [UUID: String]
         let exerciseMuscles: [UUID: String]
+        let exerciseIsCompound: [UUID: Bool]
         do {
-            let (names, muscles) = try await exerciseService.fetchExerciseNamesAndMuscleGroups(topExerciseIds)
+            let (names, muscles, _, isCompound) = try await exerciseService
+                .fetchExerciseDetails(candidateExerciseIds)
             exerciseNames = names
             exerciseMuscles = muscles
+            exerciseIsCompound = isCompound
         } catch {
             exerciseNames = [:]
             exerciseMuscles = [:]
+            exerciseIsCompound = [:]
         }
+
+        // Score each candidate: session count, with a 2x multiplier for compound
+        // lifts so they outrank isolation movements even with slightly fewer sessions.
+        // A bench press with 8 sessions (8 * 2 = 16) beats a cable fly with 12
+        // sessions (12 * 1 = 12) — which is the right behavior.
+        let scored = candidateExerciseIds.map { id -> (UUID, Double) in
+            let sessions = Double(sessionCountByExercise[id]?.count ?? 0)
+            let isCompound = exerciseIsCompound[id] ?? false
+            let multiplier: Double = isCompound ? 2.0 : 1.0
+            return (id, sessions * multiplier)
+        }
+
+        let topExerciseIds = scored
+            .sorted { $0.1 > $1.1 }
+            .prefix(limit)
+            .map(\.0)
+
+        guard !topExerciseIds.isEmpty else { return [] }
 
         // Build snapshots per exercise
         let sessionMap = Dictionary(uniqueKeysWithValues: sessions.map { ($0.id, $0) })

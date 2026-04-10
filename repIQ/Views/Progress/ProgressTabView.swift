@@ -22,12 +22,15 @@ struct ProgressTabView: View {
                     )
                 } else {
                     VStack(spacing: RQSpacing.xl) {
-                        // 1. Hero: Strength Trajectory — top 3 lifts with AI narrative
+                        // 1. Monthly Stats Header — at-a-glance snapshot of this month
+                        MonthlyStatsHeader(stats: viewModel.monthlyStats)
+
+                        // 2. Hero: Strength Trajectory — top 5 compound lifts with AI narrative
                         StrengthTrajectoryCard(lifts: viewModel.topLifts) { _ in
                             showExercisePicker = true
                         }
 
-                        // 2. Streak + Consistency (merged)
+                        // 3. Streak + Consistency (merged)
                         streakConsistencySection
 
                         // 3. Smart Insights — prescriptive coaching (promoted from #6)
@@ -57,9 +60,6 @@ struct ProgressTabView: View {
                         if !viewModel.recentPRs.isEmpty {
                             recentPRsSection
                         }
-
-                        // 9. Lifetime Stats Footer
-                        lifetimeStatsFooter
                     }
                     .padding(.horizontal, RQSpacing.screenHorizontal)
                     .padding(.top, RQSpacing.lg)
@@ -190,42 +190,6 @@ struct ProgressTabView: View {
         if streak.currentStreak >= 2 { return RQColors.success }   // 2+ weeks
         if streak.currentStreak > 0 { return RQColors.textSecondary }
         return RQColors.textTertiary
-    }
-
-    // MARK: - 9. Lifetime Stats Footer (small strip)
-
-    private var lifetimeStatsFooter: some View {
-        HStack(spacing: 0) {
-            lifetimeStat(value: "\(viewModel.sessions.count)", label: "WORKOUTS")
-            Divider().frame(height: 24).background(RQColors.surfaceTertiary)
-            lifetimeStat(value: formatVolumeCompact(viewModel.totalVolume), label: "TOTAL VOL")
-            Divider().frame(height: 24).background(RQColors.surfaceTertiary)
-            lifetimeStat(value: "\(viewModel.totalPRCount)", label: "PRS")
-            Divider().frame(height: 24).background(RQColors.surfaceTertiary)
-            lifetimeStat(value: "\(daysTrainingCount)", label: "DAYS")
-        }
-        .padding(.vertical, RQSpacing.sm)
-    }
-
-    private func lifetimeStat(value: String, label: String) -> some View {
-        VStack(spacing: 2) {
-            Text(value)
-                .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                .foregroundColor(RQColors.textSecondary)
-            Text(label)
-                .font(.system(size: 8, weight: .medium))
-                .tracking(0.5)
-                .foregroundColor(RQColors.textTertiary)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private var daysTrainingCount: Int {
-        guard let firstSession = viewModel.sessions.min(by: { ($0.completedAt ?? $0.startedAt) < ($1.completedAt ?? $1.startedAt) }) else {
-            return 0
-        }
-        let startDate = firstSession.completedAt ?? firstSession.startedAt
-        return max(1, Calendar.current.dateComponents([.day], from: startDate, to: Date()).day ?? 0)
     }
 
     // MARK: - 4. Weekly Volume Chart

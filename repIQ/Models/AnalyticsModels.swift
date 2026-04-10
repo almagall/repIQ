@@ -428,6 +428,15 @@ struct StrengthPrediction {
     var isReliable: Bool { confidence >= 0.3 }
 }
 
+// MARK: - Monthly Stats (Progress tab header)
+
+struct MonthlyStats: Sendable {
+    let workouts: Int        // sessions completed this month
+    let prCount: Int         // PRs hit this month
+    let totalSets: Int       // working sets logged this month
+    let avgRPE: Double?      // average RPE across this month's sets
+}
+
 // MARK: - Top Lift Trajectory (hero card on Progress tab)
 
 struct TopLiftTrajectory: Identifiable, Sendable {
