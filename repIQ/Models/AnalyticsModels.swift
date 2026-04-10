@@ -443,6 +443,8 @@ struct TopLiftTrajectory: Identifiable, Sendable {
     let exerciseId: UUID
     let exerciseName: String
     let muscleGroup: String
+    let workoutDayId: UUID?
+    let dayName: String?
     let sessionCount: Int
     let currentE1RM: Double
     let fourWeekDelta: Double
@@ -452,7 +454,11 @@ struct TopLiftTrajectory: Identifiable, Sendable {
     let narrative: String
     let sparkline: [Double] // recent e1RM values for the mini chart
 
-    var id: UUID { exerciseId }
+    /// Unique ID combining exercise + workout day so the same exercise
+    /// on different days appears as distinct entries.
+    var id: String {
+        "\(exerciseId.uuidString)-\(workoutDayId?.uuidString ?? "global")"
+    }
 
     /// Builds a one-sentence coaching narrative based on velocity and delta.
     static func buildNarrative(status: VelocityStatus, weeklyPercent: Double, deltaPercent: Double, sessionCount: Int) -> String {

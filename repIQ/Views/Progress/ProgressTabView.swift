@@ -5,6 +5,7 @@ struct ProgressTabView: View {
     @State private var viewModel = ProgressDashboardViewModel()
     @State private var showExercisePicker = false
     @State private var showMonthlyReport = false
+    @State private var selectedExerciseId: UUID?
     @State private var socialViewModel = SocialViewModel()
 
     var body: some View {
@@ -25,10 +26,16 @@ struct ProgressTabView: View {
                         // 1. Monthly Stats Header — at-a-glance snapshot of this month
                         MonthlyStatsHeader(stats: viewModel.monthlyStats)
 
-                        // 2. Hero: Strength Trajectory — top 5 compound lifts with AI narrative
-                        StrengthTrajectoryCard(lifts: viewModel.topLifts) { _ in
-                            showExercisePicker = true
-                        }
+                        // 2. Hero: Strength Trajectory — top lifts scoped by workout day
+                        StrengthTrajectoryCard(
+                            lifts: viewModel.topLifts,
+                            onSelect: { lift in
+                                selectedExerciseId = lift.exerciseId
+                            },
+                            onBrowseAll: {
+                                showExercisePicker = true
+                            }
+                        )
 
                         // 3. Streak + Consistency (merged)
                         streakConsistencySection
@@ -88,6 +95,9 @@ struct ProgressTabView: View {
             }
             .navigationDestination(isPresented: $showExercisePicker) {
                 ExercisePickerProgressView()
+            }
+            .navigationDestination(item: $selectedExerciseId) { exerciseId in
+                ExerciseProgressLoaderView(exerciseId: exerciseId)
             }
             .task {
                 await viewModel.loadDashboard()

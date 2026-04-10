@@ -28,6 +28,12 @@ final class ActiveWorkoutViewModel {
     // MARK: - Exercise Substitution
     var showExerciseSubstitution = false
 
+    // MARK: - Incomplete Sets Navigation
+    /// When the user tries to navigate away from an exercise with incomplete
+    /// working sets, store the pending action so they can confirm or cancel.
+    var showIncompleteWorkingSetsAlert = false
+    var pendingNavigationAction: (() -> Void)?
+
     // MARK: - Warmup Suggestion Dismissals
     var dismissedWarmupSuggestions: Set<Int> = [] // exercise indices where user dismissed suggestion
 
@@ -303,30 +309,63 @@ final class ActiveWorkoutViewModel {
 
     // MARK: - Exercise Navigation
 
+    /// Whether the current exercise group has incomplete working sets.
+    private var currentGroupHasIncompleteWorkingSets: Bool {
+        let indices = currentGroupIndices
+        return indices.contains { i in
+            guard let exercise = exercises[safe: i] else { return false }
+            return !exercise.isAllWorkingSetsCompleted
+        }
+    }
+
+    /// Attempts navigation; if the current exercise has incomplete working
+    /// sets, shows a confirmation alert and defers the action.
+    private func navigateWithCheck(_ action: @escaping () -> Void) {
+        if currentGroupHasIncompleteWorkingSets {
+            pendingNavigationAction = action
+            showIncompleteWorkingSetsAlert = true
+        } else {
+            action()
+        }
+    }
+
+    /// Called when the user confirms they want to leave despite incomplete sets.
+    func confirmPendingNavigation() {
+        pendingNavigationAction?()
+        pendingNavigationAction = nil
+    }
+
     func goToPreviousExercise() {
         guard canGoToPrevious else { return }
-        let prevGroup = allGroups[currentGroupPosition - 1]
-        currentExerciseIndex = prevGroup.first ?? currentExerciseIndex
+        navigateWithCheck {
+            let prevGroup = self.allGroups[self.currentGroupPosition - 1]
+            self.currentExerciseIndex = prevGroup.first ?? self.currentExerciseIndex
+        }
     }
 
     func goToNextExercise() {
         guard canGoToNext else { return }
-        let nextGroup = allGroups[currentGroupPosition + 1]
-        currentExerciseIndex = nextGroup.first ?? currentExerciseIndex
+        navigateWithCheck {
+            let nextGroup = self.allGroups[self.currentGroupPosition + 1]
+            self.currentExerciseIndex = nextGroup.first ?? self.currentExerciseIndex
+        }
     }
 
     func goToExercise(at index: Int) {
         guard exercises.indices.contains(index) else { return }
-        // Navigate to the group that contains this index
-        if let group = exercises[index].supersetGroup {
-            let groupStart = exercises.enumerated()
-                .filter { $0.element.supersetGroup == group }
-                .map(\.offset)
-                .first ?? index
-            currentExerciseIndex = groupStart
-            scrollToExerciseIndex = index
-        } else {
-            currentExerciseIndex = index
+        // If already on this exercise/group, no need to check
+        if currentGroupIndices.contains(index) { return }
+        navigateWithCheck {
+            if let group = self.exercises[index].supersetGroup {
+                let groupStart = self.exercises.enumerated()
+                    .filter { $0.element.supersetGroup == group }
+                    .map(\.offset)
+                    .first ?? index
+                self.currentExerciseIndex = groupStart
+                self.scrollToExerciseIndex = index
+            } else {
+                self.currentExerciseIndex = index
+            }
         }
     }
 
@@ -507,6 +546,11 @@ final class ActiveWorkoutViewModel {
         isCompleting = true
         timerTask?.cancel()
         isLoading = true
+
+        // Clear auto-save immediately so the app never offers to resume
+        // a workout that the user already finished — even if post-processing
+        // (PR detection, feed items, etc.) fails below.
+        WorkoutAutoSave.clear()
 
         do {
             guard let userId = try? await supabase.auth.session.user.id else {
@@ -762,7 +806,6 @@ final class ActiveWorkoutViewModel {
             timerTask?.cancel()
             autoSaveTask?.cancel()
             cancelRestTimer()
-            WorkoutAutoSave.clear()
             UIApplication.shared.isIdleTimerDisabled = false
 
             // Sync any offline sets that were queued

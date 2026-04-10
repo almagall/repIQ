@@ -1,11 +1,12 @@
 import SwiftUI
 
-/// The hero card at the top of the Progress tab showing the user's top 3
-/// most-logged lifts with current estimated 1RM, 4-week delta, velocity status,
-/// a tiny sparkline, and a one-sentence AI narrative.
+/// The hero card at the top of the Progress tab showing the user's top
+/// most-logged lifts scoped by workout day, with current estimated 1RM,
+/// 4-week delta, velocity status, a tiny sparkline, and a coaching narrative.
 struct StrengthTrajectoryCard: View {
     let lifts: [TopLiftTrajectory]
     var onSelect: ((TopLiftTrajectory) -> Void)? = nil
+    var onBrowseAll: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: RQSpacing.md) {
@@ -40,6 +41,29 @@ struct StrengthTrajectoryCard: View {
                                     .background(RQColors.surfaceTertiary)
                             }
                         }
+
+                        // Browse All Exercises row
+                        Divider()
+                            .background(RQColors.surfaceTertiary)
+
+                        Button {
+                            onBrowseAll?()
+                        } label: {
+                            HStack {
+                                Image(systemName: "list.bullet.rectangle")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(RQColors.accent)
+                                Text("Browse All Exercises")
+                                    .font(RQTypography.caption)
+                                    .foregroundColor(RQColors.accent)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundColor(RQColors.textTertiary)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -51,12 +75,21 @@ struct StrengthTrajectoryCard: View {
             onSelect?(lift)
         } label: {
             HStack(alignment: .top, spacing: RQSpacing.md) {
-                // Left: exercise name + narrative
+                // Left: exercise name + day context + narrative
                 VStack(alignment: .leading, spacing: RQSpacing.xxs) {
-                    Text(lift.exerciseName)
-                        .font(RQTypography.headline)
-                        .foregroundColor(RQColors.textPrimary)
-                        .lineLimit(1)
+                    HStack(spacing: RQSpacing.xs) {
+                        Text(lift.exerciseName)
+                            .font(RQTypography.headline)
+                            .foregroundColor(RQColors.textPrimary)
+                            .lineLimit(1)
+
+                        if let dayName = lift.dayName {
+                            Text("· \(dayName)")
+                                .font(.system(size: 11))
+                                .foregroundColor(RQColors.textTertiary)
+                                .lineLimit(1)
+                        }
+                    }
 
                     HStack(spacing: RQSpacing.xs) {
                         Image(systemName: lift.velocityStatus.icon)

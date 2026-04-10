@@ -143,6 +143,22 @@ struct ActiveWorkoutView: View {
             } message: {
                 Text("Your logged sets will be saved, but the session will be marked as abandoned.")
             }
+            .alert("Incomplete Working Sets", isPresented: $viewModel.showIncompleteWorkingSetsAlert) {
+                Button("Continue Anyway") {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        viewModel.confirmPendingNavigation()
+                    }
+                }
+                Button("Stay Here", role: .cancel) {
+                    viewModel.pendingNavigationAction = nil
+                }
+            } message: {
+                if let exercise = viewModel.currentExercise {
+                    Text("You've completed \(exercise.completedWorkingSetCount) of \(exercise.targetSets) working sets for \(exercise.exerciseName).")
+                } else {
+                    Text("You still have unfinished working sets for this exercise.")
+                }
+            }
             .sheet(isPresented: $viewModel.showExerciseSubstitution) {
                 if let exercise = viewModel.currentExercise {
                     ExerciseSubstitutionView(currentExercise: exercise) { newExercise in

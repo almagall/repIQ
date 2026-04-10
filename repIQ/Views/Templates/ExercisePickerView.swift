@@ -44,6 +44,7 @@ struct ExercisePickerView: View {
     let onSelect: (Exercise) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel = ExercisePickerViewModel()
+    @State private var showCreateCustom = false
 
     private let muscleGroups = MuscleGroup.allCases
     private let equipmentTypes = Equipment.allCases
@@ -108,14 +109,51 @@ struct ExercisePickerView: View {
                     Spacer()
                 } else if viewModel.exercises.isEmpty {
                     Spacer()
-                    EmptyStateView(
-                        icon: "dumbbell",
-                        title: "No Exercises Found",
-                        message: "Try adjusting your search or filters."
-                    )
+                    VStack(spacing: RQSpacing.lg) {
+                        EmptyStateView(
+                            icon: "dumbbell",
+                            title: "No Exercises Found",
+                            message: "Try adjusting your search or filters, or create your own."
+                        )
+                        Button {
+                            showCreateCustom = true
+                        } label: {
+                            HStack(spacing: RQSpacing.sm) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 16))
+                                Text("Create Custom Exercise")
+                                    .font(RQTypography.headline)
+                            }
+                            .foregroundColor(RQColors.accent)
+                        }
+                    }
                     Spacer()
                 } else {
                     List {
+                        // Create custom exercise row
+                        Section {
+                            Button {
+                                showCreateCustom = true
+                            } label: {
+                                HStack(spacing: RQSpacing.md) {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.system(size: 20))
+                                        .foregroundColor(RQColors.accent)
+                                    VStack(alignment: .leading, spacing: RQSpacing.xxs) {
+                                        Text("Create Custom Exercise")
+                                            .font(RQTypography.body)
+                                            .foregroundColor(RQColors.accent)
+                                        Text("Add an exercise not in the library")
+                                            .font(RQTypography.caption)
+                                            .foregroundColor(RQColors.textTertiary)
+                                    }
+                                    Spacer()
+                                }
+                                .padding(.vertical, RQSpacing.xs)
+                            }
+                            .listRowBackground(Color.clear)
+                        }
+
                         ForEach(viewModel.groupedExercises, id: \.0) { group, exercises in
                             Section {
                                 ForEach(exercises) { exercise in
@@ -151,6 +189,12 @@ struct ExercisePickerView: View {
             .task {
                 await viewModel.search()
             }
+            .sheet(isPresented: $showCreateCustom) {
+                CreateCustomExerciseView { newExercise in
+                    onSelect(newExercise)
+                    dismiss()
+                }
+            }
         }
     }
 
@@ -168,6 +212,16 @@ struct ExercisePickerView: View {
                         Text("Compound")
                             .font(RQTypography.caption)
                             .foregroundColor(RQColors.accent)
+                    }
+                    if !exercise.isBuiltIn {
+                        Text("Custom")
+                            .font(.system(size: 9, weight: .semibold))
+                            .tracking(0.5)
+                            .foregroundColor(RQColors.background)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(RQColors.textTertiary)
+                            .cornerRadius(4)
                     }
                 }
             }

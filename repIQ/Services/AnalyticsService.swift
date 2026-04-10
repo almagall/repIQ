@@ -828,6 +828,10 @@ struct AnalyticsService: Sendable {
         let sessions = try await workoutService.fetchAllSessions(userId: userId)
         guard !sessions.isEmpty else { return [] }
 
+        // Build session lookup maps
+        let sessionMap = Dictionary(uniqueKeysWithValues: sessions.map { ($0.id, $0) })
+        let sessionDayMap: [UUID: UUID?] = Dictionary(uniqueKeysWithValues: sessions.map { ($0.id, $0.workoutDayId) })
+
         // Fetch all working sets across all sessions
         let sessionIds = sessions.map(\.id)
         let allSets: [WorkoutSet] = try await supabase.from("workout_sets")
@@ -838,19 +842,31 @@ struct AnalyticsService: Sendable {
             .value
         guard !allSets.isEmpty else { return [] }
 
-        // Count unique sessions per exercise (session count, not set count)
-        var sessionCountByExercise: [UUID: Set<UUID>] = [:]
-        for set in allSets {
-            sessionCountByExercise[set.exerciseId, default: []].insert(set.sessionId)
+        // Composite key: (exerciseId, workoutDayId) — same exercise on different
+        // workout days is tracked independently because fatigue context differs.
+        struct ExerciseDayKey: Hashable {
+            let exerciseId: UUID
+            let workoutDayId: UUID? // nil for legacy sessions without a day
         }
 
-        // Need at least 2 sessions to be a meaningful trajectory candidate.
-        let candidateExerciseIds = sessionCountByExercise
+        // Count unique sessions per exercise-day pair
+        var sessionCountByKey: [ExerciseDayKey: Set<UUID>] = [:]
+        for set in allSets {
+            let dayId = sessionDayMap[set.sessionId] ?? nil
+            let key = ExerciseDayKey(exerciseId: set.exerciseId, workoutDayId: dayId)
+            sessionCountByKey[key, default: []].insert(set.sessionId)
+        }
+
+        // Need at least 2 sessions to be a meaningful trajectory candidate
+        let candidateKeys = sessionCountByKey
             .filter { $0.value.count >= 2 }
             .keys
             .map { $0 }
 
-        guard !candidateExerciseIds.isEmpty else { return [] }
+        guard !candidateKeys.isEmpty else { return [] }
+
+        // Collect unique exercise IDs for metadata lookup
+        let uniqueExerciseIds = Array(Set(candidateKeys.map(\.exerciseId)))
 
         // Fetch exercise names + equipment + muscle groups + isCompound for ranking
         let exerciseNames: [UUID: String]
@@ -858,7 +874,7 @@ struct AnalyticsService: Sendable {
         let exerciseIsCompound: [UUID: Bool]
         do {
             let (names, muscles, _, isCompound) = try await exerciseService
-                .fetchExerciseDetails(candidateExerciseIds)
+                .fetchExerciseDetails(uniqueExerciseIds)
             exerciseNames = names
             exerciseMuscles = muscles
             exerciseIsCompound = isCompound
@@ -868,30 +884,38 @@ struct AnalyticsService: Sendable {
             exerciseIsCompound = [:]
         }
 
-        // Score each candidate: session count, with a 2x multiplier for compound
-        // lifts so they outrank isolation movements even with slightly fewer sessions.
-        // A bench press with 8 sessions (8 * 2 = 16) beats a cable fly with 12
-        // sessions (12 * 1 = 12) — which is the right behavior.
-        let scored = candidateExerciseIds.map { id -> (UUID, Double) in
-            let sessions = Double(sessionCountByExercise[id]?.count ?? 0)
-            let isCompound = exerciseIsCompound[id] ?? false
+        // Score each candidate: session count with 2x compound multiplier
+        let scored = candidateKeys.map { key -> (ExerciseDayKey, Double) in
+            let sessions = Double(sessionCountByKey[key]?.count ?? 0)
+            let isCompound = exerciseIsCompound[key.exerciseId] ?? false
             let multiplier: Double = isCompound ? 2.0 : 1.0
-            return (id, sessions * multiplier)
+            return (key, sessions * multiplier)
         }
 
-        let topExerciseIds = scored
+        let topKeys = scored
             .sorted { $0.1 > $1.1 }
             .prefix(limit)
             .map(\.0)
 
-        guard !topExerciseIds.isEmpty else { return [] }
+        guard !topKeys.isEmpty else { return [] }
 
-        // Build snapshots per exercise
-        let sessionMap = Dictionary(uniqueKeysWithValues: sessions.map { ($0.id, $0) })
+        // Fetch workout day names for display
+        let uniqueDayIds = Array(Set(topKeys.compactMap(\.workoutDayId)))
+        let dayNames: [UUID: String]
+        if !uniqueDayIds.isEmpty {
+            dayNames = (try? await workoutService.fetchWorkoutDayNames(ids: uniqueDayIds)) ?? [:]
+        } else {
+            dayNames = [:]
+        }
+
+        // Build snapshots per exercise-day pair
         var trajectories: [TopLiftTrajectory] = []
 
-        for exerciseId in topExerciseIds {
-            let exerciseSets = allSets.filter { $0.exerciseId == exerciseId }
+        for key in topKeys {
+            let exerciseSets = allSets.filter { set in
+                set.exerciseId == key.exerciseId
+                    && (sessionDayMap[set.sessionId] ?? nil) == key.workoutDayId
+            }
 
             // Group by session
             var setsBySession: [UUID: [WorkoutSet]] = [:]
@@ -946,10 +970,12 @@ struct AnalyticsService: Sendable {
                     velocityStatus = .maintaining
                     weeklyPercent = 0
                     trajectories.append(TopLiftTrajectory(
-                        exerciseId: exerciseId,
-                        exerciseName: exerciseNames[exerciseId] ?? "Exercise",
-                        muscleGroup: exerciseMuscles[exerciseId] ?? "",
-                        sessionCount: sessionCountByExercise[exerciseId]?.count ?? 0,
+                        exerciseId: key.exerciseId,
+                        exerciseName: exerciseNames[key.exerciseId] ?? "Exercise",
+                        muscleGroup: exerciseMuscles[key.exerciseId] ?? "",
+                        workoutDayId: key.workoutDayId,
+                        dayName: key.workoutDayId.flatMap { dayNames[$0] },
+                        sessionCount: sessionCountByKey[key]?.count ?? 0,
                         currentE1RM: last.estimated1RM,
                         fourWeekDelta: delta,
                         fourWeekDeltaPercent: deltaPercent,
@@ -983,10 +1009,12 @@ struct AnalyticsService: Sendable {
             )
 
             trajectories.append(TopLiftTrajectory(
-                exerciseId: exerciseId,
-                exerciseName: exerciseNames[exerciseId] ?? "Exercise",
-                muscleGroup: exerciseMuscles[exerciseId] ?? "",
-                sessionCount: sessionCountByExercise[exerciseId]?.count ?? 0,
+                exerciseId: key.exerciseId,
+                exerciseName: exerciseNames[key.exerciseId] ?? "Exercise",
+                muscleGroup: exerciseMuscles[key.exerciseId] ?? "",
+                workoutDayId: key.workoutDayId,
+                dayName: key.workoutDayId.flatMap { dayNames[$0] },
+                sessionCount: sessionCountByKey[key]?.count ?? 0,
                 currentE1RM: last.estimated1RM,
                 fourWeekDelta: delta,
                 fourWeekDeltaPercent: deltaPercent,

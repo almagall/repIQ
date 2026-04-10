@@ -122,8 +122,18 @@ struct ExerciseLogEntry: Identifiable {
         sets.filter(\.isCompleted).count
     }
 
+    /// Number of working sets that have been completed.
+    var completedWorkingSetCount: Int {
+        sets.filter { $0.isCompleted && $0.setType == .working }.count
+    }
+
     var isAllSetsCompleted: Bool {
         completedSetCount >= targetSets
+    }
+
+    /// True when all target working sets are done.
+    var isAllWorkingSetsCompleted: Bool {
+        completedWorkingSetCount >= targetSets
     }
 
     var totalVolume: Double {

@@ -85,17 +85,22 @@ struct ExerciseLibraryService: Sendable {
         muscleGroup: String,
         equipment: String,
         isCompound: Bool,
-        defaultRestSeconds: Int = 90
+        defaultRestSeconds: Int = 90,
+        notes: String? = nil
     ) async throws -> Exercise {
-        try await supabase.from("exercises")
-            .insert([
-                "user_id": userId.uuidString,
-                "name": name,
-                "muscle_group": muscleGroup,
-                "equipment": equipment,
-                "is_compound": "\(isCompound)",
-                "default_rest_seconds": "\(defaultRestSeconds)"
-            ])
+        var payload: [String: String] = [
+            "user_id": userId.uuidString,
+            "name": name,
+            "muscle_group": muscleGroup,
+            "equipment": equipment,
+            "is_compound": "\(isCompound)",
+            "default_rest_seconds": "\(defaultRestSeconds)"
+        ]
+        if let notes {
+            payload["notes"] = notes
+        }
+        return try await supabase.from("exercises")
+            .insert(payload)
             .select()
             .single()
             .execute()
