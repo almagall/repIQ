@@ -6,6 +6,7 @@ struct TemplateListView: View {
     @State private var showCreateTemplate = false
     @State private var showProgramBrowser = false
     @State private var showNewTemplateOptions = false
+    @State private var templateToDelete: Template?
 
     var body: some View {
         NavigationStack {
@@ -29,18 +30,31 @@ struct TemplateListView: View {
                     ScrollView {
                         VStack(spacing: RQSpacing.md) {
                             ForEach(viewModel.templates) { template in
-                                NavigationLink {
-                                    TemplateDetailView(
-                                        template: template,
-                                        onDelete: {
-                                            Task { await viewModel.deleteTemplate(template) }
-                                        },
-                                        onDuplicate: {
-                                            await viewModel.duplicateTemplate(template)
-                                        }
-                                    )
-                                } label: {
-                                    templateCard(template)
+                                HStack(spacing: 0) {
+                                    NavigationLink {
+                                        TemplateDetailView(
+                                            template: template,
+                                            onDelete: {
+                                                Task { await viewModel.deleteTemplate(template) }
+                                            },
+                                            onDuplicate: {
+                                                await viewModel.duplicateTemplate(template)
+                                            }
+                                        )
+                                    } label: {
+                                        templateCard(template)
+                                    }
+
+                                    // Delete button
+                                    Button {
+                                        templateToDelete = template
+                                    } label: {
+                                        Image(systemName: "trash")
+                                            .font(.system(size: 14))
+                                            .foregroundColor(RQColors.error)
+                                            .frame(width: 44, height: 44)
+                                    }
+                                    .padding(.leading, RQSpacing.xs)
                                 }
                             }
                         }
@@ -63,7 +77,7 @@ struct TemplateListView: View {
                     }
                 }
             }
-            .confirmationDialog("New Template", isPresented: $showNewTemplateOptions, titleVisibility: .visible) {
+            .alert("New Template", isPresented: $showNewTemplateOptions) {
                 Button("Custom Template") {
                     showCreateTemplate = true
                 }
@@ -82,6 +96,27 @@ struct TemplateListView: View {
                     showProgramBrowser = false
                     selectedTab = 0
                 })
+            }
+            .alert(
+                "Delete Template?",
+                isPresented: Binding(
+                    get: { templateToDelete != nil },
+                    set: { if !$0 { templateToDelete = nil } }
+                )
+            ) {
+                Button("Delete", role: .destructive) {
+                    if let template = templateToDelete {
+                        Task { await viewModel.deleteTemplate(template) }
+                    }
+                    templateToDelete = nil
+                }
+                Button("Cancel", role: .cancel) {
+                    templateToDelete = nil
+                }
+            } message: {
+                if let template = templateToDelete {
+                    Text("This will permanently delete \"\(template.name)\" and all its workout days. This cannot be undone.")
+                }
             }
             .task {
                 await viewModel.loadTemplates()
