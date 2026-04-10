@@ -79,14 +79,6 @@ final class ProgressDashboardViewModel {
         return ((current - previous) / previous) * 100
     }
 
-    /// Overall effective reps ratio across all muscle groups.
-    var overallEffectiveRatio: Double? {
-        let totalEffective = effectiveRepsSummary.reduce(0) { $0 + $1.effectiveReps }
-        let totalReps = effectiveRepsSummary.reduce(0) { $0 + $1.totalReps }
-        guard totalReps > 0 else { return nil }
-        return Double(totalEffective) / Double(totalReps)
-    }
-
     /// 4-week moving average of weekly volume, used as the reference line on the volume chart.
     var volumeBaseline: Double? {
         let validWeeks = volumeTrend.suffix(4).filter { $0.totalVolume > 0 }
@@ -112,15 +104,6 @@ final class ProgressDashboardViewModel {
             return "Dipping below average — recovery week?"
         }
         return "Significant drop — time to rebuild"
-    }
-
-    /// The 3 muscles with the lowest effective rep ratio (where intensity is leaking gains).
-    var weakestEffectiveMuscles: [EffectiveRepsSummary] {
-        effectiveRepsSummary
-            .filter { $0.totalReps > 0 }
-            .sorted { $0.effectiveRatio < $1.effectiveRatio }
-            .prefix(3)
-            .map { $0 }
     }
 
     // MARK: - Name Helpers
@@ -205,7 +188,7 @@ final class ProgressDashboardViewModel {
                 weeklySessionCount = currentWeek.sessionCount
             }
 
-            // Generate prescriptive insights with full data
+            // Generate actionable insights (max 3)
             insights = InsightEngine.generateInsights(
                 volumeTrend: fetchedTrend,
                 muscleDistribution: fetchedMuscle,
@@ -214,7 +197,7 @@ final class ProgressDashboardViewModel {
                 totalSessions: fetchedSessions.count,
                 lastWorkoutDate: fetchedStreak.lastWorkoutDate,
                 averageRPE: fetchedRPE,
-                effectiveRepsData: fetchedEffectiveReps,
+                topLifts: fetchedTopLifts,
                 weeklySessionCount: weeklySessionCount
             )
 

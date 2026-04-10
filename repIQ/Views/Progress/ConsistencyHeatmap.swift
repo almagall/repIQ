@@ -12,27 +12,18 @@ struct ConsistencyHeatmap: View {
     private let cellSize: CGFloat = 18
     private let cellSpacing: CGFloat = 3
     private let dayLabelWidth: CGFloat = 14
+    private let dayLabels = ["M", "T", "W", "T", "F", "S", "S"]
 
     var body: some View {
         VStack(alignment: .leading, spacing: RQSpacing.xs) {
             HStack(alignment: .top, spacing: cellSpacing) {
-                // Day-of-week labels (M / W / F)
+                // Day-of-week labels
                 VStack(spacing: cellSpacing) {
                     ForEach(0..<dayCount, id: \.self) { dayIdx in
-                        Group {
-                            if dayIdx == 0 {
-                                Text("M")
-                            } else if dayIdx == 2 {
-                                Text("W")
-                            } else if dayIdx == 4 {
-                                Text("F")
-                            } else {
-                                Text("")
-                            }
-                        }
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundColor(RQColors.textTertiary)
-                        .frame(width: dayLabelWidth, height: cellSize)
+                        Text(dayLabels[dayIdx])
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundColor(RQColors.textTertiary)
+                            .frame(width: dayLabelWidth, height: cellSize)
                     }
                 }
 
@@ -49,19 +40,17 @@ struct ConsistencyHeatmap: View {
             }
 
             // Week date labels (every 4 weeks)
-            HStack(spacing: cellSpacing) {
-                Spacer().frame(width: dayLabelWidth)
+            HStack(spacing: 0) {
+                Spacer().frame(width: dayLabelWidth + cellSpacing)
                 ForEach(0..<weekCount, id: \.self) { weekIdx in
-                    Group {
-                        if weekIdx % 4 == 0 {
-                            Text(weekLabel(weekIdx: weekIdx))
-                                .font(.system(size: 9, weight: .medium))
-                                .foregroundColor(RQColors.textTertiary)
-                        } else {
-                            Text("")
-                        }
+                    if weekIdx % 4 == 0 {
+                        Text(weekLabel(weekIdx: weekIdx))
+                            .font(.system(size: 8, weight: .medium))
+                            .foregroundColor(RQColors.textTertiary)
+                            .lineLimit(1)
+                            .fixedSize()
+                            .frame(width: (cellSize + cellSpacing) * 4, alignment: .leading)
                     }
-                    .frame(width: cellSize, alignment: .leading)
                 }
             }
             .padding(.top, 2)
@@ -104,7 +93,7 @@ struct ConsistencyHeatmap: View {
     private func weekLabel(weekIdx: Int) -> String {
         let date = dateFor(weekIdx: weekIdx, dayOfWeek: 0)
         let formatter = DateFormatter()
-        formatter.dateFormat = "M/d"
+        formatter.dateFormat = "MMM d"
         return formatter.string(from: date)
     }
 }
