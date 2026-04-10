@@ -1,107 +1,106 @@
 import SwiftUI
 
-/// A compact 12-week GitHub-style activity heatmap showing daily workout presence.
-/// Designed to be small enough to not require scrolling — 12 weeks wide × 7 days tall
-/// with week labels at the bottom.
+/// A 12-week activity heatmap showing daily workout presence.
+/// Cells are sized dynamically to fill the available card width.
+/// Uses a binary trained / didn't-train color scheme — for lifting, you
+/// almost always do exactly one workout per day, so an intensity scale
+/// would just be visual noise.
 struct ConsistencyHeatmap: View {
     let dailyData: [(date: Date, count: Int)]
 
-    // Number of weeks shown — matches fetchTrainingFrequency(weeks: 12)
     private let weekCount = 12
-    private let cellSize: CGFloat = 10
-    private let cellSpacing: CGFloat = 2
+    private let dayCount = 7
+    private let cellSpacing: CGFloat = 3
+    private let dayLabelWidth: CGFloat = 16
 
     var body: some View {
-        VStack(alignment: .leading, spacing: RQSpacing.xs) {
-            // Grid
-            HStack(alignment: .top, spacing: cellSpacing) {
-                // Day-of-week labels on the left
-                VStack(alignment: .trailing, spacing: cellSpacing) {
-                    Text("M")
-                        .font(.system(size: 8, weight: .semibold))
-                        .foregroundColor(RQColors.textTertiary)
-                        .frame(width: 10, height: cellSize)
-                    Spacer().frame(height: cellSize)
-                    Text("W")
-                        .font(.system(size: 8, weight: .semibold))
-                        .foregroundColor(RQColors.textTertiary)
-                        .frame(width: 10, height: cellSize)
-                    Spacer().frame(height: cellSize)
-                    Text("F")
-                        .font(.system(size: 8, weight: .semibold))
-                        .foregroundColor(RQColors.textTertiary)
-                        .frame(width: 10, height: cellSize)
-                    Spacer().frame(height: cellSize * 2 + cellSpacing)
-                }
+        GeometryReader { geo in
+            // Compute cell size from available width so the grid fills the card
+            let availableWidth = geo.size.width - dayLabelWidth - cellSpacing
+            let cellSize = max(8, (availableWidth - cellSpacing * CGFloat(weekCount - 1)) / CGFloat(weekCount))
 
-                // Heatmap grid + week labels
-                VStack(alignment: .leading, spacing: cellSpacing) {
-                    // Rows: Mon - Sun (7 rows)
-                    ForEach(0..<7, id: \.self) { dayOfWeek in
-                        HStack(spacing: cellSpacing) {
-                            ForEach(0..<weekCount, id: \.self) { weekIdx in
-                                dayCell(weekIdx: weekIdx, dayOfWeek: dayOfWeek)
-                            }
-                        }
-                    }
-
-                    // Week labels row (shows every 4 weeks)
-                    HStack(spacing: cellSpacing) {
-                        ForEach(0..<weekCount, id: \.self) { weekIdx in
+            VStack(alignment: .leading, spacing: RQSpacing.xs) {
+                HStack(alignment: .top, spacing: cellSpacing) {
+                    // Day-of-week labels (M / W / F)
+                    VStack(spacing: cellSpacing) {
+                        ForEach(0..<dayCount, id: \.self) { dayIdx in
                             Group {
-                                if weekIdx % 4 == 0 {
-                                    Text(weekLabel(weekIdx: weekIdx))
-                                        .font(.system(size: 7, weight: .medium))
-                                        .foregroundColor(RQColors.textTertiary)
+                                if dayIdx == 0 {
+                                    Text("M")
+                                } else if dayIdx == 2 {
+                                    Text("W")
+                                } else if dayIdx == 4 {
+                                    Text("F")
                                 } else {
                                     Text("")
                                 }
                             }
-                            .frame(width: cellSize, alignment: .leading)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(RQColors.textTertiary)
+                            .frame(width: dayLabelWidth, height: cellSize)
                         }
                     }
-                    .padding(.top, 1)
-                }
-            }
 
-            // Legend
-            HStack(spacing: RQSpacing.xs) {
-                Text("Less")
-                    .font(.system(size: 8))
-                    .foregroundColor(RQColors.textTertiary)
-                ForEach(0..<5, id: \.self) { level in
-                    RoundedRectangle(cornerRadius: 1.5)
-                        .fill(colorForLevel(level))
-                        .frame(width: cellSize, height: cellSize)
+                    // Heatmap grid
+                    VStack(alignment: .leading, spacing: cellSpacing) {
+                        ForEach(0..<dayCount, id: \.self) { dayOfWeek in
+                            HStack(spacing: cellSpacing) {
+                                ForEach(0..<weekCount, id: \.self) { weekIdx in
+                                    dayCell(weekIdx: weekIdx, dayOfWeek: dayOfWeek, size: cellSize)
+                                }
+                            }
+                        }
+                    }
                 }
-                Text("More")
-                    .font(.system(size: 8))
-                    .foregroundColor(RQColors.textTertiary)
+
+                // Week date labels (every 4 weeks)
+                HStack(spacing: cellSpacing) {
+                    Spacer().frame(width: dayLabelWidth)
+                    ForEach(0..<weekCount, id: \.self) { weekIdx in
+                        Group {
+                            if weekIdx % 4 == 0 {
+                                Text(weekLabel(weekIdx: weekIdx))
+                                    .font(.system(size: 9, weight: .medium))
+                                    .foregroundColor(RQColors.textTertiary)
+                            } else {
+                                Text("")
+                            }
+                        }
+                        .frame(width: cellSize, alignment: .leading)
+                    }
+                }
+                .padding(.top, 2)
             }
         }
+        .frame(height: heatmapHeight)
+    }
+
+    /// Total height needed: 7 rows + 6 spacings + week label row + padding.
+    /// Computed assuming a typical card width of ~280pt to give a stable layout.
+    private var heatmapHeight: CGFloat {
+        let estimatedCellSize: CGFloat = 20
+        return estimatedCellSize * CGFloat(dayCount) + cellSpacing * CGFloat(dayCount - 1) + 18
     }
 
     // MARK: - Cell Rendering
 
-    private func dayCell(weekIdx: Int, dayOfWeek: Int) -> some View {
+    private func dayCell(weekIdx: Int, dayOfWeek: Int, size: CGFloat) -> some View {
         let date = dateFor(weekIdx: weekIdx, dayOfWeek: dayOfWeek)
-        let count = countFor(date: date)
-        let level = intensityLevel(count: count)
+        let trained = countFor(date: date) > 0
 
-        return RoundedRectangle(cornerRadius: 1.5)
-            .fill(colorForLevel(level))
-            .frame(width: cellSize, height: cellSize)
+        return RoundedRectangle(cornerRadius: 2)
+            .fill(trained ? RQColors.accent : RQColors.surfaceTertiary)
+            .frame(width: size, height: size)
     }
 
     // MARK: - Date Math
 
-    /// Computes the date at the given (weekIdx, dayOfWeek) position in the grid.
+    /// Computes the date at the given (weekIdx, dayOfWeek) position.
     /// Week 0 is the oldest (12 weeks ago), dayOfWeek 0 is Monday.
     private func dateFor(weekIdx: Int, dayOfWeek: Int) -> Date {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
 
-        // Find the start of the current week (Monday)
         guard let thisWeekMonday = calendar.dateInterval(of: .weekOfYear, for: today)?.start,
               let startMonday = calendar.date(byAdding: .weekOfYear, value: -(weekCount - 1), to: thisWeekMonday) else {
             return today
@@ -120,24 +119,5 @@ struct ConsistencyHeatmap: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "M/d"
         return formatter.string(from: date)
-    }
-
-    // MARK: - Color Mapping
-
-    private func intensityLevel(count: Int) -> Int {
-        if count == 0 { return 0 }
-        if count == 1 { return 2 }
-        if count == 2 { return 3 }
-        return 4
-    }
-
-    private func colorForLevel(_ level: Int) -> Color {
-        switch level {
-        case 0: return RQColors.surfaceTertiary
-        case 1: return RQColors.accent.opacity(0.2)
-        case 2: return RQColors.accent.opacity(0.45)
-        case 3: return RQColors.accent.opacity(0.7)
-        default: return RQColors.accent
-        }
     }
 }
