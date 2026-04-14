@@ -100,6 +100,20 @@ struct StrengthTrajectoryCard: View {
                             .foregroundColor(RQColors.textTertiary)
                             .lineLimit(1)
                     }
+
+                    // 4-week projection (only when reliable + meaningful gain)
+                    if let projection = lift.projection,
+                       projection.projectedGain >= 3 {
+                        HStack(spacing: RQSpacing.xs) {
+                            Image(systemName: "chart.line.uptrend.xyaxis")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(RQColors.accent)
+                            Text("On pace for \(formatWeight(projection.projectedE1RM)) in 4 weeks")
+                                .font(.system(size: 11))
+                                .foregroundColor(RQColors.accent.opacity(0.85))
+                                .lineLimit(1)
+                        }
+                    }
                 }
 
                 Spacer(minLength: RQSpacing.sm)

@@ -26,7 +26,12 @@ struct ProgressTabView: View {
                         // 1. Monthly Stats Header — at-a-glance snapshot of this month
                         MonthlyStatsHeader(stats: viewModel.monthlyStats)
 
-                        // 2. Hero: Strength Trajectory — top lifts scoped by workout day
+                        // 2. Last Workout recap — answers "how did I do last time?"
+                        if let recap = viewModel.lastWorkoutRecap {
+                            LastWorkoutRecapCard(recap: recap)
+                        }
+
+                        // 3. Hero: Strength Trajectory — top lifts scoped by workout day
                         StrengthTrajectoryCard(
                             lifts: viewModel.topLifts,
                             onSelect: { lift in
@@ -56,6 +61,11 @@ struct ProgressTabView: View {
                         // 6. Recent PRs — celebration
                         if !viewModel.recentPRs.isEmpty {
                             recentPRsSection
+                        }
+
+                        // 7. Monthly Report Card CTA — only when there's enough data
+                        if (viewModel.monthlyStats?.workouts ?? 0) >= 3 {
+                            monthlyReportCTA
                         }
                     }
                     .padding(.horizontal, RQSpacing.screenHorizontal)
@@ -94,6 +104,7 @@ struct ProgressTabView: View {
                 await socialViewModel.loadSocialData()
             }
             .refreshable {
+                UIImpactFeedbackGenerator(style: .soft).impactOccurred()
                 await viewModel.loadDashboard()
             }
         }
@@ -318,6 +329,57 @@ struct ProgressTabView: View {
         )
     }
 
+    // MARK: - Monthly Report CTA
+
+    private var currentMonthName: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM"
+        return formatter.string(from: Date())
+    }
+
+    private var monthlyReportCTA: some View {
+        Button {
+            showMonthlyReport = true
+        } label: {
+            HStack(spacing: RQSpacing.md) {
+                ZStack {
+                    Circle()
+                        .fill(RQColors.accent.opacity(0.15))
+                        .frame(width: 44, height: 44)
+                    Image(systemName: "doc.text.magnifyingglass")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(RQColors.accent)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Your \(currentMonthName) Report Card")
+                        .font(RQTypography.headline)
+                        .foregroundColor(RQColors.textPrimary)
+                    Text("See your monthly highlights, top lifts, and stats")
+                        .font(RQTypography.caption)
+                        .foregroundColor(RQColors.textTertiary)
+                        .lineLimit(1)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(RQColors.textTertiary)
+            }
+            .padding(RQSpacing.cardPadding)
+            .background(
+                RoundedRectangle(cornerRadius: RQSpacing.cardCornerRadius)
+                    .fill(RQColors.surfaceSecondary)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: RQSpacing.cardCornerRadius)
+                            .stroke(RQColors.accent.opacity(0.3), lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
     // MARK: - 6. Recent PRs
 
     private var recentPRsSection: some View {
@@ -327,7 +389,14 @@ struct ProgressTabView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: RQSpacing.md) {
                     ForEach(viewModel.recentPRs.prefix(8), id: \.record.id) { pr in
-                        prCard(pr.record, exerciseName: pr.exerciseName)
+                        if let sessionId = pr.record.sessionId {
+                            NavigationLink(value: sessionId) {
+                                prCard(pr.record, exerciseName: pr.exerciseName)
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            prCard(pr.record, exerciseName: pr.exerciseName)
+                        }
                     }
                 }
             }
@@ -371,6 +440,8 @@ struct ProgressTabView: View {
             HStack {
                 sectionHeaderWithInfo("MUSCLE BALANCE", topic: ProgressExplainer.muscleBalance)
                 Spacer()
+                // Info button explaining the DIRECT/ADJUSTED toggle
+                InfoButton(topic: ProgressExplainer.fractionalVolume)
                 // Fractional volume toggle
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
@@ -400,17 +471,8 @@ struct ProgressTabView: View {
 
             RQCard {
                 VStack(spacing: RQSpacing.lg) {
-                    // Donut chart
-                    Chart(viewModel.activeMuscleDistribution) { group in
-                        SectorMark(
-                            angle: .value("Volume", group.volume),
-                            innerRadius: .ratio(0.6),
-                            angularInset: 1.5
-                        )
-                        .foregroundStyle(group.color)
-                        .cornerRadius(RQRadius.small)
-                    }
-                    .frame(height: 160)
+                    // Body diagram hero + watch list
+                    MuscleBalanceBodyView(distribution: viewModel.activeMuscleDistribution)
 
                     if viewModel.showFractionalVolume {
                         HStack(spacing: RQSpacing.xs) {
@@ -420,28 +482,6 @@ struct ProgressTabView: View {
                                 .font(RQTypography.caption)
                         }
                         .foregroundColor(RQColors.textTertiary)
-                    }
-
-                    // Legend
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: RQSpacing.sm) {
-                        ForEach(viewModel.activeMuscleDistribution) { group in
-                            HStack(spacing: RQSpacing.sm) {
-                                RoundedRectangle(cornerRadius: 2)
-                                    .fill(group.color)
-                                    .frame(width: 10, height: 10)
-
-                                Text(group.displayName)
-                                    .font(RQTypography.caption)
-                                    .foregroundColor(RQColors.textSecondary)
-                                    .lineLimit(1)
-
-                                Spacer()
-
-                                Text(String(format: "%.0f%%", group.percentage))
-                                    .font(RQTypography.label)
-                                    .foregroundColor(RQColors.textTertiary)
-                            }
-                        }
                     }
 
                     // Push / Pull ratio (merged in)

@@ -71,10 +71,19 @@ struct ConsistencyHeatmap: View {
 
     // MARK: - Date Math
 
+    /// Calendar configured to start weeks on Monday so the heatmap rows
+    /// (M T W T F S S) align with the actual day boundaries — independent
+    /// of the user's locale, which would otherwise default to Sunday in the US.
+    private var mondayCalendar: Calendar {
+        var cal = Calendar.current
+        cal.firstWeekday = 2 // Monday
+        return cal
+    }
+
     /// Computes the date at the given (weekIdx, dayOfWeek) position.
     /// Week 0 is the oldest (12 weeks ago), dayOfWeek 0 is Monday.
     private func dateFor(weekIdx: Int, dayOfWeek: Int) -> Date {
-        let calendar = Calendar.current
+        let calendar = mondayCalendar
         let today = calendar.startOfDay(for: Date())
 
         guard let thisWeekMonday = calendar.dateInterval(of: .weekOfYear, for: today)?.start,
@@ -86,8 +95,7 @@ struct ConsistencyHeatmap: View {
     }
 
     private func countFor(date: Date) -> Int {
-        let calendar = Calendar.current
-        return dailyData.first { calendar.isDate($0.date, inSameDayAs: date) }?.count ?? 0
+        return dailyData.first { mondayCalendar.isDate($0.date, inSameDayAs: date) }?.count ?? 0
     }
 
     private func weekLabel(weekIdx: Int) -> String {

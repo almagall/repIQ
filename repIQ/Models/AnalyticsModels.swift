@@ -409,7 +409,7 @@ enum ConsistencyGrade: String, Sendable {
 
 // MARK: - Strength Prediction
 
-struct StrengthPrediction {
+struct StrengthPrediction: Sendable {
     let currentE1RM: Double
     let projectedE1RM: Double // 4 weeks out
     let weeklyGainRate: Double // lbs per week (from linear regression slope)
@@ -435,6 +435,30 @@ struct MonthlyStats: Sendable {
     let prCount: Int         // PRs hit this month
     let totalSets: Int       // working sets logged this month
     let avgRPE: Double?      // average RPE across this month's sets
+    let previousMonth: PreviousMonthStats?  // for month-over-month deltas
+}
+
+struct PreviousMonthStats: Sendable {
+    let workouts: Int
+    let prCount: Int
+    let totalSets: Int
+    let avgRPE: Double?
+}
+
+// MARK: - Last Workout Recap (top of Progress tab)
+
+/// A lightweight summary of the user's most recent completed session.
+/// Powers the "Last Workout" recap card so users can drill straight into
+/// their last session from the Progress tab.
+struct LastWorkoutRecap: Sendable {
+    let sessionId: UUID
+    let templateName: String?
+    let dayName: String?
+    let completedAt: Date
+    let durationSeconds: Int
+    let workingSets: Int
+    let totalVolume: Double
+    let prCount: Int
 }
 
 // MARK: - Top Lift Trajectory (hero card on Progress tab)
@@ -453,6 +477,7 @@ struct TopLiftTrajectory: Identifiable, Sendable {
     let weeklyPercent: Double
     let narrative: String
     let sparkline: [Double] // recent e1RM values for the mini chart
+    let projection: StrengthPrediction? // 4-week e1RM projection (only when reliable)
 
     /// Unique ID combining exercise + workout day so the same exercise
     /// on different days appears as distinct entries.

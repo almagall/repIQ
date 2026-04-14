@@ -26,6 +26,7 @@ final class ProgressDashboardViewModel {
     var consistencyScore: ConsistencyScore?
     var topLifts: [TopLiftTrajectory] = []
     var monthlyStats: MonthlyStats?
+    var lastWorkoutRecap: LastWorkoutRecap?
 
     // UI toggle for fractional volume
     var showFractionalVolume: Bool = false
@@ -87,23 +88,64 @@ final class ProgressDashboardViewModel {
     }
 
     /// An interpreted narrative for the volume trend (replaces the raw percent delta).
+    /// A prescriptive coaching caption that combines volume deviation with
+    /// recovery (RPE) and recent PR signals to produce actionable guidance.
+    /// More specific than a raw deviation message — tells the user what to do.
     var volumeTrendNarrative: String? {
         guard let baseline = volumeBaseline, baseline > 0,
               let current = volumeTrend.last?.totalVolume else { return nil }
         let deviation = ((current - baseline) / baseline) * 100
+        let rpe = averageRPE ?? 0
+        let hasRecentPRs = recentPRs.contains { pr in
+            let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+            return pr.record.achievedAt >= sevenDaysAgo
+        }
+        let isHighFatigue = rpe >= 8.5
+        let isLowFatigue = rpe > 0 && rpe <= 7.0
+
+        // Big spike up (>15%)
         if deviation > 15 {
-            return "Volume trending up — watch recovery"
+            if isHighFatigue {
+                return "Volume up sharply with high RPE — prioritize sleep and recovery this week"
+            }
+            return "Volume up sharply — keep weekly increases under 10% to avoid overreaching"
         }
+
+        // Modest gain (5-15%)
         if deviation > 5 {
-            return "Above 4-week average — building nicely"
+            if hasRecentPRs {
+                return "Above baseline and hitting PRs — your training is paying off"
+            }
+            return "Above 4-week average — solid progressive overload"
         }
-        if deviation > -5 {
-            return "Within sustainable range"
+
+        // Steady (-5 to +5%)
+        if deviation >= -5 {
+            if isLowFatigue {
+                return "Steady volume at low effort — consider bumping weight or reps to drive progress"
+            }
+            if hasRecentPRs {
+                return "Holding volume and hitting PRs — quality over quantity working well"
+            }
+            return "Within sustainable range — keep stacking consistent weeks"
         }
+
+        // Modest dip (-15 to -5%)
         if deviation > -15 {
-            return "Dipping below average — recovery week?"
+            if isHighFatigue {
+                return "Volume eased back while RPE stays high — smart recovery move"
+            }
+            if hasRecentPRs {
+                return "Volume down slightly but PRs are landing — looks like a peaking week"
+            }
+            return "Dipping below average — recovery week, or time to add load back?"
         }
-        return "Significant drop — time to rebuild"
+
+        // Significant drop (>15% down)
+        if isHighFatigue {
+            return "Significant deload — let RPE come down before rebuilding volume"
+        }
+        return "Significant drop — if not a planned deload, aim to rebuild back to baseline"
     }
 
     // MARK: - Name Helpers
@@ -144,6 +186,7 @@ final class ProgressDashboardViewModel {
             async let landmarkTask = analyticsService.fetchVolumeLandmarkData(userId: userId)
             async let topLiftsTask = analyticsService.fetchTopLiftsTrajectory(userId: userId, limit: 5)
             async let monthlyStatsTask = analyticsService.fetchMonthlyStats(userId: userId)
+            async let lastRecapTask = analyticsService.fetchLastWorkoutRecap(userId: userId)
 
             // Await all
             let fetchedStreak = try await streakTask
@@ -161,6 +204,7 @@ final class ProgressDashboardViewModel {
             let fetchedLandmarks = try await landmarkTask
             let fetchedTopLifts = (try? await topLiftsTask) ?? []
             let fetchedMonthlyStats = try? await monthlyStatsTask
+            let fetchedLastRecap = try? await lastRecapTask
 
             // Update state
             streakData = fetchedStreak
@@ -178,6 +222,7 @@ final class ProgressDashboardViewModel {
             volumeLandmarks = fetchedLandmarks
             topLifts = fetchedTopLifts
             monthlyStats = fetchedMonthlyStats
+            lastWorkoutRecap = fetchedLastRecap ?? nil
 
             // Compute overview stats
             totalVolume = fetchedMilestoneData.totalVolume

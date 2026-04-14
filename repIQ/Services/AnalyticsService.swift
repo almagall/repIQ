@@ -757,35 +757,78 @@ struct AnalyticsService: Sendable {
     /// Used by the Progress tab header to give users an at-a-glance "how was my month".
     func fetchMonthlyStats(userId: UUID) async throws -> MonthlyStats {
         let calendar = Calendar.current
-        guard let monthStart = calendar.dateInterval(of: .month, for: Date())?.start else {
-            return MonthlyStats(workouts: 0, prCount: 0, totalSets: 0, avgRPE: nil)
+        let now = Date()
+
+        // Current month bounds
+        guard let currentInterval = calendar.dateInterval(of: .month, for: now) else {
+            return MonthlyStats(workouts: 0, prCount: 0, totalSets: 0, avgRPE: nil, previousMonth: nil)
         }
+
+        // Previous month bounds (last day of previous month → 1 day before current start)
+        let previousMonthDate = calendar.date(byAdding: .month, value: -1, to: now) ?? now
+        let previousInterval = calendar.dateInterval(of: .month, for: previousMonthDate)
+
+        // Fetch in parallel
+        async let currentTask = fetchStatsForRange(
+            userId: userId,
+            start: currentInterval.start,
+            end: currentInterval.end
+        )
+        async let previousTask: (workouts: Int, prCount: Int, totalSets: Int, avgRPE: Double?)? = {
+            guard let prev = previousInterval else { return nil }
+            return try? await fetchStatsForRange(userId: userId, start: prev.start, end: prev.end)
+        }()
+
+        let current = try await currentTask
+        let previous = await previousTask
+
+        return MonthlyStats(
+            workouts: current.workouts,
+            prCount: current.prCount,
+            totalSets: current.totalSets,
+            avgRPE: current.avgRPE,
+            previousMonth: previous.map {
+                PreviousMonthStats(workouts: $0.workouts, prCount: $0.prCount, totalSets: $0.totalSets, avgRPE: $0.avgRPE)
+            }
+        )
+    }
+
+    /// Helper that fetches workouts/PRs/sets/RPE for an arbitrary date range.
+    /// Used by `fetchMonthlyStats` to compute current and previous month in parallel.
+    private func fetchStatsForRange(
+        userId: UUID,
+        start: Date,
+        end: Date
+    ) async throws -> (workouts: Int, prCount: Int, totalSets: Int, avgRPE: Double?) {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let monthStartString = formatter.string(from: monthStart)
+        let startString = formatter.string(from: start)
+        let endString = formatter.string(from: end)
 
-        // Sessions completed this month
+        // Sessions completed in this range
         let sessions: [WorkoutSession] = try await supabase.from("workout_sessions")
             .select()
             .eq("user_id", value: userId.uuidString)
             .eq("status", value: "completed")
-            .gte("completed_at", value: monthStartString)
+            .gte("completed_at", value: startString)
+            .lt("completed_at", value: endString)
             .execute()
             .value
 
         let workouts = sessions.count
 
-        // PRs achieved this month
+        // PRs achieved in this range
         struct PRRow: Decodable { let id: UUID }
         let prRows: [PRRow] = (try? await supabase.from("personal_records")
             .select("id")
             .eq("user_id", value: userId.uuidString)
-            .gte("achieved_at", value: monthStartString)
+            .gte("achieved_at", value: startString)
+            .lt("achieved_at", value: endString)
             .execute()
             .value) ?? []
         let prCount = prRows.count
 
-        // Working sets logged this month
+        // Working sets logged in this range
         var totalSets = 0
         var rpeSum = 0.0
         var rpeCount = 0
@@ -807,11 +850,67 @@ struct AnalyticsService: Sendable {
         }
         let avgRPE = rpeCount > 0 ? rpeSum / Double(rpeCount) : nil
 
-        return MonthlyStats(
-            workouts: workouts,
-            prCount: prCount,
-            totalSets: totalSets,
-            avgRPE: avgRPE
+        return (workouts: workouts, prCount: prCount, totalSets: totalSets, avgRPE: avgRPE)
+    }
+
+    // MARK: - Last Workout Recap
+
+    /// Fetches a lightweight summary of the user's most recent completed session.
+    /// Used by the Last Workout recap card on the Progress tab. Returns nil if
+    /// the user has no completed sessions.
+    func fetchLastWorkoutRecap(userId: UUID) async throws -> LastWorkoutRecap? {
+        // Most recent completed session
+        let sessions: [WorkoutSession] = try await supabase.from("workout_sessions")
+            .select()
+            .eq("user_id", value: userId.uuidString)
+            .eq("status", value: "completed")
+            .order("completed_at", ascending: false)
+            .limit(1)
+            .execute()
+            .value
+
+        guard let session = sessions.first, let completedAt = session.completedAt else {
+            return nil
+        }
+
+        // Sets for this session (working sets only for the volume calculation)
+        let sets: [WorkoutSet] = (try? await supabase.from("workout_sets")
+            .select()
+            .eq("session_id", value: session.id.uuidString)
+            .eq("set_type", value: "working")
+            .execute()
+            .value) ?? []
+
+        let workingSets = sets.count
+        let totalVolume = sets.reduce(0.0) { $0 + ($1.weight * Double($1.reps)) }
+
+        // PR count for this session
+        struct PRRow: Decodable { let id: UUID }
+        let prRows: [PRRow] = (try? await supabase.from("personal_records")
+            .select("id")
+            .eq("session_id", value: session.id.uuidString)
+            .execute()
+            .value) ?? []
+
+        // Resolve template + day names if present
+        var templateName: String? = nil
+        var dayName: String? = nil
+        if let templateId = session.templateId {
+            templateName = (try? await workoutService.fetchTemplateNames(ids: [templateId]))?[templateId]
+        }
+        if let dayId = session.workoutDayId {
+            dayName = (try? await workoutService.fetchWorkoutDayNames(ids: [dayId]))?[dayId]
+        }
+
+        return LastWorkoutRecap(
+            sessionId: session.id,
+            templateName: templateName,
+            dayName: dayName,
+            completedAt: completedAt,
+            durationSeconds: session.durationSeconds ?? 0,
+            workingSets: workingSets,
+            totalVolume: totalVolume,
+            prCount: prRows.count
         )
     }
 
@@ -949,6 +1048,11 @@ struct AnalyticsService: Sendable {
 
             guard let last = snapshots.last else { continue }
 
+            // 4-week strength projection (only show when the regression fit is
+            // confident enough — false projections are worse than no projection).
+            let rawProjection = AnalyticsService.predictStrength(from: snapshots)
+            let projection: StrengthPrediction? = (rawProjection?.confidence ?? 0) >= 0.5 ? rawProjection : nil
+
             // Compute 4-week delta
             let fourWeeksAgo = Calendar.current.date(byAdding: .day, value: -28, to: Date()) ?? Date()
             let priorSnapshot = snapshots.reversed().first(where: { $0.date <= fourWeeksAgo })
@@ -987,7 +1091,8 @@ struct AnalyticsService: Sendable {
                             deltaPercent: deltaPercent,
                             sessionCount: snapshots.count
                         ),
-                        sparkline: snapshots.map(\.estimated1RM)
+                        sparkline: snapshots.map(\.estimated1RM),
+                        projection: projection
                     ))
                     continue
                 }
@@ -1021,7 +1126,8 @@ struct AnalyticsService: Sendable {
                 velocityStatus: velocityStatus,
                 weeklyPercent: weeklyPercent,
                 narrative: narrative,
-                sparkline: snapshots.suffix(12).map(\.estimated1RM)
+                sparkline: snapshots.suffix(12).map(\.estimated1RM),
+                projection: projection
             ))
         }
 

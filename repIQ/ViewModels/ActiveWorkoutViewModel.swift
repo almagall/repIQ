@@ -547,9 +547,12 @@ final class ActiveWorkoutViewModel {
         timerTask?.cancel()
         isLoading = true
 
-        // Clear auto-save immediately so the app never offers to resume
-        // a workout that the user already finished — even if post-processing
-        // (PR detection, feed items, etc.) fails below.
+        // CRITICAL: Cancel the periodic auto-save BEFORE clearing the file.
+        // Otherwise a sleeping auto-save tick can wake up mid-completion and
+        // write the state back to disk after we've cleared it, causing the
+        // "Resume workout?" prompt to appear for an already-finished workout.
+        autoSaveTask?.cancel()
+        autoSaveTask = nil
         WorkoutAutoSave.clear()
 
         do {
@@ -821,6 +824,12 @@ final class ActiveWorkoutViewModel {
     func abandonWorkout() async {
         guard let sessionId else { return }
 
+        // Cancel auto-save and clear state BEFORE the network call so a
+        // sleeping auto-save tick can't fire mid-await and re-save the file.
+        autoSaveTask?.cancel()
+        autoSaveTask = nil
+        WorkoutAutoSave.clear()
+
         do {
             try await workoutService.abandonSession(sessionId: sessionId)
         } catch {
@@ -828,9 +837,7 @@ final class ActiveWorkoutViewModel {
         }
 
         timerTask?.cancel()
-        autoSaveTask?.cancel()
         cancelRestTimer()
-        WorkoutAutoSave.clear()
         UIApplication.shared.isIdleTimerDisabled = false
     }
 
@@ -923,17 +930,30 @@ final class ActiveWorkoutViewModel {
                     percentImprovement: pctImprovement,
                     estimated1RM: est1RM
                 )
-                // Update tracked PR so subsequent sets compare against the new best
-                if var exercisePRs = currentPRs[exerciseId],
-                   let prIndex = exercisePRs.firstIndex(where: { $0.recordType == .weight }) {
+                // Update tracked PR so subsequent sets compare against the new best.
+                // Critical: must also INSERT if no record exists yet (first-ever PR),
+                // otherwise repeating the same weight in a later set would clear this
+                // badge and move it to that set since the cache still shows no PR.
+                let userIdForCache = (try? await supabase.auth.session.user.id) ?? UUID()
+                let updatedPR = PersonalRecord(
+                    id: UUID(), userId: userIdForCache,
+                    exerciseId: exerciseId, recordType: .weight,
+                    value: completedSet.weight, repsAtWeight: completedSet.reps,
+                    sessionId: sessionId, achievedAt: Date(), createdAt: Date()
+                )
+                var exercisePRs = currentPRs[exerciseId] ?? []
+                if let prIndex = exercisePRs.firstIndex(where: { $0.recordType == .weight }) {
+                    // Preserve original id/userId for existing record
                     exercisePRs[prIndex] = PersonalRecord(
                         id: exercisePRs[prIndex].id, userId: exercisePRs[prIndex].userId,
                         exerciseId: exerciseId, recordType: .weight,
                         value: completedSet.weight, repsAtWeight: completedSet.reps,
                         sessionId: sessionId, achievedAt: Date(), createdAt: Date()
                     )
-                    currentPRs[exerciseId] = exercisePRs
+                } else {
+                    exercisePRs.append(updatedPR)
                 }
+                currentPRs[exerciseId] = exercisePRs
             } else {
                 // Rep PR: most reps ever at this exact weight
                 let repPR = prs.first(where: { $0.recordType == .reps && $0.value == completedSet.weight })
@@ -962,17 +982,27 @@ final class ActiveWorkoutViewModel {
                         percentImprovement: pctImprovement,
                         estimated1RM: nil
                     )
-                    // Update tracked rep PR
-                    if var exercisePRs = currentPRs[exerciseId],
-                       let prIndex = exercisePRs.firstIndex(where: { $0.recordType == .reps && $0.value == completedSet.weight }) {
+                    // Update tracked rep PR — must INSERT if no record exists yet,
+                    // otherwise a later set with the same weight+reps would re-trigger
+                    // the badge since the cache wouldn't reflect this PR.
+                    let userIdForRepCache = (try? await supabase.auth.session.user.id) ?? UUID()
+                    var exercisePRs = currentPRs[exerciseId] ?? []
+                    if let prIndex = exercisePRs.firstIndex(where: { $0.recordType == .reps && $0.value == completedSet.weight }) {
                         exercisePRs[prIndex] = PersonalRecord(
                             id: exercisePRs[prIndex].id, userId: exercisePRs[prIndex].userId,
                             exerciseId: exerciseId, recordType: .reps,
                             value: completedSet.weight, repsAtWeight: completedSet.reps,
                             sessionId: sessionId, achievedAt: Date(), createdAt: Date()
                         )
-                        currentPRs[exerciseId] = exercisePRs
+                    } else {
+                        exercisePRs.append(PersonalRecord(
+                            id: UUID(), userId: userIdForRepCache,
+                            exerciseId: exerciseId, recordType: .reps,
+                            value: completedSet.weight, repsAtWeight: completedSet.reps,
+                            sessionId: sessionId, achievedAt: Date(), createdAt: Date()
+                        ))
                     }
+                    currentPRs[exerciseId] = exercisePRs
                 }
             }
         }
@@ -1240,6 +1270,10 @@ final class ActiveWorkoutViewModel {
 
     /// Saves current workout state to disk for crash recovery.
     func saveWorkoutState() {
+        // Don't save state during or after completion — prevents a race
+        // where a sleeping auto-save tick re-creates the file after we
+        // cleared it in completeWorkout/abandonWorkout.
+        guard !isCompleting else { return }
         guard let sessionId else { return }
 
         let savedExercises = exercises.map { exercise in
