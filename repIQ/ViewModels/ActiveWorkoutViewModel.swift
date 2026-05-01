@@ -378,6 +378,7 @@ final class ActiveWorkoutViewModel {
         navigateWithCheck {
             let prevGroup = self.allGroups[self.currentGroupPosition - 1]
             self.currentExerciseIndex = prevGroup.first ?? self.currentExerciseIndex
+            self.pushActivityUpdate()
         }
     }
 
@@ -386,6 +387,7 @@ final class ActiveWorkoutViewModel {
         navigateWithCheck {
             let nextGroup = self.allGroups[self.currentGroupPosition + 1]
             self.currentExerciseIndex = nextGroup.first ?? self.currentExerciseIndex
+            self.pushActivityUpdate()
         }
     }
 
@@ -404,7 +406,53 @@ final class ActiveWorkoutViewModel {
             } else {
                 self.currentExerciseIndex = index
             }
+            self.pushActivityUpdate()
         }
+    }
+
+    // MARK: - Live Activity
+
+    /// Builds a fresh ContentState from current view-model state and pushes
+    /// it to the running Live Activity. Cheap to call — Apple rate-limits.
+    /// Per-second tick updates (rest countdown, elapsed timer) are handled
+    /// by `Text(timerInterval:)` in the activity layout, so we only need to
+    /// push on meaningful events: set logged, exercise changed, rest started/ended.
+    func pushActivityUpdate() {
+        guard let exercise = currentExercise else { return }
+        let completed = exercise.sets.filter { $0.isCompleted && $0.setType == .working }.count
+        let nextSetIndex = min(completed + 1, exercise.targetSets)
+        let restEnd: Date? = (restTimerActive && restTimerRemaining > 0)
+            ? Date().addingTimeInterval(TimeInterval(restTimerRemaining))
+            : nil
+        let state = WorkoutActivityAttributes.ContentState(
+            currentExerciseName: exercise.exerciseName,
+            setProgress: "Set \(nextSetIndex)/\(exercise.targetSets)",
+            elapsedSeconds: elapsedSeconds,
+            restEndDate: restEnd,
+            isRestActive: restEnd != nil
+        )
+        LiveActivityService.shared.update(state)
+    }
+
+    /// Starts the Live Activity once exercises are loaded. Called from
+    /// `startWorkout()` and the recovery flow.
+    private func startLiveActivity() {
+        guard let exercise = currentExercise else { return }
+        let nextSetIndex = min(exercise.completedWorkingSetCount + 1, exercise.targetSets)
+        let initialState = WorkoutActivityAttributes.ContentState(
+            currentExerciseName: exercise.exerciseName,
+            setProgress: "Set \(nextSetIndex)/\(exercise.targetSets)",
+            elapsedSeconds: elapsedSeconds,
+            restEndDate: nil,
+            isRestActive: false
+        )
+        let workoutDisplayName = dayName.isEmpty ? templateName
+            : (templateName.isEmpty ? dayName : "\(templateName) · \(dayName)")
+        LiveActivityService.shared.start(
+            workoutName: workoutDisplayName,
+            startedAt: startTime,
+            initialState: initialState
+        )
     }
 
     // MARK: - Lifecycle
@@ -521,7 +569,10 @@ final class ActiveWorkoutViewModel {
             // 6. Start periodic auto-save for crash recovery
             startAutoSave()
 
-            // 7. Check if proactive deload should be suggested
+            // 7. Start Live Activity (Lock Screen + Dynamic Island)
+            startLiveActivity()
+
+            // 8. Check if proactive deload should be suggested
             if let templateId = template.id as UUID? {
                 deloadSuggestion = try? await progressionService.shouldSuggestDeload(
                     userId: userId,
@@ -599,6 +650,10 @@ final class ActiveWorkoutViewModel {
         autoSaveTask?.cancel()
         autoSaveTask = nil
         WorkoutAutoSave.clear()
+
+        // End the Live Activity immediately so the Lock Screen / Dynamic Island
+        // don't keep showing a stale workout while post-processing runs.
+        LiveActivityService.shared.endNow()
 
         do {
             guard let userId = try? await supabase.auth.session.user.id else {
@@ -897,6 +952,9 @@ final class ActiveWorkoutViewModel {
         autoSaveTask = nil
         WorkoutAutoSave.clear()
 
+        // End the Live Activity so the Lock Screen / Dynamic Island clear
+        LiveActivityService.shared.endNow()
+
         do {
             try await workoutService.abandonSession(sessionId: sessionId)
         } catch {
@@ -1142,6 +1200,11 @@ final class ActiveWorkoutViewModel {
 
         // Auto-save workout state
         saveWorkoutState()
+
+        // Update Live Activity with the new set progress (and rest timer if it
+        // was just started above). Slight redundancy with startRestTimer's own
+        // push is fine — Apple rate-limits internally.
+        pushActivityUpdate()
     }
 
     func uncompleteSet(exerciseIndex: Int, setIndex: Int) async {
@@ -1424,7 +1487,12 @@ final class ActiveWorkoutViewModel {
     }
 
     /// Public entry point for starting auto-save (used by recovery flow).
-    func startAutoSavePublic() { startAutoSave() }
+    /// Also re-starts the Live Activity so a recovered workout shows on the
+    /// Lock Screen / Dynamic Island just like a freshly started one.
+    func startAutoSavePublic() {
+        startAutoSave()
+        startLiveActivity()
+    }
 
     /// Starts periodic auto-save (every 30 seconds).
     private func startAutoSave() {
@@ -1628,6 +1696,10 @@ final class ActiveWorkoutViewModel {
         restTimerTarget = seconds
         restTimerRemaining = seconds
         restTimerActive = true
+        // Push to Live Activity so the Lock Screen / Dynamic Island show the
+        // countdown immediately. The activity layout uses Text(timerInterval:)
+        // to tick down without further updates from us.
+        pushActivityUpdate()
 
         restTimerTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -1640,6 +1712,8 @@ final class ActiveWorkoutViewModel {
                     // Haptic when timer completes
                     let generator = UINotificationFeedbackGenerator()
                     generator.notificationOccurred(.success)
+                    // Push to clear restEndDate on the activity
+                    self.pushActivityUpdate()
                     break
                 }
             }
@@ -1647,10 +1721,14 @@ final class ActiveWorkoutViewModel {
     }
 
     func cancelRestTimer() {
+        let wasActive = restTimerActive
         restTimerTask?.cancel()
         restTimerActive = false
         restTimerRemaining = 0
         restTimerTarget = 0
+        if wasActive {
+            pushActivityUpdate()
+        }
     }
 
     private func formatWeightForPR(_ weight: Double) -> String {

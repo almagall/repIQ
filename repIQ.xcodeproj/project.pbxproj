@@ -8,16 +8,54 @@
 
 /* Begin PBXBuildFile section */
 		05F2098D2F57CBE700E0AE4C /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = AABB00022F57000100000002 /* Supabase */; };
+		16723FA9829F8F6FE0C26C6E /* repIQActivityLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 805A81F6E8EA0CD82A505ADF /* repIQActivityLiveActivity.swift */; };
+		37B1F6640D219C43B35A95AB /* repIQActivity.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = A14F1DF956B7F86B4C780FF6 /* repIQActivity.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		3F5886C1DA789F6382EA6824 /* repIQActivityBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = F26AF96E268BE030890FF9D2 /* repIQActivityBundle.swift */; };
 		AABB00052F57000100000005 /* MuscleMap in Frameworks */ = {isa = PBXBuildFile; productRef = AABB00042F57000100000004 /* MuscleMap */; };
+		C96737C4966F48AD1BF8CD46 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 298AABDBB9638BFD05E0E579 /* Foundation.framework */; };
+		DC59E30F2C34CFF757CB2BC5 /* WorkoutActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E46F72B954B19179BC1D9A35 /* WorkoutActivityAttributes.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		7FF4D894A8282D6B3334A5EF /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 05F2081D2F56CC0D00E0AE4C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 251CA646CCFECD7E029C0377;
+			remoteInfo = repIQActivity;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		0D17CF57034DF72E46AA48A8 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				37B1F6640D219C43B35A95AB /* repIQActivity.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		05F208252F56CC0D00E0AE4C /* repIQ.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = repIQ.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		298AABDBB9638BFD05E0E579 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		805A81F6E8EA0CD82A505ADF /* repIQActivityLiveActivity.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = repIQActivityLiveActivity.swift; sourceTree = "<group>"; };
+		A14F1DF956B7F86B4C780FF6 /* repIQActivity.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = repIQActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		B64A60A37C4C087306AA9BE4 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B9CFDB2158141F72BAD626D9 /* repIQActivity.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = repIQActivity.entitlements; sourceTree = "<group>"; };
+		E46F72B954B19179BC1D9A35 /* WorkoutActivityAttributes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = WorkoutActivityAttributes.swift; path = ../repIQ/Models/WorkoutActivityAttributes.swift; sourceTree = "<group>"; };
+		F26AF96E268BE030890FF9D2 /* repIQActivityBundle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = repIQActivityBundle.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		05F208272F56CC0D00E0AE4C /* repIQ */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = repIQ;
 			sourceTree = "<group>";
 		};
@@ -33,14 +71,32 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		9A1DE9BDB08BA660B5FCA210 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C96737C4966F48AD1BF8CD46 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		04473250CD4C8CA46BFEC21F /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				0A7C47BBC373DB5E139D3DE1 /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		05F2081C2F56CC0D00E0AE4C = {
 			isa = PBXGroup;
 			children = (
 				05F208272F56CC0D00E0AE4C /* repIQ */,
 				05F208262F56CC0D00E0AE4C /* Products */,
+				04473250CD4C8CA46BFEC21F /* Frameworks */,
+				4A47B28E97936E5D18523BF4 /* repIQActivity */,
 			);
 			sourceTree = "<group>";
 		};
@@ -48,8 +104,29 @@
 			isa = PBXGroup;
 			children = (
 				05F208252F56CC0D00E0AE4C /* repIQ.app */,
+				A14F1DF956B7F86B4C780FF6 /* repIQActivity.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		0A7C47BBC373DB5E139D3DE1 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				298AABDBB9638BFD05E0E579 /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		4A47B28E97936E5D18523BF4 /* repIQActivity */ = {
+			isa = PBXGroup;
+			children = (
+				F26AF96E268BE030890FF9D2 /* repIQActivityBundle.swift */,
+				805A81F6E8EA0CD82A505ADF /* repIQActivityLiveActivity.swift */,
+				B64A60A37C4C087306AA9BE4 /* Info.plist */,
+				B9CFDB2158141F72BAD626D9 /* repIQActivity.entitlements */,
+				E46F72B954B19179BC1D9A35 /* WorkoutActivityAttributes.swift */,
+			);
+			path = repIQActivity;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -62,10 +139,12 @@
 				05F208212F56CC0D00E0AE4C /* Sources */,
 				05F208222F56CC0D00E0AE4C /* Frameworks */,
 				05F208232F56CC0D00E0AE4C /* Resources */,
+				0D17CF57034DF72E46AA48A8 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				2D237E45B04F4EF6B6F5EB07 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				05F208272F56CC0D00E0AE4C /* repIQ */,
@@ -78,6 +157,23 @@
 			productName = repIQ;
 			productReference = 05F208252F56CC0D00E0AE4C /* repIQ.app */;
 			productType = "com.apple.product-type.application";
+		};
+		251CA646CCFECD7E029C0377 /* repIQActivity */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 68B82C9BB4DB6DFB4818C800 /* Build configuration list for PBXNativeTarget "repIQActivity" */;
+			buildPhases = (
+				4C132331D8A823B7ABA78D5A /* Sources */,
+				9A1DE9BDB08BA660B5FCA210 /* Frameworks */,
+				6338D165F1FAF5D8EA564259 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = repIQActivity;
+			productName = repIQActivity;
+			productReference = A14F1DF956B7F86B4C780FF6 /* repIQActivity.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -113,12 +209,20 @@
 			projectRoot = "";
 			targets = (
 				05F208242F56CC0D00E0AE4C /* repIQ */,
+				251CA646CCFECD7E029C0377 /* repIQActivity */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		05F208232F56CC0D00E0AE4C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6338D165F1FAF5D8EA564259 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -135,7 +239,26 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		4C132331D8A823B7ABA78D5A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3F5886C1DA789F6382EA6824 /* repIQActivityBundle.swift in Sources */,
+				16723FA9829F8F6FE0C26C6E /* repIQActivityLiveActivity.swift in Sources */,
+				DC59E30F2C34CFF757CB2BC5 /* WorkoutActivityAttributes.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		2D237E45B04F4EF6B6F5EB07 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = repIQActivity;
+			target = 251CA646CCFECD7E029C0377 /* repIQActivity */;
+			targetProxy = 7FF4D894A8282D6B3334A5EF /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		05F2082E2F56CC0E00E0AE4C /* Debug */ = {
@@ -262,6 +385,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = repIQ/repIQ.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 6;
 				DEVELOPMENT_TEAM = A6A68RW9W3;
@@ -290,6 +414,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = repIQ/repIQ.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 6;
 				DEVELOPMENT_TEAM = A6A68RW9W3;
@@ -313,6 +438,61 @@
 			};
 			name = Release;
 		};
+		2ACEA93C0EF35D242AADC286 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = repIQActivity/repIQActivity.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 6;
+				DEVELOPMENT_TEAM = A6A68RW9W3;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = repIQActivity/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.3;
+				PRODUCT_BUNDLE_IDENTIFIER = com.repiq.repIQ.repIQActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		A6817E28D8CE9FF033DDD797 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = repIQActivity/repIQActivity.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 6;
+				DEVELOPMENT_TEAM = A6A68RW9W3;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = repIQActivity/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.3;
+				PRODUCT_BUNDLE_IDENTIFIER = com.repiq.repIQ.repIQActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -330,6 +510,15 @@
 			buildConfigurations = (
 				05F208312F56CC0E00E0AE4C /* Debug */,
 				05F208322F56CC0E00E0AE4C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		68B82C9BB4DB6DFB4818C800 /* Build configuration list for PBXNativeTarget "repIQActivity" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A6817E28D8CE9FF033DDD797 /* Release */,
+				2ACEA93C0EF35D242AADC286 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

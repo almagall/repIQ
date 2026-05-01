@@ -44,14 +44,14 @@ struct MainTabView: View {
         }
         .tint(RQColors.accent)
         .environment(workoutCoordinator)
-        // Mini-bar appears above the tab bar when a workout is minimized.
-        // safeAreaInset reserves space so tab content isn't hidden behind it.
-        .safeAreaInset(edge: .bottom) {
+        // Mini-bar above the tab bar — uses the iOS 18+ TabView accessory slot,
+        // which is the only modifier that composes correctly with the new Tab API.
+        // (.safeAreaInset gets eaten by the TabView's internal layout.)
+        .tabViewBottomAccessory {
             if workoutCoordinator.isMinimized, let vm = activeWorkoutViewModel {
                 WorkoutMiniBar(viewModel: vm) {
                     workoutCoordinator.expand()
                 }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .animation(.easeInOut(duration: 0.25), value: workoutCoordinator.isMinimized)
