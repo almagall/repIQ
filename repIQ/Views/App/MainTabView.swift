@@ -24,36 +24,43 @@ struct MainTabView: View {
     }
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            Tab("Home", systemImage: "house.fill", value: 0) {
-                DashboardView()
-            }
+        // Manual overlay approach: wrap the TabView in a ZStack and position the
+        // mini-bar as a bottom-aligned overlay. iOS 26's `tabViewBottomAccessory`
+        // and `safeAreaInset` both have rendering quirks with the new floating-pill
+        // tab bar, so we sidestep them by drawing the bar ourselves.
+        ZStack(alignment: .bottom) {
+            TabView(selection: $selectedTab) {
+                Tab("Home", systemImage: "house.fill", value: 0) {
+                    DashboardView()
+                }
 
-            Tab("Progress", systemImage: "chart.line.uptrend.xyaxis", value: 1) {
-                ProgressTabView()
-            }
+                Tab("Progress", systemImage: "chart.line.uptrend.xyaxis", value: 1) {
+                    ProgressTabView()
+                }
 
-            Tab("Social", systemImage: "person.2.fill", value: 2) {
-                SocialTabView(viewModel: socialViewModel)
-            }
-            .badge(socialViewModel.notificationCount)
+                Tab("Social", systemImage: "person.2.fill", value: 2) {
+                    SocialTabView(viewModel: socialViewModel)
+                }
+                .badge(socialViewModel.notificationCount)
 
-            Tab("Profile", systemImage: "person.fill", value: 3) {
-                ProfileView()
+                Tab("Profile", systemImage: "person.fill", value: 3) {
+                    ProfileView()
+                }
             }
-        }
-        .tint(RQColors.accent)
-        .environment(workoutCoordinator)
-        // Mini-bar above the tab bar — uses the iOS 18+ TabView accessory slot,
-        // which is the only modifier that composes correctly with the new Tab API.
-        // (.safeAreaInset gets eaten by the TabView's internal layout.)
-        .tabViewBottomAccessory {
+            .tint(RQColors.accent)
+
+            // Persistent mini-bar above the floating tab bar (~85pt up to clear it).
             if workoutCoordinator.isMinimized, let vm = activeWorkoutViewModel {
                 WorkoutMiniBar(viewModel: vm) {
                     workoutCoordinator.expand()
                 }
+                .padding(.horizontal, RQSpacing.md)
+                .padding(.bottom, 96) // sits above the floating tab bar
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .zIndex(10)
             }
         }
+        .environment(workoutCoordinator)
         .animation(.easeInOut(duration: 0.25), value: workoutCoordinator.isMinimized)
         .fullScreenCover(isPresented: expandedBinding) {
             if recoveredState != nil {
