@@ -652,7 +652,9 @@ struct ExerciseLogView: View {
 
     private var addSetMenu: some View {
         Menu {
-            ForEach(SetType.allCases, id: \.self) { type in
+            // Exclude .warmup — there's a dedicated "Add Warm Up" button
+            // above the working sets, so showing it here is redundant.
+            ForEach(SetType.allCases.filter { $0 != .warmup }, id: \.self) { type in
                 Button {
                     viewModel.addSet(exerciseIndex: exerciseIndex, setType: type)
                 } label: {

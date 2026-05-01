@@ -51,10 +51,12 @@ struct SetRowView: View {
     var body: some View {
         guard let set else { return AnyView(EmptyView()) }
 
+        let isWorking = set.setType == .working
+
         return AnyView(
             VStack(alignment: .leading, spacing: 0) {
                 // Ghost row — per-set target (decision + previous set) or previous fallback
-                if let target = progressionTarget {
+                if let target = progressionTarget, isWorking {
                     // Compute mode-aware per-set target from progression decision + this set's previous data
                     let (targetW, targetR, _) = ActiveWorkoutViewModel.perSetTarget(
                         decision: target, previousSet: previousSet,
@@ -92,36 +94,18 @@ struct SetRowView: View {
                         Spacer()
                     }
                     .padding(.bottom, 3)
-                } else if let prev = previousSet {
-                    // No progression target: show raw previous session data
-                    HStack(spacing: RQSpacing.sm) {
-                        Spacer().frame(width: 32)
 
-                        Text("Prev:")
-                            .font(RQTypography.caption)
-                            .foregroundColor(RQColors.textTertiary)
-
-                        if isBodyweightOnly {
-                            Text("\(prev.reps) reps")
-                                .font(RQTypography.caption)
-                                .foregroundColor(RQColors.textTertiary)
-                        } else {
-                            Text("\(formatWeight(prev.weight)) × \(prev.reps)")
-                                .font(RQTypography.caption)
-                                .foregroundColor(RQColors.textTertiary)
-                        }
-
-                        if let rpe = prev.rpe {
-                            Text("@\(formatRPE(rpe))")
-                                .font(RQTypography.caption)
-                                .foregroundColor(RQColors.textTertiary.opacity(0.6))
-                        }
-
-                        Spacer()
+                    // Previous-set line with delta (always show below the target if data exists)
+                    if let prev = previousSet {
+                        previousSetLine(prev: prev, comparisonWeight: targetW, comparisonReps: targetR, showDelta: true)
                     }
-                    .padding(.bottom, 2)
-                } else if progressionTarget == nil && !set.isCompleted {
-                    // Baseline hint — no target and no previous data
+                } else if let prev = previousSet {
+                    // No target — show raw previous session data. For non-working sets
+                    // we still show the previous data for context, but no delta arrow
+                    // since warmups/drops/etc. aren't progression-tracked.
+                    previousSetLine(prev: prev, comparisonWeight: nil, comparisonReps: nil, showDelta: false)
+                } else if isWorking && !set.isCompleted {
+                    // Baseline hint — only show on working sets without target or previous data
                     HStack(spacing: RQSpacing.xs) {
                         Spacer().frame(width: 32)
 
@@ -508,5 +492,107 @@ struct SetRowView: View {
         weight.truncatingRemainder(dividingBy: 1) == 0
             ? String(format: "%.0f", weight)
             : String(format: "%.1f", weight)
+    }
+
+    // MARK: - Previous-Set Line
+
+    /// Renders a single muted line showing the previous session's set values, with
+    /// an optional delta arrow comparing to the current target.
+    /// Examples:
+    ///   "Last: 150 × 12 @ 8  ▲5 lb"   (working set, more weight than target)
+    ///   "Last: 150 × 12  ▲1 rep"      (working set, same weight + more reps)
+    ///   "Last: 150 × 12  ="            (working set, same as last time)
+    ///   "Last: 45 × 10"                (warmup — no delta arrow)
+    @ViewBuilder
+    private func previousSetLine(
+        prev: WorkoutSet,
+        comparisonWeight: Double?,
+        comparisonReps: Int?,
+        showDelta: Bool
+    ) -> some View {
+        HStack(spacing: 4) {
+            Spacer().frame(width: 32)
+
+            Text("Last:")
+                .font(.system(size: 10))
+                .foregroundColor(RQColors.textTertiary.opacity(0.7))
+
+            if isBodyweightOnly {
+                Text("\(prev.reps) reps")
+                    .font(.system(size: 10))
+                    .foregroundColor(RQColors.textTertiary.opacity(0.7))
+            } else {
+                Text("\(formatWeight(prev.weight)) × \(prev.reps)")
+                    .font(.system(size: 10))
+                    .foregroundColor(RQColors.textTertiary.opacity(0.7))
+            }
+
+            if let rpe = prev.rpe {
+                Text("@ \(formatRPE(rpe))")
+                    .font(.system(size: 10))
+                    .foregroundColor(RQColors.textTertiary.opacity(0.55))
+            }
+
+            if showDelta, let curW = comparisonWeight, let curR = comparisonReps {
+                deltaBadge(prevWeight: prev.weight, prevReps: prev.reps, curWeight: curW, curReps: curR)
+            }
+
+            Spacer()
+        }
+        .padding(.bottom, 2)
+    }
+
+    /// Small inline delta badge comparing target to previous session.
+    /// - Heavier weight → green ▲ +N lb
+    /// - Same weight + more reps → green ▲ +N rep
+    /// - Identical → gray =
+    /// - Lighter weight → orange ▼ −N lb (intentional deload)
+    @ViewBuilder
+    private func deltaBadge(prevWeight: Double, prevReps: Int, curWeight: Double, curReps: Int) -> some View {
+        let weightDelta = curWeight - prevWeight
+        let repsDelta = curReps - prevReps
+
+        if weightDelta > 0.001 {
+            // Heavier
+            HStack(spacing: 1) {
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 7, weight: .bold))
+                Text("\(formatWeight(weightDelta)) lb")
+                    .font(.system(size: 10, weight: .semibold))
+            }
+            .foregroundColor(RQColors.success)
+        } else if weightDelta < -0.001 {
+            // Lighter
+            HStack(spacing: 1) {
+                Image(systemName: "arrow.down")
+                    .font(.system(size: 7, weight: .bold))
+                Text("\(formatWeight(abs(weightDelta))) lb")
+                    .font(.system(size: 10, weight: .semibold))
+            }
+            .foregroundColor(RQColors.warning)
+        } else if repsDelta > 0 {
+            // Same weight, more reps
+            HStack(spacing: 1) {
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 7, weight: .bold))
+                Text("\(repsDelta) rep\(repsDelta == 1 ? "" : "s")")
+                    .font(.system(size: 10, weight: .semibold))
+            }
+            .foregroundColor(RQColors.success)
+        } else if repsDelta < 0 {
+            // Same weight, fewer reps
+            HStack(spacing: 1) {
+                Image(systemName: "arrow.down")
+                    .font(.system(size: 7, weight: .bold))
+                Text("\(abs(repsDelta)) rep\(abs(repsDelta) == 1 ? "" : "s")")
+                    .font(.system(size: 10, weight: .semibold))
+            }
+            .foregroundColor(RQColors.warning)
+        } else {
+            // Identical
+            Text("=")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(RQColors.textTertiary.opacity(0.7))
+        }
     }
 }

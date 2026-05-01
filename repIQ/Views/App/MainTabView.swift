@@ -8,9 +8,22 @@ struct MainTabView: View {
     @State private var showRecoveryAlert = false
     @State private var recoveredState: SavedWorkoutState?
 
-    var body: some View {
-        @Bindable var coordinator = workoutCoordinator
+    /// Binding for the full-screen cover. Reads `coordinator.isExpanded`.
+    /// On dismiss (set to false), the cover becomes hidden — but if the workout is
+    /// still active (just minimized), we DON'T tear down the view model.
+    private var expandedBinding: Binding<Bool> {
+        Binding(
+            get: { workoutCoordinator.isExpanded },
+            set: { newValue in
+                if !newValue && workoutCoordinator.isExpanded {
+                    // System or programmatic dismiss — collapse rather than fully end
+                    workoutCoordinator.minimize()
+                }
+            }
+        )
+    }
 
+    var body: some View {
         TabView(selection: $selectedTab) {
             Tab("Home", systemImage: "house.fill", value: 0) {
                 DashboardView()
@@ -31,15 +44,25 @@ struct MainTabView: View {
         }
         .tint(RQColors.accent)
         .environment(workoutCoordinator)
-        .fullScreenCover(isPresented: $coordinator.showActiveWorkout) {
-            // Clean up when dismissed
-            activeWorkoutViewModel = nil
-        } content: {
+        // Mini-bar appears above the tab bar when a workout is minimized.
+        // safeAreaInset reserves space so tab content isn't hidden behind it.
+        .safeAreaInset(edge: .bottom) {
+            if workoutCoordinator.isMinimized, let vm = activeWorkoutViewModel {
+                WorkoutMiniBar(viewModel: vm) {
+                    workoutCoordinator.expand()
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: workoutCoordinator.isMinimized)
+        .fullScreenCover(isPresented: expandedBinding) {
             if recoveredState != nil {
                 // Restoring from saved state — no template/day needed
                 let vm = makeRecoveryViewModel()
                 ActiveWorkoutView(viewModel: vm) {
+                    // Full dismiss path (Finish / Abandon)
                     workoutCoordinator.dismissWorkout()
+                    activeWorkoutViewModel = nil
                     recoveredState = nil
                 }
                 .environment(workoutCoordinator)
@@ -47,7 +70,9 @@ struct MainTabView: View {
                let day = workoutCoordinator.selectedWorkoutDay {
                 let vm = makeWorkoutViewModel(template: template, day: day)
                 ActiveWorkoutView(viewModel: vm) {
+                    // Full dismiss path (Finish / Abandon)
                     workoutCoordinator.dismissWorkout()
+                    activeWorkoutViewModel = nil
                 }
                 .environment(workoutCoordinator)
             }
@@ -68,7 +93,7 @@ struct MainTabView: View {
         .alert("Resume Workout?", isPresented: $showRecoveryAlert) {
             Button("Resume") {
                 if recoveredState != nil {
-                    workoutCoordinator.showActiveWorkout = true
+                    workoutCoordinator.presentation = .expanded
                 }
             }
             Button("Discard", role: .destructive) {

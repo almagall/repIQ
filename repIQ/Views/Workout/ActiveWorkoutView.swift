@@ -86,6 +86,19 @@ struct ActiveWorkoutView: View {
                     }
                 }
 
+                // Minimize — collapses the workout to a mini-bar so the user can
+                // navigate the rest of the app without losing their workout state.
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        coordinator.minimize()
+                    } label: {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(RQColors.textSecondary)
+                    }
+                    .accessibilityLabel("Minimize workout")
+                }
+
                 ToolbarItem(placement: .topBarLeading) {
                     Menu {
                         Button(role: .destructive) {

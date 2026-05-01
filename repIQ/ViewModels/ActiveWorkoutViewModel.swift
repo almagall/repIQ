@@ -212,6 +212,44 @@ final class ActiveWorkoutViewModel {
     ///   - setPosition: 0-indexed position within working sets.
     ///   - equipment: Equipment type for weight increment calculation.
     /// - Returns: A named tuple of (weight, reps, rpe) for this set position.
+    /// Re-clamps a loaded progression target's rep range against the current rep cap.
+    /// Saved targets may have been computed when the cap was unset or different, so
+    /// we never trust the stored bounds without re-applying the active cap.
+    static func clampedTarget(
+        _ target: ProgressionTarget?,
+        trainingMode: TrainingMode,
+        repCap: Int?
+    ) -> ProgressionTarget? {
+        guard let target else { return nil }
+        let modeUpper = trainingMode.repRange.upperBound
+        let effectiveUpper = min(repCap ?? modeUpper, modeUpper)
+
+        // Already within bounds — no rebuild needed
+        if target.targetRepsLow <= effectiveUpper && target.targetRepsHigh <= effectiveUpper {
+            return target
+        }
+
+        let clampedLow = min(target.targetRepsLow, effectiveUpper)
+        let clampedHigh = min(target.targetRepsHigh, effectiveUpper)
+        return ProgressionTarget(
+            exerciseId: target.exerciseId,
+            trainingMode: target.trainingMode,
+            targetWeight: target.targetWeight,
+            targetRepsLow: clampedLow,
+            targetRepsHigh: clampedHigh,
+            targetRPE: target.targetRPE,
+            decision: target.decision,
+            reasoning: target.reasoning,
+            previousWeight: target.previousWeight,
+            previousReps: target.previousReps,
+            previousRPE: target.previousRPE,
+            estimatedOneRM: target.estimatedOneRM,
+            mesocycleRPEOffset: target.mesocycleRPEOffset,
+            rpeFatigueDetected: target.rpeFatigueDetected,
+            e1rmConfidence: target.e1rmConfidence
+        )
+    }
+
     static func perSetTarget(
         decision target: ProgressionTarget?,
         previousSet prev: WorkoutSet?,
@@ -426,7 +464,14 @@ final class ActiveWorkoutViewModel {
             // 4. Build ExerciseLogEntry array
             exercises = dayExercises.sorted(by: { $0.sortOrder < $1.sortOrder }).map { dayExercise in
                 let prevSets = previousData[dayExercise.exerciseId] ?? []
-                let target = targets[dayExercise.exerciseId]
+                // Defense-in-depth: re-clamp the loaded target's rep range against
+                // the current rep cap. Saved targets may have been computed when the
+                // cap was different (or unset), so we always re-apply the cap on load.
+                let target = Self.clampedTarget(
+                    targets[dayExercise.exerciseId],
+                    trainingMode: dayExercise.trainingMode,
+                    repCap: dayExercise.repCap
+                )
                 let restSeconds = dayExercise.restSecondsOverride
                     ?? dayExercise.exercise?.defaultRestSeconds
                     ?? AppConstants.Defaults.restTimerSeconds
@@ -566,8 +611,12 @@ final class ActiveWorkoutViewModel {
 
             // If the workout was backdated (startedAt is before today),
             // use startedAt as the completion date so it shows up on the correct day.
+            // Best-effort: if the session is already completed (e.g. from a resumed
+            // auto-save), this UPDATE is harmless. Using try? so a failure here
+            // doesn't prevent the summary from building — the user should always
+            // be able to dismiss a finished workout.
             let isBackdated = !Calendar.current.isDateInToday(startTime)
-            try await workoutService.completeSession(
+            try? await workoutService.completeSession(
                 sessionId: sessionId,
                 durationSeconds: duration,
                 completionDate: isBackdated ? startTime : nil
@@ -815,8 +864,26 @@ final class ActiveWorkoutViewModel {
             await syncOfflineSets()
 
         } catch {
-            errorMessage = "Failed to complete workout: \(error.localizedDescription)"
-            isCompleting = false
+            // Even if post-processing fails, never trap the user in the
+            // logging screen. Show a minimal summary so they can dismiss.
+            if workoutSummary == nil {
+                workoutSummary = WorkoutSummaryData(
+                    duration: Int(Date().timeIntervalSince(startTime)),
+                    totalSets: totalCompletedSets,
+                    totalVolume: totalVolume,
+                    exerciseSummaries: [],
+                    newPRs: [],
+                    progressionDecisions: [],
+                    iqPointsEarned: 0,
+                    currentStreak: 0,
+                    longestStreak: 0,
+                    newBadges: []
+                )
+            }
+            timerTask?.cancel()
+            autoSaveTask?.cancel()
+            cancelRestTimer()
+            UIApplication.shared.isIdleTimerDisabled = false
         }
         isLoading = false
     }
