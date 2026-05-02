@@ -82,17 +82,17 @@ struct WorkoutMiniBar: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, minHeight: 48)
             .background(
-                Capsule(style: .continuous)
-                    .fill(RQColors.surfaceSecondary)
-                    .shadow(color: .black.opacity(0.4), radius: 12, x: 0, y: 4)
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .fill(Color(red: 0.08, green: 0.08, blue: 0.10))
+                    .shadow(color: .black.opacity(0.6), radius: 16, x: 0, y: 6)
                     .overlay(
-                        Capsule(style: .continuous)
-                            .stroke(RQColors.accent.opacity(0.25), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 28, style: .continuous)
+                            .stroke(RQColors.accent, lineWidth: 1.5)
                     )
             )
-            .contentShape(Capsule())
+            .contentShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
         }
         .buttonStyle(.plain)
     }

@@ -20,15 +20,29 @@ final class LiveActivityService {
 
     // MARK: - Lifecycle
 
-    /// Begins a new Live Activity for the workout. If one is already running,
-    /// it is ended first to avoid orphaned activities.
-    func start(workoutName: String, startedAt: Date, initialState: WorkoutActivityAttributes.ContentState) {
+    /// Begins a new Live Activity for the workout.
+    ///
+    /// **Orphan cleanup:** iOS keeps a Live Activity visible after the app
+    /// process terminates, but our in-memory `activity` reference doesn't
+    /// survive that — so on next launch we don't know about prior activities
+    /// and `Activity.request(...)` would create a second one stacked on top
+    /// of the orphan, producing visually corrupted/overlapping renders. To
+    /// avoid that, we always enumerate `Activity<...>.activities` and end
+    /// every existing one before requesting the new activity.
+    ///
+    /// Async because `end(_:dismissalPolicy:)` is async and we need to wait
+    /// for the cleanup to complete before requesting the new activity.
+    func start(workoutName: String, startedAt: Date, initialState: WorkoutActivityAttributes.ContentState) async {
         guard isAvailable else { return }
 
-        // End any leftover activity from a previous workout that wasn't cleaned up
-        if activity != nil {
-            Task { await end() }
+        // Defensive cleanup: end every existing activity (our own + orphans
+        // from prior app sessions) before creating a new one. Without this,
+        // a force-quit-then-relaunch would stack a second activity on top
+        // of the orphan and iOS would render them combined / corrupted.
+        for existing in Activity<WorkoutActivityAttributes>.activities {
+            await existing.end(nil, dismissalPolicy: .immediate)
         }
+        activity = nil
 
         let attributes = WorkoutActivityAttributes(workoutName: workoutName, startedAt: startedAt)
         let content = ActivityContent(state: initialState, staleDate: nil)
@@ -43,6 +57,16 @@ final class LiveActivityService {
             // Common failure modes: user denied permission, system at activity limit
             activity = nil
         }
+    }
+
+    /// Ends every running Live Activity of this type. Called at app launch
+    /// so orphans from prior sessions are cleaned up immediately, before
+    /// the user even starts a new workout.
+    func cleanupOrphans() async {
+        for orphan in Activity<WorkoutActivityAttributes>.activities {
+            await orphan.end(nil, dismissalPolicy: .immediate)
+        }
+        activity = nil
     }
 
     /// Pushes a new ContentState to the running activity. Cheap to call — Apple

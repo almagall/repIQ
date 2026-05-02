@@ -49,6 +49,14 @@ struct SetEntry: Identifiable {
     var prType: PRType? // non-nil if this set beat a personal record
     var notes: String? // optional set-level note
 
+    /// Snapshot of the suggested target at workout start (from `perSetTarget`).
+    /// Immutable — `weight`/`reps`/`rpe` may diverge as the user adjusts via
+    /// the in-app inputs or the Live Activity steppers, but these stay put so
+    /// we can show "Goal" alongside the pending values.
+    let targetWeight: Double
+    let targetReps: Int
+    let targetRPE: Double?
+
     var isPR: Bool { prType != nil }
 
     init(
@@ -56,7 +64,10 @@ struct SetEntry: Identifiable {
         setType: SetType = .working,
         weight: Double = 0,
         reps: Int = 0,
-        rpe: Double? = nil
+        rpe: Double? = nil,
+        targetWeight: Double? = nil,
+        targetReps: Int? = nil,
+        targetRPE: Double? = nil
     ) {
         self.id = UUID()
         self.setNumber = setNumber
@@ -69,6 +80,12 @@ struct SetEntry: Identifiable {
         self.isSaving = false
         self.prType = nil
         self.notes = nil
+        // If a target wasn't explicitly snapshotted, fall back to the
+        // initial pending values — so existing call sites (warmup sets,
+        // user-added sets, recovery from autosave) don't lose target data.
+        self.targetWeight = targetWeight ?? weight
+        self.targetReps = targetReps ?? reps
+        self.targetRPE = targetRPE ?? rpe
     }
 }
 

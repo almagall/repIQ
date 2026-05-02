@@ -68,6 +68,10 @@ final class AppState {
 
 struct RootView: View {
     @State private var appState = AppState()
+    // Coordinator is hoisted to RootView so it survives across
+    // authentication / onboarding transitions. The active workout view
+    // model lives on the coordinator itself (see WorkoutCoordinator).
+    @State private var workoutCoordinator = WorkoutCoordinator()
 
     var body: some View {
         Group {
@@ -79,7 +83,7 @@ struct RootView: View {
                         appState.completeOnboarding()
                     }
                 } else {
-                    MainTabView()
+                    MainTabView(workoutCoordinator: workoutCoordinator)
                 }
             } else {
                 AuthView()
@@ -89,6 +93,9 @@ struct RootView: View {
         .animation(.easeInOut(duration: 0.3), value: appState.isLoading)
         .animation(.easeInOut(duration: 0.3), value: appState.needsOnboarding)
         .task {
+            // Clear any orphaned Live Activity from a prior crashed/killed
+            // app session before anything else can request a new one.
+            await LiveActivityService.shared.cleanupOrphans()
             await appState.listenToAuthChanges()
         }
     }

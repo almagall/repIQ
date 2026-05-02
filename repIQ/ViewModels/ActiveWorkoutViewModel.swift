@@ -82,6 +82,9 @@ final class ActiveWorkoutViewModel {
         restTimerTask?.cancel()
         autoSaveTask?.cancel()
         UIApplication.shared.isIdleTimerDisabled = false
+        // Don't clear WorkoutIntentBridge handlers here — they're re-registered
+        // by startLiveActivity, and clearing from a non-MainActor deinit would
+        // require a hop. completeWorkout / abandonWorkout already clear them.
     }
 
     // MARK: - Computed
@@ -418,41 +421,220 @@ final class ActiveWorkoutViewModel {
     /// by `Text(timerInterval:)` in the activity layout, so we only need to
     /// push on meaningful events: set logged, exercise changed, rest started/ended.
     func pushActivityUpdate() {
-        guard let exercise = currentExercise else { return }
-        let completed = exercise.sets.filter { $0.isCompleted && $0.setType == .working }.count
-        let nextSetIndex = min(completed + 1, exercise.targetSets)
-        let restEnd: Date? = (restTimerActive && restTimerRemaining > 0)
-            ? Date().addingTimeInterval(TimeInterval(restTimerRemaining))
-            : nil
-        let state = WorkoutActivityAttributes.ContentState(
-            currentExerciseName: exercise.exerciseName,
-            setProgress: "Set \(nextSetIndex)/\(exercise.targetSets)",
-            elapsedSeconds: elapsedSeconds,
-            restEndDate: restEnd,
-            isRestActive: restEnd != nil
-        )
-        LiveActivityService.shared.update(state)
+        guard currentExercise != nil else { return }
+        LiveActivityService.shared.update(buildContentState())
     }
 
     /// Starts the Live Activity once exercises are loaded. Called from
     /// `startWorkout()` and the recovery flow.
-    private func startLiveActivity() {
-        guard let exercise = currentExercise else { return }
-        let nextSetIndex = min(exercise.completedWorkingSetCount + 1, exercise.targetSets)
-        let initialState = WorkoutActivityAttributes.ContentState(
-            currentExerciseName: exercise.exerciseName,
-            setProgress: "Set \(nextSetIndex)/\(exercise.targetSets)",
-            elapsedSeconds: elapsedSeconds,
-            restEndDate: nil,
-            isRestActive: false
-        )
+    ///
+    /// Async because `LiveActivityService.start` ends any orphaned
+    /// activities before requesting a new one — without awaiting that, we
+    /// could end up with two activities visible on the Lock Screen at
+    /// once and a corrupted render.
+    private func startLiveActivity() async {
+        guard currentExercise != nil else { return }
+        let initialState = buildContentState()
         let workoutDisplayName = dayName.isEmpty ? templateName
             : (templateName.isEmpty ? dayName : "\(templateName) · \(dayName)")
-        LiveActivityService.shared.start(
+        await LiveActivityService.shared.start(
             workoutName: workoutDisplayName,
             startedAt: startTime,
             initialState: initialState
         )
+        registerIntentHandlers()
+    }
+
+    /// Builds the current ContentState — used both for the initial state and
+    /// for incremental updates. Centralizes the upcoming-set lookup so the
+    /// Lock Screen steppers and the rest of the layout stay in sync.
+    private func buildContentState() -> WorkoutActivityAttributes.ContentState {
+        guard let exercise = currentExercise else {
+            return WorkoutActivityAttributes.ContentState(
+                currentExerciseName: "",
+                setProgress: "",
+                elapsedSeconds: elapsedSeconds,
+                restEndDate: nil,
+                isRestActive: false,
+                pendingWeight: nil,
+                pendingReps: 0,
+                pendingRPE: nil,
+                goalWeight: nil,
+                goalReps: 0,
+                goalRPE: nil,
+                previousSet: nil,
+                weightStep: 5,
+                weightUnit: "lb",
+                currentExerciseIndex: currentExerciseIndex,
+                currentSetIndex: 0,
+                setKind: .other
+            )
+        }
+        let completedWorking = exercise.sets.filter { $0.isCompleted && $0.setType == .working }.count
+        let nextSetNumberForLabel = min(completedWorking + 1, exercise.targetSets)
+
+        // Find the next un-completed set on the current exercise. Prefer
+        // working sets; if none remain (e.g., user is at warmup), pick the
+        // next un-completed set regardless of type.
+        let upcoming = exercise.sets.firstIndex(where: { !$0.isCompleted && $0.setType == .working })
+            ?? exercise.sets.firstIndex(where: { !$0.isCompleted })
+        let upcomingSet = upcoming.flatMap { exercise.sets[safe: $0] }
+
+        // Previous-session set at the same set position. Sourced from
+        // `previousSets` which the workout-start fetch populates with the
+        // most recent prior session's WorkoutSets (scoped by workout day).
+        let previous: WorkoutActivityAttributes.PreviousSetSummary?
+        if let upcomingSet,
+           upcomingSet.setType == .working,
+           let prevForExercise = exercise.previousSets.first {
+            // Match on setNumber, not array index, since prior session may
+            // have had warmup sets at lower positions.
+            let match = prevForExercise.first(where: {
+                $0.setNumber == upcomingSet.setNumber
+            })
+            previous = match.map {
+                WorkoutActivityAttributes.PreviousSetSummary(
+                    weight: exercise.isBodyweightOnly ? nil : $0.weight,
+                    reps: $0.reps,
+                    rpe: $0.rpe
+                )
+            }
+        } else {
+            previous = nil
+        }
+
+        let restEnd: Date? = (restTimerActive && restTimerRemaining > 0)
+            ? Date().addingTimeInterval(TimeInterval(restTimerRemaining))
+            : nil
+
+        let kind: WorkoutActivityAttributes.SetKind
+        switch upcomingSet?.setType {
+        case .working: kind = .working
+        case .warmup:  kind = .warmup
+        default:       kind = .other
+        }
+
+        let weightStep = ProgressionService.weightIncrement(for: exercise.equipment)
+
+        return WorkoutActivityAttributes.ContentState(
+            currentExerciseName: exercise.exerciseName,
+            setProgress: "Set \(nextSetNumberForLabel)/\(exercise.targetSets)",
+            elapsedSeconds: elapsedSeconds,
+            restEndDate: restEnd,
+            isRestActive: restEnd != nil,
+            pendingWeight: exercise.isBodyweightOnly ? nil : upcomingSet?.weight,
+            pendingReps: upcomingSet?.reps ?? 0,
+            pendingRPE: upcomingSet?.rpe,
+            goalWeight: exercise.isBodyweightOnly ? nil : upcomingSet?.targetWeight,
+            goalReps: upcomingSet?.targetReps ?? 0,
+            goalRPE: upcomingSet?.targetRPE,
+            previousSet: previous,
+            weightStep: weightStep > 0 ? weightStep : 5,
+            weightUnit: "lb",
+            currentExerciseIndex: currentExerciseIndex,
+            currentSetIndex: upcoming ?? 0,
+            setKind: kind
+        )
+    }
+
+    // MARK: - Intent Bridge
+
+    /// Wires the WorkoutIntentBridge to this VM so Lock Screen / Dynamic
+    /// Island stepper + LOG buttons can call back in.
+    private func registerIntentHandlers() {
+        WorkoutIntentBridge.shared.logSetHandler = { [weak self] in
+            guard let self else { throw WorkoutIntentError.noActiveWorkout }
+            try await self.handleLogSetFromIntent()
+        }
+        WorkoutIntentBridge.shared.adjustSetHandler = { [weak self] field, direction in
+            guard let self else { throw WorkoutIntentError.noActiveWorkout }
+            try self.handleAdjustSetFromIntent(field: field, direction: direction)
+        }
+        WorkoutIntentBridge.shared.skipRestHandler = { [weak self] in
+            guard let self else { throw WorkoutIntentError.noActiveWorkout }
+            self.cancelRestTimer()
+        }
+    }
+
+    /// Cleared in completeWorkout / abandonWorkout so the bridge stops routing
+    /// taps to a workout that's already over.
+    private func unregisterIntentHandlers() {
+        WorkoutIntentBridge.shared.logSetHandler = nil
+        WorkoutIntentBridge.shared.adjustSetHandler = nil
+        WorkoutIntentBridge.shared.skipRestHandler = nil
+    }
+
+    /// Called from `LogSetIntent.perform()` via `WorkoutIntentBridge`. Logs
+    /// the next un-completed working set on the current exercise using the
+    /// pending values (already on the SetEntry — adjusted by the steppers).
+    /// Reuses the existing `completeSet` path for save / offline-queue / PR
+    /// detection / rest timer / haptics / autosave.
+    private func handleLogSetFromIntent() async throws {
+        guard exercises.indices.contains(currentExerciseIndex) else {
+            throw WorkoutIntentError.noUpcomingSet
+        }
+        let exercise = exercises[currentExerciseIndex]
+        guard let upcomingIndex = exercise.sets.firstIndex(where: {
+            !$0.isCompleted && $0.setType == .working
+        }) else {
+            throw WorkoutIntentError.noUpcomingSet
+        }
+        let target = exercise.sets[upcomingIndex]
+        if !exercise.isBodyweightOnly, target.weight <= 0 {
+            throw WorkoutIntentError.missingTarget
+        }
+        if target.reps <= 0 {
+            throw WorkoutIntentError.missingTarget
+        }
+        await completeSet(exerciseIndex: currentExerciseIndex, setIndex: upcomingIndex)
+    }
+
+    /// Called from `AdjustSetIntent.perform()`. Bumps the chosen field on
+    /// the upcoming set up or down by one increment, then pushes a Live
+    /// Activity update so the Lock Screen reflects the new value.
+    private func handleAdjustSetFromIntent(field: SetField, direction: AdjustDirection) throws {
+        guard exercises.indices.contains(currentExerciseIndex) else {
+            throw WorkoutIntentError.noUpcomingSet
+        }
+        let exercise = exercises[currentExerciseIndex]
+        guard let upcomingIndex = exercise.sets.firstIndex(where: {
+            !$0.isCompleted && $0.setType == .working
+        }) else {
+            throw WorkoutIntentError.noUpcomingSet
+        }
+
+        let sign: Double = (direction == .up) ? 1 : -1
+
+        switch field {
+        case .weight:
+            // No-op for bodyweight exercises — there's no weight to adjust.
+            guard !exercise.isBodyweightOnly else { return }
+            let step = ProgressionService.weightIncrement(for: exercise.equipment)
+            let increment = step > 0 ? step : 5
+            let current = exercises[currentExerciseIndex].sets[upcomingIndex].weight
+            let next = max(0, current + sign * increment)
+            exercises[currentExerciseIndex].sets[upcomingIndex].weight = next
+        case .reps:
+            let current = exercises[currentExerciseIndex].sets[upcomingIndex].reps
+            // Clamp at 1 going down — a 0-rep set isn't loggable.
+            let next = max(1, current + Int(sign))
+            exercises[currentExerciseIndex].sets[upcomingIndex].reps = next
+        case .rpe:
+            let setEntry = exercises[currentExerciseIndex].sets[upcomingIndex]
+            let next: Double?
+            if let c = setEntry.rpe {
+                let bumped = c + sign
+                next = (bumped < 1) ? nil : min(10, bumped)
+            } else {
+                // First tap from nil seeds at the program's target RPE so the
+                // user lands on a sensible value matched to their training
+                // mode (hypertrophy ~7-8, strength ~8-9). Falls back to 7.
+                next = setEntry.targetRPE ?? 7
+            }
+            exercises[currentExerciseIndex].sets[upcomingIndex].rpe = next
+        }
+
+        pushActivityUpdate()
     }
 
     // MARK: - Lifecycle
@@ -529,7 +711,7 @@ final class ActiveWorkoutViewModel {
                 var sets: [SetEntry] = []
                 for i in 1...dayExercise.targetSets {
                     let prev = prevSets[safe: i - 1]
-                    let (w, r, _) = Self.perSetTarget(
+                    let (w, r, expectedRPE) = Self.perSetTarget(
                         decision: target,
                         previousSet: prev,
                         trainingMode: dayExercise.trainingMode,
@@ -541,7 +723,10 @@ final class ActiveWorkoutViewModel {
                         setNumber: i,
                         setType: .working,
                         weight: w,
-                        reps: r
+                        reps: r,
+                        targetWeight: w,
+                        targetReps: r,
+                        targetRPE: expectedRPE
                     ))
                 }
 
@@ -570,7 +755,7 @@ final class ActiveWorkoutViewModel {
             startAutoSave()
 
             // 7. Start Live Activity (Lock Screen + Dynamic Island)
-            startLiveActivity()
+            await startLiveActivity()
 
             // 8. Check if proactive deload should be suggested
             if let templateId = template.id as UUID? {
@@ -654,6 +839,7 @@ final class ActiveWorkoutViewModel {
         // End the Live Activity immediately so the Lock Screen / Dynamic Island
         // don't keep showing a stale workout while post-processing runs.
         LiveActivityService.shared.endNow()
+        unregisterIntentHandlers()
 
         do {
             guard let userId = try? await supabase.auth.session.user.id else {
@@ -954,6 +1140,7 @@ final class ActiveWorkoutViewModel {
 
         // End the Live Activity so the Lock Screen / Dynamic Island clear
         LiveActivityService.shared.endNow()
+        unregisterIntentHandlers()
 
         do {
             try await workoutService.abandonSession(sessionId: sessionId)
@@ -1491,7 +1678,11 @@ final class ActiveWorkoutViewModel {
     /// Lock Screen / Dynamic Island just like a freshly started one.
     func startAutoSavePublic() {
         startAutoSave()
-        startLiveActivity()
+        // The recovery callsite is synchronous (alert button handler),
+        // so kick off the Live Activity start in a Task. The cleanup of
+        // any stale orphan from a prior crash happens inside `start()`
+        // before the new activity is requested.
+        Task { await startLiveActivity() }
     }
 
     /// Starts periodic auto-save (every 30 seconds).

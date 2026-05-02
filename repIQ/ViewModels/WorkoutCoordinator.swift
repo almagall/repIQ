@@ -14,10 +14,26 @@ enum WorkoutPresentation: Equatable {
 
 @Observable
 final class WorkoutCoordinator {
+    /// The most recently created coordinator. App Intents (run from Live
+    /// Activity buttons / Siri) use this to reach the in-flight workout.
+    /// `RootView` creates exactly one coordinator per app session, so this
+    /// reference is unambiguous while the app is alive.
+    static private(set) weak var current: WorkoutCoordinator?
+
     var presentation: WorkoutPresentation = .hidden
     var selectedTemplate: Template?
     var selectedWorkoutDay: WorkoutDay?
     var selectedWorkoutDate: Date?
+
+    /// The view model backing the active workout. Owned here (rather than in a
+    /// SwiftUI `@State`/`@Binding`) so it survives across `expanded ↔ minimized`
+    /// transitions without relying on SwiftUI re-evaluating a body closure to
+    /// keep the reference alive.
+    var activeViewModel: ActiveWorkoutViewModel?
+
+    init() {
+        Self.current = self
+    }
 
     /// Whether a workout is currently active (either minimized or expanded).
     /// Used to decide whether the mini-bar / view model should be alive.
@@ -29,24 +45,32 @@ final class WorkoutCoordinator {
     /// Whether the mini-bar should be visible above the tab bar.
     var isMinimized: Bool { presentation == .minimized }
 
-    /// Backward-compat shim for callers that still set `showActiveWorkout` directly.
-    /// When set true → expand; when set false → fully dismiss.
-    var showActiveWorkout: Bool {
-        get { presentation == .expanded }
-        set { presentation = newValue ? .expanded : .hidden }
-    }
-
     /// Called from TemplateDetailView or Dashboard to start a workout.
     func startWorkout(template: Template, day: WorkoutDay, date: Date) {
         selectedTemplate = template
         selectedWorkoutDay = day
         selectedWorkoutDate = date
+        if activeViewModel == nil {
+            activeViewModel = ActiveWorkoutViewModel()
+        }
+        presentation = .expanded
+    }
+
+    /// Resumes a workout that was force-quit. Creates the view model, restores
+    /// its state from disk, and re-arms autosave before expanding.
+    func startRecoveredWorkout(state: SavedWorkoutState) {
+        if activeViewModel == nil {
+            let vm = ActiveWorkoutViewModel()
+            vm.restoreFromSavedState(state)
+            vm.startAutoSavePublic()
+            activeViewModel = vm
+        }
         presentation = .expanded
     }
 
     /// Collapses the expanded workout to a mini-bar so the user can navigate the
     /// rest of the app while the workout is still active. View model state is
-    /// preserved in MainTabView and reused on expand.
+    /// preserved (lives on this coordinator) and reused on expand.
     func minimize() {
         guard presentation == .expanded else { return }
         presentation = .minimized
@@ -64,5 +88,6 @@ final class WorkoutCoordinator {
         selectedTemplate = nil
         selectedWorkoutDay = nil
         selectedWorkoutDate = nil
+        activeViewModel = nil
     }
 }

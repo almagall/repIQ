@@ -1,9 +1,9 @@
 import SwiftUI
 
 struct MainTabView: View {
+    let workoutCoordinator: WorkoutCoordinator
+
     @State private var selectedTab = 0
-    @State private var workoutCoordinator = WorkoutCoordinator()
-    @State private var activeWorkoutViewModel: ActiveWorkoutViewModel?
     @State private var socialViewModel = SocialViewModel()
     @State private var showRecoveryAlert = false
     @State private var recoveredState: SavedWorkoutState?
@@ -23,63 +23,60 @@ struct MainTabView: View {
         )
     }
 
+    /// Reusable modifier that wraps a tab's content with the mini-bar.
+    @ViewBuilder
+    private func withMiniBar<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        content()
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if workoutCoordinator.isMinimized, let vm = workoutCoordinator.activeViewModel {
+                    WorkoutMiniBar(viewModel: vm) {
+                        workoutCoordinator.expand()
+                    }
+                    .padding(.horizontal, RQSpacing.md)
+                    .padding(.vertical, 6)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .animation(.easeInOut(duration: 0.25), value: workoutCoordinator.isMinimized)
+    }
+
     var body: some View {
-        // Manual overlay approach: wrap the TabView in a ZStack and position the
-        // mini-bar as a bottom-aligned overlay. iOS 26's `tabViewBottomAccessory`
-        // and `safeAreaInset` both have rendering quirks with the new floating-pill
-        // tab bar, so we sidestep them by drawing the bar ourselves.
-        ZStack(alignment: .bottom) {
-            TabView(selection: $selectedTab) {
-                Tab("Home", systemImage: "house.fill", value: 0) {
-                    DashboardView()
+        // Use the legacy `.tabItem` API; mini-bar is added via safeAreaInset on
+        // each tab's root content view (see `withMiniBar`).
+        TabView(selection: $selectedTab) {
+            withMiniBar { DashboardView() }
+                .tabItem {
+                    Label("Home", systemImage: "house.fill")
                 }
+                .tag(0)
 
-                Tab("Progress", systemImage: "chart.line.uptrend.xyaxis", value: 1) {
-                    ProgressTabView()
+            withMiniBar { ProgressTabView() }
+                .tabItem {
+                    Label("Progress", systemImage: "chart.line.uptrend.xyaxis")
                 }
+                .tag(1)
 
-                Tab("Social", systemImage: "person.2.fill", value: 2) {
-                    SocialTabView(viewModel: socialViewModel)
+            withMiniBar { SocialTabView(viewModel: socialViewModel) }
+                .tabItem {
+                    Label("Social", systemImage: "person.2.fill")
                 }
                 .badge(socialViewModel.notificationCount)
+                .tag(2)
 
-                Tab("Profile", systemImage: "person.fill", value: 3) {
-                    ProfileView()
+            withMiniBar { ProfileView() }
+                .tabItem {
+                    Label("Profile", systemImage: "person.fill")
                 }
-            }
-            .tint(RQColors.accent)
-
-            // Persistent mini-bar above the floating tab bar (~85pt up to clear it).
-            if workoutCoordinator.isMinimized, let vm = activeWorkoutViewModel {
-                WorkoutMiniBar(viewModel: vm) {
-                    workoutCoordinator.expand()
-                }
-                .padding(.horizontal, RQSpacing.md)
-                .padding(.bottom, 96) // sits above the floating tab bar
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .zIndex(10)
-            }
+                .tag(3)
         }
+        .tint(RQColors.accent)
         .environment(workoutCoordinator)
-        .animation(.easeInOut(duration: 0.25), value: workoutCoordinator.isMinimized)
         .fullScreenCover(isPresented: expandedBinding) {
-            if recoveredState != nil {
-                // Restoring from saved state — no template/day needed
-                let vm = makeRecoveryViewModel()
+            if let vm = workoutCoordinator.activeViewModel {
                 ActiveWorkoutView(viewModel: vm) {
                     // Full dismiss path (Finish / Abandon)
                     workoutCoordinator.dismissWorkout()
-                    activeWorkoutViewModel = nil
                     recoveredState = nil
-                }
-                .environment(workoutCoordinator)
-            } else if let template = workoutCoordinator.selectedTemplate,
-               let day = workoutCoordinator.selectedWorkoutDay {
-                let vm = makeWorkoutViewModel(template: template, day: day)
-                ActiveWorkoutView(viewModel: vm) {
-                    // Full dismiss path (Finish / Abandon)
-                    workoutCoordinator.dismissWorkout()
-                    activeWorkoutViewModel = nil
                 }
                 .environment(workoutCoordinator)
             }
@@ -88,7 +85,6 @@ struct MainTabView: View {
             // Check for recoverable workout on app launch
             if WorkoutAutoSave.hasRecoverableState,
                let state = WorkoutAutoSave.load() {
-                // Only recover if saved less than 4 hours ago
                 if Date().timeIntervalSince(state.savedAt) < 4 * 3600 {
                     recoveredState = state
                     showRecoveryAlert = true
@@ -99,8 +95,9 @@ struct MainTabView: View {
         }
         .alert("Resume Workout?", isPresented: $showRecoveryAlert) {
             Button("Resume") {
-                if recoveredState != nil {
-                    workoutCoordinator.presentation = .expanded
+                if let state = recoveredState {
+                    workoutCoordinator.startRecoveredWorkout(state: state)
+                    recoveredState = nil
                 }
             }
             Button("Discard", role: .destructive) {
@@ -112,27 +109,5 @@ struct MainTabView: View {
                 Text("You have an unfinished \(state.dayName.isEmpty ? "workout" : state.dayName) from \(state.savedAt.relativeDisplay). Would you like to pick up where you left off?")
             }
         }
-    }
-
-    private func makeWorkoutViewModel(template: Template, day: WorkoutDay) -> ActiveWorkoutViewModel {
-        if let existing = activeWorkoutViewModel {
-            return existing
-        }
-        let vm = ActiveWorkoutViewModel()
-        activeWorkoutViewModel = vm
-        return vm
-    }
-
-    private func makeRecoveryViewModel() -> ActiveWorkoutViewModel {
-        if let existing = activeWorkoutViewModel {
-            return existing
-        }
-        let vm = ActiveWorkoutViewModel()
-        if let state = recoveredState {
-            vm.restoreFromSavedState(state)
-            vm.startAutoSavePublic()
-        }
-        activeWorkoutViewModel = vm
-        return vm
     }
 }

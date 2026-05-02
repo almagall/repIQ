@@ -11,6 +11,10 @@
 		16723FA9829F8F6FE0C26C6E /* repIQActivityLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 805A81F6E8EA0CD82A505ADF /* repIQActivityLiveActivity.swift */; };
 		37B1F6640D219C43B35A95AB /* repIQActivity.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = A14F1DF956B7F86B4C780FF6 /* repIQActivity.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		3F5886C1DA789F6382EA6824 /* repIQActivityBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = F26AF96E268BE030890FF9D2 /* repIQActivityBundle.swift */; };
+		A1A1A1A1B1B1B1B1C1C1C002 /* WorkoutIntentBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A1B1B1B1B1C1C1C001 /* WorkoutIntentBridge.swift */; };
+		A1A1A1A1B1B1B1B1C1C1C004 /* LogSetIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A1B1B1B1B1C1C1C003 /* LogSetIntent.swift */; };
+		A1A1A1A1B1B1B1B1C1C1C006 /* SkipRestIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A1B1B1B1B1C1C1C005 /* SkipRestIntent.swift */; };
+		A1A1A1A1B1B1B1B1C1C1C008 /* AdjustSetIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1A1A1A1B1B1B1B1C1C1C007 /* AdjustSetIntent.swift */; };
 		AABB00052F57000100000005 /* MuscleMap in Frameworks */ = {isa = PBXBuildFile; productRef = AABB00042F57000100000004 /* MuscleMap */; };
 		C96737C4966F48AD1BF8CD46 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 298AABDBB9638BFD05E0E579 /* Foundation.framework */; };
 		DC59E30F2C34CFF757CB2BC5 /* WorkoutActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E46F72B954B19179BC1D9A35 /* WorkoutActivityAttributes.swift */; };
@@ -45,6 +49,10 @@
 		298AABDBB9638BFD05E0E579 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		805A81F6E8EA0CD82A505ADF /* repIQActivityLiveActivity.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = repIQActivityLiveActivity.swift; sourceTree = "<group>"; };
 		A14F1DF956B7F86B4C780FF6 /* repIQActivity.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = repIQActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1A1A1A1B1B1B1B1C1C1C001 /* WorkoutIntentBridge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = WorkoutIntentBridge.swift; path = ../repIQ/Intents/WorkoutIntentBridge.swift; sourceTree = "<group>"; };
+		A1A1A1A1B1B1B1B1C1C1C003 /* LogSetIntent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LogSetIntent.swift; path = ../repIQ/Intents/LogSetIntent.swift; sourceTree = "<group>"; };
+		A1A1A1A1B1B1B1B1C1C1C005 /* SkipRestIntent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SkipRestIntent.swift; path = ../repIQ/Intents/SkipRestIntent.swift; sourceTree = "<group>"; };
+		A1A1A1A1B1B1B1B1C1C1C007 /* AdjustSetIntent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AdjustSetIntent.swift; path = ../repIQ/Intents/AdjustSetIntent.swift; sourceTree = "<group>"; };
 		B64A60A37C4C087306AA9BE4 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B9CFDB2158141F72BAD626D9 /* repIQActivity.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = repIQActivity.entitlements; sourceTree = "<group>"; };
 		E46F72B954B19179BC1D9A35 /* WorkoutActivityAttributes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = WorkoutActivityAttributes.swift; path = ../repIQ/Models/WorkoutActivityAttributes.swift; sourceTree = "<group>"; };
@@ -54,8 +62,6 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		05F208272F56CC0D00E0AE4C /* repIQ */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = repIQ;
 			sourceTree = "<group>";
 		};
@@ -125,6 +131,10 @@
 				B64A60A37C4C087306AA9BE4 /* Info.plist */,
 				B9CFDB2158141F72BAD626D9 /* repIQActivity.entitlements */,
 				E46F72B954B19179BC1D9A35 /* WorkoutActivityAttributes.swift */,
+				A1A1A1A1B1B1B1B1C1C1C001 /* WorkoutIntentBridge.swift */,
+				A1A1A1A1B1B1B1B1C1C1C003 /* LogSetIntent.swift */,
+				A1A1A1A1B1B1B1B1C1C1C005 /* SkipRestIntent.swift */,
+				A1A1A1A1B1B1B1B1C1C1C007 /* AdjustSetIntent.swift */,
 			);
 			path = repIQActivity;
 			sourceTree = "<group>";
@@ -246,6 +256,10 @@
 				3F5886C1DA789F6382EA6824 /* repIQActivityBundle.swift in Sources */,
 				16723FA9829F8F6FE0C26C6E /* repIQActivityLiveActivity.swift in Sources */,
 				DC59E30F2C34CFF757CB2BC5 /* WorkoutActivityAttributes.swift in Sources */,
+				A1A1A1A1B1B1B1B1C1C1C002 /* WorkoutIntentBridge.swift in Sources */,
+				A1A1A1A1B1B1B1B1C1C1C004 /* LogSetIntent.swift in Sources */,
+				A1A1A1A1B1B1B1B1C1C1C006 /* SkipRestIntent.swift in Sources */,
+				A1A1A1A1B1B1B1B1C1C1C008 /* AdjustSetIntent.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
