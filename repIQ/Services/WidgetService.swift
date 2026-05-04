@@ -3,32 +3,53 @@ import WidgetKit
 
 /// Syncs workout data to shared UserDefaults for the home screen widget.
 /// Requires App Group "group.com.repiq.shared" configured in both targets.
+///
+/// The widget runs in a separate process (the activity extension) and reads
+/// these keys directly via `UserDefaults(suiteName:)`. Keep the keys in sync
+/// with `repIQActivityBundle.swift` if you rename anything.
 struct WidgetService {
-    private static let defaults = UserDefaults(suiteName: "group.com.repiq.shared")
+    static let appGroupSuite = "group.com.repiq.shared"
+    private static let defaults = UserDefaults(suiteName: appGroupSuite)
 
-    /// Call after workout completion or on app launch to sync widget data.
-    static func syncWidgetData(
-        currentStreak: Int,
-        weeklySessionCount: Int,
-        lastWorkoutDate: Date?,
-        nextWorkoutName: String?
-    ) {
-        defaults?.set(currentStreak, forKey: "widget_currentStreak")
-        defaults?.set(weeklySessionCount, forKey: "widget_weeklySessionCount")
-        defaults?.set(lastWorkoutDate, forKey: "widget_lastWorkoutDate")
-        defaults?.set(nextWorkoutName, forKey: "widget_nextWorkoutName")
+    /// Snapshot of the data the home screen widget renders. Pass `nil` for
+    /// any field you don't have yet — the widget falls back gracefully.
+    struct Snapshot {
+        var currentStreak: Int
+        var weeklyWorkingSetCount: Int
+        var lastWorkoutDate: Date?
+        var lastPRSummary: String?
 
-        // Tell WidgetKit to refresh
+        static let empty = Snapshot(
+            currentStreak: 0,
+            weeklyWorkingSetCount: 0,
+            lastWorkoutDate: nil,
+            lastPRSummary: nil
+        )
+    }
+
+    /// Pushes a fresh snapshot to the App Group and asks WidgetKit to refresh.
+    static func sync(_ snapshot: Snapshot) {
+        defaults?.set(snapshot.currentStreak, forKey: Keys.currentStreak)
+        defaults?.set(snapshot.weeklyWorkingSetCount, forKey: Keys.weeklyWorkingSetCount)
+        defaults?.set(snapshot.lastWorkoutDate, forKey: Keys.lastWorkoutDate)
+        defaults?.set(snapshot.lastPRSummary, forKey: Keys.lastPRSummary)
         WidgetCenter.shared.reloadAllTimelines()
     }
 
-    /// Convenience to sync from analytics data.
-    static func syncFromDashboard(streak: Int, weeklySetCount: Int, lastSession: Date?) {
-        syncWidgetData(
-            currentStreak: streak,
-            weeklySessionCount: weeklySetCount,
-            lastWorkoutDate: lastSession,
-            nextWorkoutName: nil
-        )
+    /// Targeted update for fields the workout completion path knows about
+    /// without re-fetching the full dashboard snapshot. The streak refreshes
+    /// instantly when a workout completes; the rest of the snapshot fills in
+    /// on the next dashboard load.
+    static func updateAfterWorkoutCompletion(currentStreak: Int, lastWorkoutDate: Date) {
+        defaults?.set(currentStreak, forKey: Keys.currentStreak)
+        defaults?.set(lastWorkoutDate, forKey: Keys.lastWorkoutDate)
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    enum Keys {
+        static let currentStreak = "widget_currentStreak"
+        static let weeklyWorkingSetCount = "widget_weeklyWorkingSetCount"
+        static let lastWorkoutDate = "widget_lastWorkoutDate"
+        static let lastPRSummary = "widget_lastPRSummary"
     }
 }
