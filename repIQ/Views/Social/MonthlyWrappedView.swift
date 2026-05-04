@@ -1,304 +1,274 @@
 import SwiftUI
 
-/// Spotify-style monthly training report card with shareable card.
+/// Entry point for the monthly wrapped flow. Generates (idempotently) the
+/// prior month's wrapped on appear, then hands off to `WrappedStoryView` for
+/// the Spotify-style story presentation. Past months are accessible via a
+/// sheet from the archetype (closing) slide.
 struct MonthlyWrappedView: View {
     @Bindable var viewModel: SocialViewModel
+
     @State private var wrapped: MonthlyWrapped?
     @State private var pastWrapped: [MonthlyWrapped] = []
-    @State private var isLoading = false
-    @State private var selectedWrapped: MonthlyWrapped?
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+    @State private var showHistorySheet = false
+    @State private var shareImage: UIImage?
+    @State private var showWrappedShareSheet = false
+
+    private let service = DigestService()
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: RQSpacing.xl) {
-                if isLoading {
-                    ProgressView()
-                        .tint(RQColors.accent)
-                        .padding(.top, RQSpacing.xxxl)
-                } else if let w = selectedWrapped ?? wrapped {
-                    wrappedCard(w)
+        ZStack {
+            Color.black.ignoresSafeArea()
 
-                    // Past months
-                    if !pastWrapped.isEmpty {
-                        pastSection
-                    }
-                } else {
-                    emptyState
-                }
-            }
-            .padding(.horizontal, RQSpacing.screenHorizontal)
-            .padding(.vertical, RQSpacing.lg)
-        }
-        .background(RQColors.background)
-        .navigationTitle("Monthly Report Card")
-        .navigationBarTitleDisplayMode(.inline)
-        .task {
-            await loadWrapped()
-        }
-    }
-
-    // MARK: - Wrapped Card
-
-    private func wrappedCard(_ w: MonthlyWrapped) -> some View {
-        VStack(spacing: RQSpacing.lg) {
-            // Month header
-            VStack(spacing: RQSpacing.sm) {
-                Text(monthLabel(w.monthStart))
-                    .font(RQTypography.title1)
-                    .foregroundColor(RQColors.textPrimary)
-                Text("YOUR MONTHLY REPORT CARD")
-                    .font(RQTypography.label)
-                    .textCase(.uppercase)
-                    .tracking(2)
-                    .foregroundColor(RQColors.accent)
-            }
-
-            // Hero stats
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: RQSpacing.md) {
-                heroStat(value: "\(w.totalSessions)", label: "Workouts", icon: "figure.strengthtraining.traditional", color: RQColors.accent)
-                heroStat(value: formatVolume(w.totalVolume), label: "Volume Lifted", icon: "scalemass.fill", color: RQColors.success)
-                heroStat(value: "\(w.totalSets)", label: "Total Sets", icon: "number", color: RQColors.hypertrophy)
-                heroStat(value: "\(w.totalPRs)", label: "Personal Records", icon: "star.fill", color: RQColors.warning)
-            }
-
-            // Key insights
-            insightsSection(w)
-
-            // Biggest PR
-            if let prExercise = w.biggestPRExercise, let prValue = w.biggestPRValue {
-                RQCard {
-                    VStack(spacing: RQSpacing.sm) {
-                        Image(systemName: "trophy.fill")
-                            .font(.system(size: 28))
-                            .foregroundColor(RQColors.warning)
-                        Text("Biggest PR")
-                            .font(RQTypography.label)
-                            .textCase(.uppercase)
-                            .tracking(1.5)
-                            .foregroundColor(RQColors.textTertiary)
-                        Text(prExercise)
-                            .font(RQTypography.headline)
-                            .foregroundColor(RQColors.textPrimary)
-                        Text("\(formatWeight(prValue)) lbs")
-                            .font(RQTypography.numbers)
-                            .foregroundColor(RQColors.warning)
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-            }
-
-            // Additional stats
-            additionalStats(w)
-        }
-    }
-
-    private func heroStat(value: String, label: String, icon: String, color: Color) -> some View {
-        RQCard {
-            VStack(spacing: RQSpacing.sm) {
-                Image(systemName: icon)
-                    .font(.system(size: 20))
-                    .foregroundColor(color)
-
-                Text(value)
-                    .font(RQTypography.numbers)
-                    .foregroundColor(RQColors.textPrimary)
-
-                Text(label)
-                    .font(RQTypography.label)
-                    .textCase(.uppercase)
-                    .tracking(1)
-                    .foregroundColor(RQColors.textTertiary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-            .frame(maxWidth: .infinity)
-        }
-    }
-
-    private func insightsSection(_ w: MonthlyWrapped) -> some View {
-        VStack(spacing: RQSpacing.md) {
-            // Top exercise
-            if let topExercise = w.topExerciseName {
-                insightRow(
-                    icon: "flame.fill",
-                    title: "Most Performed",
-                    detail: topExercise,
-                    subtitle: w.topExerciseVolume.map { "\(formatVolume($0)) volume" },
-                    color: RQColors.warning
+            if isLoading {
+                ProgressView()
+                    .tint(RQColors.accent)
+            } else if let wrapped {
+                WrappedStoryView(
+                    wrapped: wrapped,
+                    onShare: { share(wrapped: wrapped) },
+                    onViewHistory: { showHistorySheet = true }
                 )
-            }
-
-            // Most consistent muscle
-            if let muscle = w.mostConsistentMuscle {
-                insightRow(
-                    icon: "checkmark.circle.fill",
-                    title: "Most Consistent",
-                    detail: muscle.capitalized,
-                    subtitle: "muscle group",
-                    color: RQColors.success
-                )
-            }
-
-            // Favorite day
-            if let day = w.favoriteDay {
-                insightRow(
-                    icon: "calendar",
-                    title: "Favorite Day",
-                    detail: day,
-                    subtitle: "most workouts on this day",
-                    color: RQColors.accent
-                )
-            }
-
-            // Longest streak
-            if w.longestStreak > 0 {
-                insightRow(
-                    icon: "flame.fill",
-                    title: "Longest Streak",
-                    detail: "\(w.longestStreak) days",
-                    subtitle: nil,
-                    color: RQColors.warning
-                )
+                // Force a fresh story view (slide index reset) when the user
+                // switches between months from the history sheet.
+                .id(wrapped.id)
+            } else {
+                emptyOrErrorState
             }
         }
-    }
-
-    private func insightRow(icon: String, title: String, detail: String, subtitle: String?, color: Color) -> some View {
-        RQCard {
-            HStack(spacing: RQSpacing.md) {
-                Image(systemName: icon)
-                    .font(.system(size: 18))
-                    .foregroundColor(color)
-                    .frame(width: 28)
-
-                VStack(alignment: .leading, spacing: RQSpacing.xxs) {
-                    Text(title)
-                        .font(RQTypography.caption)
-                        .foregroundColor(RQColors.textTertiary)
-                    Text(detail)
-                        .font(RQTypography.headline)
-                        .foregroundColor(RQColors.textPrimary)
-                    if let sub = subtitle {
-                        Text(sub)
-                            .font(RQTypography.label)
-                            .foregroundColor(RQColors.textSecondary)
-                    }
+        .toolbar(.hidden, for: .navigationBar)
+        .preferredColorScheme(.dark)
+        .task { await load() }
+        .sheet(isPresented: $showHistorySheet) {
+            WrappedHistorySheet(
+                pastWrapped: pastWrapped,
+                onSelect: { selected in
+                    showHistorySheet = false
+                    wrapped = selected
                 }
-
-                Spacer()
+            )
+        }
+        .sheet(isPresented: $showWrappedShareSheet) {
+            if let img = shareImage {
+                WrappedShareSheet(items: [img])
             }
         }
     }
 
-    private func additionalStats(_ w: MonthlyWrapped) -> some View {
-        VStack(alignment: .leading, spacing: RQSpacing.md) {
-            Text("DETAILS")
-                .font(RQTypography.label)
-                .textCase(.uppercase)
-                .tracking(1.5)
-                .foregroundColor(RQColors.textSecondary)
-
-            if let duration = w.avgSessionDuration {
-                detailRow(label: "Avg Session Duration", value: formatDuration(duration))
-            }
-
-            if let rank = w.percentileRank {
-                detailRow(label: "Percentile Rank", value: "Top \(100 - rank)%")
-            }
-        }
-    }
-
-    private func detailRow(label: String, value: String) -> some View {
-        HStack {
-            Text(label)
-                .font(RQTypography.body)
-                .foregroundColor(RQColors.textSecondary)
-            Spacer()
-            Text(value)
-                .font(RQTypography.numbersSmall)
-                .foregroundColor(RQColors.textPrimary)
-        }
-        .padding(RQSpacing.md)
-        .background(RQColors.surfacePrimary)
-        .cornerRadius(RQRadius.medium)
-    }
-
-    // MARK: - Past Section
-
-    private var pastSection: some View {
-        VStack(alignment: .leading, spacing: RQSpacing.md) {
-            Text("PAST MONTHS")
-                .font(RQTypography.label)
-                .textCase(.uppercase)
-                .tracking(1.5)
-                .foregroundColor(RQColors.textSecondary)
-
-            ForEach(pastWrapped) { past in
-                Button {
-                    selectedWrapped = past
-                } label: {
-                    RQCard {
-                        HStack(spacing: RQSpacing.md) {
-                            VStack(alignment: .leading, spacing: RQSpacing.xxs) {
-                                Text(monthLabel(past.monthStart))
-                                    .font(RQTypography.headline)
-                                    .foregroundColor(RQColors.textPrimary)
-                                HStack(spacing: RQSpacing.md) {
-                                    Label("\(past.totalSessions) workouts", systemImage: "figure.strengthtraining.traditional")
-                                    Label("\(past.totalPRs) PRs", systemImage: "star.fill")
-                                }
-                                .font(RQTypography.caption)
-                                .foregroundColor(RQColors.textSecondary)
-                            }
-
-                            Spacer()
-
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 12))
-                                .foregroundColor(RQColors.textTertiary)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: - Empty State
-
-    private var emptyState: some View {
+    @ViewBuilder
+    private var emptyOrErrorState: some View {
         VStack(spacing: RQSpacing.lg) {
             Image(systemName: "chart.bar.doc.horizontal")
                 .font(.system(size: 40))
-                .foregroundColor(RQColors.textTertiary)
-            Text("No report card available")
-                .font(RQTypography.headline)
-                .foregroundColor(RQColors.textSecondary)
-            Text("Complete workouts this month and your report card will be generated at the end of the month.")
-                .font(RQTypography.footnote)
-                .foregroundColor(RQColors.textTertiary)
-                .multilineTextAlignment(.center)
+                .foregroundStyle(.white.opacity(0.3))
+            if let errorMessage {
+                Text("Couldn't load your Wrapped")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text(errorMessage)
+                    .font(.system(size: 13))
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.white.opacity(0.55))
+                    .padding(.horizontal, RQSpacing.xl)
+                Button("Try again") {
+                    Task { await load() }
+                }
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(RQColors.accent)
+            } else {
+                Text("No Wrapped yet")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.white)
+                Text("Train this month and your Wrapped will be ready on the 1st of next month.")
+                    .font(.system(size: 13))
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.white.opacity(0.55))
+                    .padding(.horizontal, RQSpacing.xl)
+            }
         }
-        .padding(.top, RQSpacing.xxxl)
     }
 
-    // MARK: - Helpers
+    // MARK: - Loading
 
-    private func loadWrapped() async {
-        guard let userId = viewModel.currentUserId else { return }
+    private func load() async {
+        guard let userId = viewModel.currentUserId else {
+            errorMessage = "Not signed in."
+            isLoading = false
+            return
+        }
         isLoading = true
-        defer { isLoading = false }
-
-        let service = DigestService()
+        errorMessage = nil
         do {
-            wrapped = try await service.generateMonthlyWrapped(userId: userId)
-            pastWrapped = try await service.fetchWrappedHistory(userId: userId)
-            // Remove current from past
-            if let current = wrapped {
-                pastWrapped.removeAll { $0.id == current.id }
+            let current = try await service.generateMonthlyWrapped(userId: userId)
+            let history = try await service.fetchWrappedHistory(userId: userId)
+            wrapped = current
+            pastWrapped = history.filter { $0.id != current.id }
+            // Mark as viewed so the dashboard banner + tab dot badge clear.
+            if current.viewedAt == nil {
+                Task { try? await service.markWrappedViewed(wrappedId: current.id) }
             }
         } catch {
-            // Silently fail
+            errorMessage = (error as NSError).localizedDescription
         }
+        isLoading = false
+    }
+
+    // MARK: - Sharing
+
+    @MainActor
+    private func share(wrapped: MonthlyWrapped) {
+        let card = WrappedShareCard(wrapped: wrapped)
+        let renderer = ImageRenderer(content: card)
+        // Render at the active scene's display scale so the PNG is crisp
+        // across devices. Fall back to 3 (iPhone Pro / Plus) if no scene found.
+        let scale = UIApplication.shared.connectedScenes
+            .compactMap { ($0 as? UIWindowScene)?.screen.scale }
+            .first ?? 3.0
+        renderer.scale = scale
+        renderer.proposedSize = .init(width: 1080, height: 1920) // 9:16
+        if let image = renderer.uiImage {
+            shareImage = image
+            showWrappedShareSheet = true
+        }
+    }
+}
+
+// MARK: - History sheet
+
+private struct WrappedHistorySheet: View {
+    let pastWrapped: [MonthlyWrapped]
+    var onSelect: (MonthlyWrapped) -> Void
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: RQSpacing.md) {
+                    if pastWrapped.isEmpty {
+                        Text("No past months yet.")
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.textTertiary)
+                            .padding(.top, RQSpacing.xxl)
+                    } else {
+                        ForEach(pastWrapped) { past in
+                            Button { onSelect(past) } label: {
+                                RQCard {
+                                    HStack(spacing: RQSpacing.md) {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(monthLabel(past.monthStart))
+                                                .font(RQTypography.headline)
+                                                .foregroundColor(RQColors.textPrimary)
+                                            HStack(spacing: RQSpacing.md) {
+                                                Label("\(past.totalSessions)", systemImage: "figure.strengthtraining.traditional")
+                                                Label("\(past.totalPRs)", systemImage: "trophy.fill")
+                                            }
+                                            .font(RQTypography.caption)
+                                            .foregroundColor(RQColors.textSecondary)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 12))
+                                            .foregroundColor(RQColors.textTertiary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, RQSpacing.screenHorizontal)
+                .padding(.top, RQSpacing.lg)
+            }
+            .background(RQColors.background)
+            .navigationTitle("Past Months")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private func monthLabel(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "MMMM yyyy"
+        return f.string(from: date)
+    }
+}
+
+// MARK: - Share card (rendered to a 9:16 PNG)
+
+private struct WrappedShareCard: View {
+    let wrapped: MonthlyWrapped
+
+    var body: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            VStack(spacing: 8) {
+                Text(monthLabel(wrapped.monthStart).uppercased())
+                    .font(.system(size: 22, weight: .heavy, design: .rounded))
+                    .tracking(6)
+                    .foregroundStyle(RQColors.accent)
+                Text("YOUR WRAPPED")
+                    .font(.system(size: 56, weight: .black, design: .rounded))
+                    .tracking(2)
+                    .foregroundStyle(.white)
+            }
+
+            Spacer().frame(height: 24)
+
+            HStack(spacing: 24) {
+                shareStat(label: "WORKOUTS", value: "\(wrapped.totalSessions)")
+                shareStat(label: "PRs", value: "\(wrapped.totalPRs)")
+            }
+            HStack(spacing: 24) {
+                shareStat(label: "TOTAL VOLUME", value: formatVolume(wrapped.totalVolume))
+                shareStat(label: "WORKING SETS", value: "\(wrapped.totalSets)")
+            }
+
+            Spacer().frame(height: 24)
+
+            if let archetype = WrappedArchetype(rawValue: wrapped.archetype ?? "") {
+                VStack(spacing: 12) {
+                    Image(systemName: archetype.systemImageName)
+                        .font(.system(size: 42, weight: .semibold))
+                        .foregroundStyle(RQColors.accent)
+                    Text("YOU ARE A")
+                        .font(.system(size: 14, weight: .heavy, design: .rounded))
+                        .tracking(3)
+                        .foregroundStyle(.white.opacity(0.55))
+                    Text(archetype.displayName.uppercased())
+                        .font(.system(size: 36, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                }
+            }
+
+            Spacer()
+
+            Text("repIQ")
+                .font(.system(size: 18, weight: .heavy, design: .rounded))
+                .tracking(3)
+                .foregroundStyle(.white.opacity(0.5))
+                .padding(.bottom, 32)
+        }
+        .frame(width: 1080, height: 1920)
+        .background(
+            LinearGradient(
+                colors: [Color.black, Color(red: 0.04, green: 0.07, blue: 0.12)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+    }
+
+    private func shareStat(label: String, value: String) -> some View {
+        VStack(spacing: 6) {
+            Text(label)
+                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .tracking(2.5)
+                .foregroundStyle(.white.opacity(0.5))
+            Text(value)
+                .font(.system(size: 44, weight: .black, design: .rounded))
+                .foregroundStyle(.white)
+        }
+        .frame(width: 220)
     }
 
     private func monthLabel(_ date: Date) -> String {
@@ -307,27 +277,19 @@ struct MonthlyWrappedView: View {
         return f.string(from: date)
     }
 
-    private func formatVolume(_ volume: Double) -> String {
-        if volume >= 1_000_000 {
-            return String(format: "%.1fM", volume / 1_000_000)
-        }
-        if volume >= 1000 {
-            return String(format: "%.0fK", volume / 1000)
-        }
-        return String(format: "%.0f", volume)
+    private func formatVolume(_ value: Double) -> String {
+        if value >= 1_000_000 { return String(format: "%.1fM", value / 1_000_000) }
+        if value >= 1_000 { return String(format: "%.0fK", value / 1_000) }
+        return String(format: "%.0f", value)
     }
+}
 
-    private func formatWeight(_ weight: Double) -> String {
-        weight.truncatingRemainder(dividingBy: 1) == 0
-            ? String(format: "%.0f", weight)
-            : String(format: "%.1f", weight)
-    }
+// MARK: - UIKit share sheet bridge
 
-    private func formatDuration(_ seconds: Int) -> String {
-        let minutes = seconds / 60
-        if minutes >= 60 {
-            return "\(minutes / 60)h \(minutes % 60)m"
-        }
-        return "\(minutes)m"
+private struct WrappedShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
     }
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }

@@ -768,6 +768,8 @@ struct MonthlyWrapped: Codable, Identifiable, Sendable {
     var avgSessionDuration: Int?
     var longestStreak: Int
     var favoriteDay: String?
+    var archetype: String?
+    var viewedAt: Date?
     let createdAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -788,6 +790,8 @@ struct MonthlyWrapped: Codable, Identifiable, Sendable {
         case avgSessionDuration = "avg_session_duration"
         case longestStreak = "longest_streak"
         case favoriteDay = "favorite_day"
+        case archetype
+        case viewedAt = "viewed_at"
         case createdAt = "created_at"
     }
 }

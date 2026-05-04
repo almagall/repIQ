@@ -113,29 +113,24 @@ struct DigestService: Sendable {
 
     // MARK: - Monthly Wrapped
 
-    /// Generates a Spotify-style monthly training report card.
+    /// Generates a Spotify-style monthly training report card for the *prior*
+    /// calendar month. Idempotent via the unique (user_id, month_start)
+    /// constraint — calling this multiple times returns the existing row.
     func generateMonthlyWrapped(userId: UUID) async throws -> MonthlyWrapped {
         let calendar = Calendar.current
-        // Previous month
         let now = Date()
+        // Prior month boundaries: monthStart = 1st of last month, monthEnd = 1st of current month.
         let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: calendar.date(byAdding: .month, value: -1, to: now)!))!
         let monthEnd = calendar.date(from: calendar.dateComponents([.year, .month], from: now))!
 
-        // Check if already generated
-        let existing: [MonthlyWrapped] = try await supabase.from("monthly_wrapped")
-            .select()
-            .eq("user_id", value: userId.uuidString)
-            .eq("month_start", value: formatDate(monthStart))
-            .limit(1)
-            .execute()
-            .value
-
-        if let wrapped = existing.first { return wrapped }
+        if let existing = try await fetchExistingWrapped(userId: userId, monthStart: monthStart) {
+            return existing
+        }
 
         let monthStartStr = ISO8601DateFormatter().string(from: monthStart)
         let monthEndStr = ISO8601DateFormatter().string(from: monthEnd)
 
-        // Fetch sessions for the month
+        // 1) Sessions for the month.
         struct SessionRow: Decodable {
             let id: UUID
             let duration_seconds: Int?
@@ -150,88 +145,122 @@ struct DigestService: Sendable {
             .execute()
             .value
 
-        // Fetch sets for volume
+        // 2) Sets — for volume, set count, top exercise, and per-session unique-exercise stats.
         struct SetRow: Decodable {
+            let session_id: UUID
             let exercise_id: UUID
             let weight: Double
             let reps: Int
+            let set_type: String?
         }
         let sessionIds = sessions.map(\.id)
         var totalVolume: Double = 0
         var totalSets = 0
         var exerciseVolumes: [UUID: Double] = [:]
+        var workingSetsByExercise: [UUID: Int] = [:]
+        var exercisesPerSession: [UUID: Set<UUID>] = [:]
 
         if !sessionIds.isEmpty {
             let sets: [SetRow] = try await supabase.from("workout_sets")
-                .select("exercise_id, weight, reps")
+                .select("session_id, exercise_id, weight, reps, set_type")
                 .in("session_id", values: sessionIds.map(\.uuidString))
                 .execute()
                 .value
 
-            totalSets = sets.count
             for s in sets {
+                let isWorking = (s.set_type ?? "working") == "working"
                 let vol = s.weight * Double(s.reps)
                 totalVolume += vol
                 exerciseVolumes[s.exercise_id, default: 0] += vol
+                exercisesPerSession[s.session_id, default: []].insert(s.exercise_id)
+                if isWorking {
+                    totalSets += 1
+                    workingSetsByExercise[s.exercise_id, default: 0] += 1
+                }
             }
         }
 
-        // Top exercise by volume
-        let topExerciseId = exerciseVolumes.max(by: { $0.value < $1.value })?.key
-        var topExerciseName: String?
-        var topExerciseVolume: Double?
-        if let id = topExerciseId {
-            struct ExRow: Decodable { let name: String }
-            if let ex: ExRow = try? await supabase.from("exercises")
-                .select("name")
-                .eq("id", value: id.uuidString)
-                .single()
+        // 3) Resolve exercise names + muscle groups in one batch.
+        let allExerciseIds = Array(Set(exerciseVolumes.keys))
+        struct ExerciseRow: Decodable {
+            let id: UUID
+            let name: String
+            let muscle_group: String
+        }
+        var exerciseLookup: [UUID: ExerciseRow] = [:]
+        if !allExerciseIds.isEmpty {
+            let rows: [ExerciseRow] = try await supabase.from("exercises")
+                .select("id, name, muscle_group")
+                .in("id", values: allExerciseIds.map(\.uuidString))
                 .execute()
-                .value {
-                topExerciseName = ex.name
-                topExerciseVolume = exerciseVolumes[id]
-            }
+                .value
+            for row in rows { exerciseLookup[row.id] = row }
         }
 
-        // PRs this month
-        struct PRRow: Decodable {
-            let exercise_name: String?
-            let record_type: String
-            let value: Double
+        // 4) Top exercise by total volume.
+        let topExerciseId = exerciseVolumes.max(by: { $0.value < $1.value })?.key
+        let topExerciseName = topExerciseId.flatMap { exerciseLookup[$0]?.name }
+        let topExerciseVolume = topExerciseId.flatMap { exerciseVolumes[$0] }
+
+        // 5) Most consistent muscle = the muscle group that absorbed the most working sets.
+        var workingSetsByMuscle: [String: Int] = [:]
+        for (exerciseId, count) in workingSetsByExercise {
+            guard let muscle = exerciseLookup[exerciseId]?.muscle_group else { continue }
+            workingSetsByMuscle[muscle, default: 0] += count
         }
-        let prs: [PRRow] = try await supabase.from("personal_records")
-            .select("exercise_name, record_type, value")
+        let mostConsistentMuscle = workingSetsByMuscle.max(by: { $0.value < $1.value })?.key
+
+        // 6) PRs this month — proper join, not the broken exercise_name column.
+        struct PRJoinRow: Decodable {
+            struct ExName: Decodable { let name: String }
+            let value: Double
+            let record_type: String
+            let reps_at_weight: Int?
+            let exercises: ExName?
+        }
+        let prs: [PRJoinRow] = try await supabase.from("personal_records")
+            .select("value, record_type, reps_at_weight, exercises(name)")
             .eq("user_id", value: userId.uuidString)
             .gte("achieved_at", value: monthStartStr)
             .lt("achieved_at", value: monthEndStr)
             .execute()
             .value
 
-        // Biggest PR (by e1rm or weight)
-        let weightPRs = prs.filter { $0.record_type == "weight" || $0.record_type == "estimated1rm" }
+        let weightPRs = prs.filter { $0.record_type == "weight" || $0.record_type == "estimated_1rm" }
         let biggestPR = weightPRs.max(by: { $0.value < $1.value })
 
-        // Average session duration
+        // 7) Average session duration.
         let durations = sessions.compactMap(\.duration_seconds)
         let avgDuration = durations.isEmpty ? nil : durations.reduce(0, +) / durations.count
 
-        // Favorite day of week
+        // 8) Favorite day of week.
         let dayFormatter = DateFormatter()
         dayFormatter.dateFormat = "EEEE"
         let isoFormatter = ISO8601DateFormatter()
         var dayCounts: [String: Int] = [:]
+        var sessionDates: [Date] = []
         for s in sessions {
-            if let dateStr = s.completed_at, let date = isoFormatter.date(from: dateStr) {
-                let dayName = dayFormatter.string(from: date)
-                dayCounts[dayName, default: 0] += 1
-            }
+            guard let dateStr = s.completed_at, let date = isoFormatter.date(from: dateStr) else { continue }
+            sessionDates.append(date)
+            let dayName = dayFormatter.string(from: date)
+            dayCounts[dayName, default: 0] += 1
         }
         let favoriteDay = dayCounts.max(by: { $0.value < $1.value })?.key
 
-        // Longest streak this month (simplified: consecutive days with workouts)
-        let longestStreak = calculateMonthStreak(sessions: sessions)
+        // 9) Real longest streak from session dates (consecutive distinct days).
+        let longestStreak = longestConsecutiveDayStreak(in: sessionDates, calendar: calendar)
 
-        // Create wrapped record
+        // 10) Archetype reveal.
+        let avgUniqueExercises = sessions.isEmpty ? 0 :
+            Double(exercisesPerSession.values.map(\.count).reduce(0, +)) / Double(sessions.count)
+        let archetype = WrappedArchetype.classify(.init(
+            totalSessions: sessions.count,
+            totalPRs: prs.count,
+            totalVolume: totalVolume,
+            longestStreak: longestStreak,
+            avgUniqueExercisesPerSession: avgUniqueExercises
+        ))
+
         struct InsertPayload: Encodable {
             let user_id: String
             let month_start: String
@@ -241,12 +270,14 @@ struct DigestService: Sendable {
             let total_prs: Int
             let top_exercise_name: String?
             let top_exercise_volume: Double?
+            let most_consistent_muscle: String?
             let biggest_pr_exercise: String?
             let biggest_pr_value: Double?
             let biggest_pr_type: String?
             let avg_session_duration: Int?
             let longest_streak: Int
             let favorite_day: String?
+            let archetype: String
         }
 
         let result: MonthlyWrapped = try await supabase.from("monthly_wrapped")
@@ -259,12 +290,14 @@ struct DigestService: Sendable {
                 total_prs: prs.count,
                 top_exercise_name: topExerciseName,
                 top_exercise_volume: topExerciseVolume,
-                biggest_pr_exercise: biggestPR?.exercise_name,
+                most_consistent_muscle: mostConsistentMuscle,
+                biggest_pr_exercise: biggestPR?.exercises?.name,
                 biggest_pr_value: biggestPR?.value,
                 biggest_pr_type: biggestPR?.record_type,
                 avg_session_duration: avgDuration,
                 longest_streak: longestStreak,
-                favorite_day: favoriteDay
+                favorite_day: favoriteDay,
+                archetype: archetype.rawValue
             ))
             .select()
             .single()
@@ -272,6 +305,39 @@ struct DigestService: Sendable {
             .value
 
         return result
+    }
+
+    /// Marks a wrapped as viewed so the dashboard banner + Progress-tab dot
+    /// badge can clear. Safe to call repeatedly — idempotent on the server.
+    func markWrappedViewed(wrappedId: UUID) async throws {
+        struct Payload: Encodable { let viewed_at: String }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        try await supabase.from("monthly_wrapped")
+            .update(Payload(viewed_at: formatter.string(from: Date())))
+            .eq("id", value: wrappedId.uuidString)
+            .execute()
+    }
+
+    /// Returns the prior-month wrapped row if it already exists (without
+    /// generating one). Used by the dashboard banner to know whether to show
+    /// the "Your X Wrapped is ready" CTA.
+    func fetchPriorMonthWrapped(userId: UUID) async throws -> MonthlyWrapped? {
+        let calendar = Calendar.current
+        let now = Date()
+        let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: calendar.date(byAdding: .month, value: -1, to: now)!))!
+        return try await fetchExistingWrapped(userId: userId, monthStart: monthStart)
+    }
+
+    private func fetchExistingWrapped(userId: UUID, monthStart: Date) async throws -> MonthlyWrapped? {
+        let existing: [MonthlyWrapped] = try await supabase.from("monthly_wrapped")
+            .select()
+            .eq("user_id", value: userId.uuidString)
+            .eq("month_start", value: formatDate(monthStart))
+            .limit(1)
+            .execute()
+            .value
+        return existing.first
     }
 
     /// Fetches past wrapped reports.
@@ -329,9 +395,24 @@ struct DigestService: Sendable {
         return f.string(from: date)
     }
 
-    private func calculateMonthStreak(sessions: some Collection<some Decodable>) -> Int {
-        // Simplified: return count of sessions as a rough proxy
-        // Real implementation would parse dates and find consecutive days
-        return min(sessions.count, 30)
+    /// Longest run of consecutive distinct calendar days that contained at
+    /// least one session. Two sessions on the same day count as one day.
+    /// Returns 0 if there are no sessions.
+    private func longestConsecutiveDayStreak(in dates: [Date], calendar: Calendar) -> Int {
+        guard !dates.isEmpty else { return 0 }
+        let days = Set(dates.map { calendar.startOfDay(for: $0) }).sorted()
+        var longest = 1
+        var current = 1
+        for i in 1..<days.count {
+            let prev = days[i - 1]
+            let next = days[i]
+            if let stepped = calendar.date(byAdding: .day, value: 1, to: prev), stepped == next {
+                current += 1
+                longest = max(longest, current)
+            } else {
+                current = 1
+            }
+        }
+        return longest
     }
 }

@@ -4,6 +4,7 @@ struct NotificationSettingsView: View {
     @State private var notificationsEnabled = false
     @State private var workoutRemindersEnabled = false
     @State private var streakRemindersEnabled = false
+    @AppStorage("monthlyWrappedRemindersEnabled") private var monthlyWrappedRemindersEnabled = true
     @State private var reminderHour = 9
     @State private var reminderMinute = 0
     @State private var selectedDays: Set<Int> = [2, 3, 4, 5, 6] // Mon-Fri
@@ -31,6 +32,12 @@ struct NotificationSettingsView: View {
                             if enabled {
                                 Task {
                                     notificationsEnabled = await notificationService.requestPermission()
+                                    // Auto-schedule the monthly wrapped reminder if the
+                                    // user hasn't explicitly turned it off — this is the
+                                    // only way most users will discover the feature.
+                                    if notificationsEnabled, monthlyWrappedRemindersEnabled {
+                                        notificationService.scheduleMonthlyWrappedReminder()
+                                    }
                                 }
                             } else {
                                 notificationService.cancelAll()
@@ -134,6 +141,28 @@ struct NotificationSettingsView: View {
                                 UNUserNotificationCenter.current().removePendingNotificationRequests(
                                     withIdentifiers: ["streak-reminder"]
                                 )
+                            }
+                        }
+                    }
+
+                    // Monthly Wrapped Reminders
+                    RQCard {
+                        Toggle(isOn: $monthlyWrappedRemindersEnabled) {
+                            VStack(alignment: .leading, spacing: RQSpacing.xxs) {
+                                Text("Monthly Wrapped")
+                                    .font(RQTypography.headline)
+                                    .foregroundColor(RQColors.textPrimary)
+                                Text("Get notified on the 1st of each month when your Wrapped is ready")
+                                    .font(RQTypography.caption)
+                                    .foregroundColor(RQColors.textTertiary)
+                            }
+                        }
+                        .tint(RQColors.accent)
+                        .onChange(of: monthlyWrappedRemindersEnabled) { _, enabled in
+                            if enabled {
+                                notificationService.scheduleMonthlyWrappedReminder()
+                            } else {
+                                notificationService.cancelMonthlyWrappedReminder()
                             }
                         }
                     }
