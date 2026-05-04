@@ -307,6 +307,207 @@ struct DigestService: Sendable {
         return result
     }
 
+    // MARK: - Monthly Report (full structured report shown after the wrapped story)
+
+    /// Bundle of everything the structured monthly report needs. Loaded
+    /// once when the user opens the report; all month-over-month deltas
+    /// are computed client-side from the two wrapped rows + the freshly
+    /// queried per-month aggregations.
+    struct ReportPayload: Sendable {
+        let current: MonthlyWrapped
+        let prior: MonthlyWrapped?
+        let topLifts: [TopLift]
+        let muscleGroupVolume: [(muscle: String, volume: Double)]
+        let trainedDates: Set<Date>
+        let personalRecords: [PRDetail]
+
+        struct TopLift: Sendable {
+            let exerciseName: String
+            let totalVolume: Double
+        }
+
+        struct PRDetail: Sendable {
+            let exerciseName: String
+            let recordType: String
+            let value: Double
+            let repsAtWeight: Int?
+            let achievedAt: Date
+        }
+    }
+
+    /// Fetches the report payload for a wrapped row. Cheap-ish: 4 queries,
+    /// all scoped to the month. Safe to call from a `.task` on the report
+    /// view's `onAppear`.
+    func fetchReportPayload(for wrapped: MonthlyWrapped) async throws -> ReportPayload {
+        let calendar = Calendar.current
+        let monthStart = wrapped.monthStart
+        let monthEnd = calendar.date(from: calendar.dateComponents(
+            [.year, .month],
+            from: calendar.date(byAdding: .month, value: 1, to: monthStart)!
+        ))!
+        let priorMonthStart = calendar.date(from: calendar.dateComponents(
+            [.year, .month],
+            from: calendar.date(byAdding: .month, value: -1, to: monthStart)!
+        ))!
+
+        let monthStartStr = ISO8601DateFormatter().string(from: monthStart)
+        let monthEndStr = ISO8601DateFormatter().string(from: monthEnd)
+
+        async let priorTask = fetchExistingWrapped(userId: wrapped.userId, monthStart: priorMonthStart)
+        async let sessionsTask = sessionDatesInMonth(
+            userId: wrapped.userId, monthStartStr: monthStartStr, monthEndStr: monthEndStr
+        )
+        async let aggregatesTask = monthExerciseAggregates(
+            userId: wrapped.userId, monthStartStr: monthStartStr, monthEndStr: monthEndStr
+        )
+        async let prsTask = monthPRs(
+            userId: wrapped.userId, monthStartStr: monthStartStr, monthEndStr: monthEndStr
+        )
+
+        let prior = (try? await priorTask) ?? nil
+        let trainedDates = (try? await sessionsTask) ?? []
+        let aggregates = (try? await aggregatesTask) ?? (top: [], byMuscle: [])
+        let prs = (try? await prsTask) ?? []
+
+        return ReportPayload(
+            current: wrapped,
+            prior: prior,
+            topLifts: aggregates.top,
+            muscleGroupVolume: aggregates.byMuscle,
+            trainedDates: trainedDates,
+            personalRecords: prs
+        )
+    }
+
+    private func sessionDatesInMonth(
+        userId: UUID, monthStartStr: String, monthEndStr: String
+    ) async throws -> Set<Date> {
+        struct Row: Decodable { let completed_at: String? }
+        let rows: [Row] = try await supabase.from("workout_sessions")
+            .select("completed_at")
+            .eq("user_id", value: userId.uuidString)
+            .eq("status", value: "completed")
+            .gte("completed_at", value: monthStartStr)
+            .lt("completed_at", value: monthEndStr)
+            .execute()
+            .value
+        let calendar = Calendar.current
+        var out = Set<Date>()
+        for row in rows {
+            guard let str = row.completed_at, let date = parseTimestamp(str) else { continue }
+            out.insert(calendar.startOfDay(for: date))
+        }
+        return out
+    }
+
+    private func parseTimestamp(_ str: String) -> Date? {
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = iso.date(from: str) { return d }
+        iso.formatOptions = [.withInternetDateTime]
+        return iso.date(from: str)
+    }
+
+    private func monthExerciseAggregates(
+        userId: UUID, monthStartStr: String, monthEndStr: String
+    ) async throws -> (top: [ReportPayload.TopLift], byMuscle: [(muscle: String, volume: Double)]) {
+        struct SessRow: Decodable { let id: UUID }
+        let sessions: [SessRow] = try await supabase.from("workout_sessions")
+            .select("id")
+            .eq("user_id", value: userId.uuidString)
+            .eq("status", value: "completed")
+            .gte("completed_at", value: monthStartStr)
+            .lt("completed_at", value: monthEndStr)
+            .execute()
+            .value
+        guard !sessions.isEmpty else { return (top: [], byMuscle: []) }
+
+        struct SetRow: Decodable {
+            let exercise_id: UUID
+            let weight: Double
+            let reps: Int
+            let set_type: String?
+        }
+        let sets: [SetRow] = try await supabase.from("workout_sets")
+            .select("exercise_id, weight, reps, set_type")
+            .in("session_id", values: sessions.map(\.id.uuidString))
+            .execute()
+            .value
+
+        var volumeByExercise: [UUID: Double] = [:]
+        for s in sets where (s.set_type ?? "working") == "working" {
+            volumeByExercise[s.exercise_id, default: 0] += s.weight * Double(s.reps)
+        }
+        let allExerciseIds = Array(volumeByExercise.keys)
+        guard !allExerciseIds.isEmpty else { return (top: [], byMuscle: []) }
+
+        struct ExerciseRow: Decodable {
+            let id: UUID
+            let name: String
+            let muscle_group: String
+        }
+        let exercises: [ExerciseRow] = try await supabase.from("exercises")
+            .select("id, name, muscle_group")
+            .in("id", values: allExerciseIds.map(\.uuidString))
+            .execute()
+            .value
+        let lookup = Dictionary(uniqueKeysWithValues: exercises.map { ($0.id, $0) })
+
+        // Top 3 lifts by volume
+        let topLifts: [ReportPayload.TopLift] = volumeByExercise
+            .compactMap { (id, vol) -> ReportPayload.TopLift? in
+                guard let row = lookup[id] else { return nil }
+                return .init(exerciseName: row.name, totalVolume: vol)
+            }
+            .sorted(by: { $0.totalVolume > $1.totalVolume })
+            .prefix(3)
+            .map { $0 }
+
+        // Volume by muscle group (sorted descending)
+        var byMuscle: [String: Double] = [:]
+        for (id, vol) in volumeByExercise {
+            guard let row = lookup[id] else { continue }
+            byMuscle[row.muscle_group, default: 0] += vol
+        }
+        let muscleSorted = byMuscle
+            .map { (muscle: $0.key, volume: $0.value) }
+            .sorted(by: { $0.volume > $1.volume })
+
+        return (top: topLifts, byMuscle: muscleSorted)
+    }
+
+    private func monthPRs(
+        userId: UUID, monthStartStr: String, monthEndStr: String
+    ) async throws -> [ReportPayload.PRDetail] {
+        struct PRJoinRow: Decodable {
+            struct ExName: Decodable { let name: String }
+            let value: Double
+            let record_type: String
+            let reps_at_weight: Int?
+            let achieved_at: String?
+            let exercises: ExName?
+        }
+        let rows: [PRJoinRow] = try await supabase.from("personal_records")
+            .select("value, record_type, reps_at_weight, achieved_at, exercises(name)")
+            .eq("user_id", value: userId.uuidString)
+            .gte("achieved_at", value: monthStartStr)
+            .lt("achieved_at", value: monthEndStr)
+            .order("achieved_at", ascending: false)
+            .execute()
+            .value
+        return rows.compactMap { row in
+            guard let exerciseName = row.exercises?.name else { return nil }
+            let date = row.achieved_at.flatMap { parseTimestamp($0) } ?? Date()
+            return ReportPayload.PRDetail(
+                exerciseName: exerciseName,
+                recordType: row.record_type,
+                value: row.value,
+                repsAtWeight: row.reps_at_weight,
+                achievedAt: date
+            )
+        }
+    }
+
     /// Marks a wrapped as viewed so the dashboard banner + Progress-tab dot
     /// badge can clear. Safe to call repeatedly — idempotent on the server.
     func markWrappedViewed(wrappedId: UUID) async throws {
