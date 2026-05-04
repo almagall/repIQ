@@ -3,13 +3,16 @@ import SwiftUI
 /// Spotify-style monthly wrapped story flow. Tap right two-thirds of the
 /// screen to advance, tap left third to go back, swipe down (system gesture)
 /// to dismiss. A linear progress bar pinned to the top tracks slide
-/// position. Each slide renders one hero stat against an animated dark
-/// background — designed for screenshotting + sharing.
+/// position. Each slide renders one hero stat against the app's industrial
+/// dark theme — uses RQColors / RQTypography throughout so the wrapped
+/// matches the rest of the app instead of feeling like a separate Spotify
+/// clone.
 struct WrappedStoryView: View {
     let wrapped: MonthlyWrapped
     var onClose: (() -> Void)? = nil
     var onShare: (() -> Void)? = nil
     var onViewHistory: (() -> Void)? = nil
+    var onViewReport: (() -> Void)? = nil
 
     @State private var currentIndex: Int = 0
     @Environment(\.dismiss) private var dismiss
@@ -42,9 +45,9 @@ struct WrappedStoryView: View {
                     } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(RQColors.textSecondary)
                             .padding(8)
-                            .background(.white.opacity(0.08), in: Circle())
+                            .background(RQColors.surfaceTertiary, in: Circle())
                     }
                     .padding(.trailing, RQSpacing.md)
                 }
@@ -128,6 +131,7 @@ struct WrappedStoryView: View {
             ArchetypeSlideView(
                 archetype: archetype,
                 onShare: { onShare?() },
+                onViewReport: { onViewReport?() },
                 onViewHistory: { onViewHistory?() }
             )
         }
@@ -139,7 +143,7 @@ struct WrappedStoryView: View {
         HStack(spacing: 4) {
             ForEach(slides.indices, id: \.self) { idx in
                 Capsule()
-                    .fill(idx <= currentIndex ? Color.white : Color.white.opacity(0.18))
+                    .fill(idx <= currentIndex ? RQColors.textPrimary : RQColors.surfaceTertiary)
                     .frame(height: 3)
                     .animation(.easeOut(duration: 0.25), value: currentIndex)
             }
@@ -148,7 +152,7 @@ struct WrappedStoryView: View {
 
     private var backgroundGradient: some View {
         LinearGradient(
-            colors: [Color.black, Color(red: 0.04, green: 0.07, blue: 0.12)],
+            colors: [RQColors.background, RQColors.surfaceSecondary],
             startPoint: .top,
             endPoint: .bottom
         )
@@ -224,7 +228,21 @@ enum WrappedSlideKind {
     }
 }
 
-// MARK: - Slide views
+// MARK: - Slide views (theme-compliant)
+
+/// Shared fonts for the story. All monospaced where numerical / titular,
+/// matching `RQTypography` design language. The hero numbers are larger
+/// than anything in the standard typography scale, so we declare them
+/// inline but mirror the `.bold/.heavy + .monospaced` style.
+private enum WrappedFonts {
+    static let cover = Font.system(size: 56, weight: .heavy, design: .monospaced)
+    static let heroLarge = Font.system(size: 88, weight: .heavy, design: .monospaced)
+    static let heroExtraLarge = Font.system(size: 96, weight: .heavy, design: .monospaced)
+    static let heroSuffix = Font.system(size: 18, weight: .semibold, design: .monospaced)
+    static let archetypeName = Font.system(size: 38, weight: .heavy, design: .monospaced)
+    static let prDetailValue = Font.system(size: 24, weight: .bold, design: .monospaced)
+    static let memorableUnit = Font.system(size: 22, weight: .bold, design: .monospaced)
+}
 
 private struct CoverSlideView: View {
     let wrapped: MonthlyWrapped
@@ -233,18 +251,18 @@ private struct CoverSlideView: View {
         VStack(spacing: RQSpacing.lg) {
             Spacer()
             Text(monthLabel(wrapped.monthStart).uppercased())
-                .font(.system(size: 14, weight: .heavy, design: .rounded))
+                .font(RQTypography.label)
                 .tracking(4)
                 .foregroundStyle(RQColors.accent)
             Text("YOUR\nWRAPPED")
-                .font(.system(size: 56, weight: .black, design: .rounded))
+                .font(WrappedFonts.cover)
                 .multilineTextAlignment(.center)
-                .foregroundStyle(.white)
+                .foregroundStyle(RQColors.textPrimary)
                 .lineSpacing(-8)
             Spacer()
             Text("Tap to begin")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.white.opacity(0.5))
+                .font(RQTypography.caption)
+                .foregroundStyle(RQColors.textTertiary)
                 .padding(.bottom, RQSpacing.xxl)
         }
         .padding(.horizontal, RQSpacing.xl)
@@ -275,27 +293,27 @@ private struct HeroStatSlideView: View {
                 .padding(.bottom, RQSpacing.md)
 
             Text(eyebrow)
-                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .font(RQTypography.label)
                 .tracking(3)
-                .foregroundStyle(.white.opacity(0.55))
+                .foregroundStyle(RQColors.textSecondary)
 
             Text(heroNumber)
-                .font(.system(size: 96, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .font(WrappedFonts.heroExtraLarge)
+                .foregroundStyle(RQColors.textPrimary)
                 .minimumScaleFactor(0.4)
                 .lineLimit(1)
 
             if let suffix = heroSuffix {
                 Text(suffix)
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .font(WrappedFonts.heroSuffix)
+                    .foregroundStyle(RQColors.textSecondary)
                     .padding(.top, -RQSpacing.sm)
             }
 
             Text(caption)
-                .font(.system(size: 16, weight: .medium))
+                .font(RQTypography.body)
                 .multilineTextAlignment(.center)
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundStyle(RQColors.textSecondary)
                 .padding(.horizontal, RQSpacing.xl)
                 .padding(.top, RQSpacing.md)
 
@@ -319,28 +337,28 @@ private struct VolumeSlideView: View {
                 .padding(.bottom, RQSpacing.md)
 
             Text("TOTAL VOLUME")
-                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .font(RQTypography.label)
                 .tracking(3)
-                .foregroundStyle(.white.opacity(0.55))
+                .foregroundStyle(RQColors.textSecondary)
 
             Text(formatPounds(pounds))
-                .font(.system(size: 88, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .font(WrappedFonts.heroLarge)
+                .foregroundStyle(RQColors.textPrimary)
                 .minimumScaleFactor(0.4)
                 .lineLimit(1)
 
             Text("lbs lifted")
-                .font(.system(size: 18, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.7))
+                .font(WrappedFonts.heroSuffix)
+                .foregroundStyle(RQColors.textSecondary)
                 .padding(.top, -RQSpacing.sm)
 
             if let phrase = MemorableUnit.phrase(for: pounds) {
                 VStack(spacing: 4) {
                     Text("That's")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .font(RQTypography.caption)
+                        .foregroundStyle(RQColors.textTertiary)
                     Text(phrase)
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .font(WrappedFonts.memorableUnit)
                         .multilineTextAlignment(.center)
                         .foregroundStyle(RQColors.accent)
                 }
@@ -379,48 +397,48 @@ private struct PRsSlideView: View {
 
             if count > 0 {
                 Text("PERSONAL RECORDS")
-                    .font(.system(size: 12, weight: .heavy, design: .rounded))
+                    .font(RQTypography.label)
                     .tracking(3)
-                    .foregroundStyle(.white.opacity(0.55))
+                    .foregroundStyle(RQColors.textSecondary)
 
                 Text("\(count)")
-                    .font(.system(size: 96, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .font(WrappedFonts.heroExtraLarge)
+                    .foregroundStyle(RQColors.textPrimary)
 
                 Text(count == 1 ? "new PR" : "new PRs")
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.7))
+                    .font(WrappedFonts.heroSuffix)
+                    .foregroundStyle(RQColors.textSecondary)
                     .padding(.top, -RQSpacing.sm)
 
                 if let biggest {
                     VStack(spacing: 6) {
-                        Text("Biggest")
-                            .font(.system(size: 12, weight: .medium))
+                        Text("BIGGEST")
+                            .font(RQTypography.label)
                             .tracking(2)
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(RQColors.textTertiary)
                         Text(biggest.exerciseName)
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(.white)
+                            .font(RQTypography.headline)
+                            .foregroundStyle(RQColors.textPrimary)
                         Text(formatPR(biggest))
-                            .font(.system(size: 24, weight: .bold, design: .rounded))
+                            .font(WrappedFonts.prDetailValue)
                             .foregroundStyle(RQColors.accent)
                     }
                     .padding(.top, RQSpacing.xl)
                 }
             } else {
                 Text("ZERO PRS")
-                    .font(.system(size: 12, weight: .heavy, design: .rounded))
+                    .font(RQTypography.label)
                     .tracking(3)
-                    .foregroundStyle(.white.opacity(0.55))
+                    .foregroundStyle(RQColors.textSecondary)
 
                 Text("Plateaus.")
-                    .font(.system(size: 56, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
+                    .font(WrappedFonts.cover)
+                    .foregroundStyle(RQColors.textPrimary)
 
                 Text("They're part of the path. The next breakthrough comes after the longest pause.")
-                    .font(.system(size: 16, weight: .medium))
+                    .font(RQTypography.body)
                     .multilineTextAlignment(.center)
-                    .foregroundStyle(.white.opacity(0.7))
+                    .foregroundStyle(RQColors.textSecondary)
                     .padding(.horizontal, RQSpacing.xl)
                     .padding(.top, RQSpacing.lg)
             }
@@ -453,21 +471,21 @@ private struct TopExerciseSlideView: View {
                 .padding(.bottom, RQSpacing.md)
 
             Text("MOST PERFORMED")
-                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .font(RQTypography.label)
                 .tracking(3)
-                .foregroundStyle(.white.opacity(0.55))
+                .foregroundStyle(RQColors.textSecondary)
 
             Text(name)
-                .font(.system(size: 44, weight: .black, design: .rounded))
+                .font(RQTypography.largeTitle)
                 .multilineTextAlignment(.center)
-                .foregroundStyle(.white)
+                .foregroundStyle(RQColors.textPrimary)
                 .minimumScaleFactor(0.5)
                 .lineLimit(2)
 
             Text("\(formatVolume(volume)) lbs of total volume on it")
-                .font(.system(size: 16, weight: .medium))
+                .font(RQTypography.body)
                 .multilineTextAlignment(.center)
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundStyle(RQColors.textSecondary)
                 .padding(.top, RQSpacing.md)
                 .padding(.horizontal, RQSpacing.xl)
 
@@ -487,6 +505,7 @@ private struct TopExerciseSlideView: View {
 private struct ArchetypeSlideView: View {
     let archetype: WrappedArchetype
     var onShare: () -> Void
+    var onViewReport: () -> Void
     var onViewHistory: () -> Void
 
     var body: some View {
@@ -499,43 +518,55 @@ private struct ArchetypeSlideView: View {
                 .padding(.bottom, RQSpacing.md)
 
             Text("YOU ARE A")
-                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .font(RQTypography.label)
                 .tracking(3)
-                .foregroundStyle(.white.opacity(0.55))
+                .foregroundStyle(RQColors.textSecondary)
 
             Text(archetype.displayName.uppercased())
-                .font(.system(size: 40, weight: .black, design: .rounded))
+                .font(WrappedFonts.archetypeName)
                 .multilineTextAlignment(.center)
-                .foregroundStyle(.white)
+                .foregroundStyle(RQColors.textPrimary)
                 .minimumScaleFactor(0.6)
                 .lineLimit(2)
 
             Text(archetype.headline)
-                .font(.system(size: 17, weight: .medium))
+                .font(RQTypography.body)
                 .multilineTextAlignment(.center)
-                .foregroundStyle(.white.opacity(0.75))
+                .foregroundStyle(RQColors.textSecondary)
                 .padding(.horizontal, RQSpacing.xl)
                 .padding(.top, RQSpacing.md)
 
             Spacer()
 
             VStack(spacing: RQSpacing.sm) {
-                Button(action: onShare) {
+                Button(action: onViewReport) {
                     HStack {
-                        Image(systemName: "square.and.arrow.up")
-                        Text("Share my Wrapped")
+                        Image(systemName: "doc.text.magnifyingglass")
+                        Text("View Full Report")
                     }
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(.black)
+                    .font(RQTypography.headline)
+                    .foregroundStyle(RQColors.background)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, RQSpacing.md)
                     .background(RQColors.accent, in: Capsule())
                 }
 
+                Button(action: onShare) {
+                    HStack {
+                        Image(systemName: "square.and.arrow.up")
+                        Text("Share my Wrapped")
+                    }
+                    .font(RQTypography.headline)
+                    .foregroundStyle(RQColors.textPrimary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, RQSpacing.md)
+                    .background(RQColors.surfaceTertiary, in: Capsule())
+                }
+
                 Button(action: onViewHistory) {
                     Text("View past months")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .font(RQTypography.caption)
+                        .foregroundStyle(RQColors.textTertiary)
                 }
             }
             .padding(.horizontal, RQSpacing.xl)

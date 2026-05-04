@@ -14,12 +14,13 @@ struct MonthlyWrappedView: View {
     @State private var showHistorySheet = false
     @State private var shareImage: UIImage?
     @State private var showWrappedShareSheet = false
+    @State private var showFullReport = false
 
     private let service = DigestService()
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            RQColors.background.ignoresSafeArea()
 
             if isLoading {
                 ProgressView()
@@ -28,7 +29,8 @@ struct MonthlyWrappedView: View {
                 WrappedStoryView(
                     wrapped: wrapped,
                     onShare: { share(wrapped: wrapped) },
-                    onViewHistory: { showHistorySheet = true }
+                    onViewHistory: { showHistorySheet = true },
+                    onViewReport: { showFullReport = true }
                 )
                 // Force a fresh story view (slide index reset) when the user
                 // switches between months from the history sheet.
@@ -52,6 +54,11 @@ struct MonthlyWrappedView: View {
         .sheet(isPresented: $showWrappedShareSheet) {
             if let img = shareImage {
                 WrappedShareSheet(items: [img])
+            }
+        }
+        .navigationDestination(isPresented: $showFullReport) {
+            if let wrapped {
+                MonthlyReportView(wrapped: wrapped)
             }
         }
     }
@@ -203,13 +210,13 @@ private struct WrappedShareCard: View {
 
             VStack(spacing: 8) {
                 Text(monthLabel(wrapped.monthStart).uppercased())
-                    .font(.system(size: 22, weight: .heavy, design: .rounded))
+                    .font(.system(size: 22, weight: .heavy, design: .monospaced))
                     .tracking(6)
                     .foregroundStyle(RQColors.accent)
                 Text("YOUR WRAPPED")
-                    .font(.system(size: 56, weight: .black, design: .rounded))
+                    .font(.system(size: 56, weight: .heavy, design: .monospaced))
                     .tracking(2)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(RQColors.textPrimary)
             }
 
             Spacer().frame(height: 24)
@@ -231,27 +238,27 @@ private struct WrappedShareCard: View {
                         .font(.system(size: 42, weight: .semibold))
                         .foregroundStyle(RQColors.accent)
                     Text("YOU ARE A")
-                        .font(.system(size: 14, weight: .heavy, design: .rounded))
+                        .font(.system(size: 14, weight: .heavy, design: .monospaced))
                         .tracking(3)
-                        .foregroundStyle(.white.opacity(0.55))
+                        .foregroundStyle(RQColors.textSecondary)
                     Text(archetype.displayName.uppercased())
-                        .font(.system(size: 36, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .font(.system(size: 36, weight: .heavy, design: .monospaced))
+                        .foregroundStyle(RQColors.textPrimary)
                 }
             }
 
             Spacer()
 
             Text("repIQ")
-                .font(.system(size: 18, weight: .heavy, design: .rounded))
+                .font(.system(size: 18, weight: .heavy, design: .monospaced))
                 .tracking(3)
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(RQColors.textSecondary)
                 .padding(.bottom, 32)
         }
         .frame(width: 1080, height: 1920)
         .background(
             LinearGradient(
-                colors: [Color.black, Color(red: 0.04, green: 0.07, blue: 0.12)],
+                colors: [RQColors.background, RQColors.surfaceSecondary],
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -261,12 +268,12 @@ private struct WrappedShareCard: View {
     private func shareStat(label: String, value: String) -> some View {
         VStack(spacing: 6) {
             Text(label)
-                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .font(.system(size: 12, weight: .heavy, design: .monospaced))
                 .tracking(2.5)
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(RQColors.textTertiary)
             Text(value)
-                .font(.system(size: 44, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
+                .font(.system(size: 44, weight: .heavy, design: .monospaced))
+                .foregroundStyle(RQColors.textPrimary)
         }
         .frame(width: 220)
     }
