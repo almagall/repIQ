@@ -52,6 +52,31 @@ final class ProfileViewModel {
         }
     }
 
+    /// Persists body/injury profile data and reflects it on the in-memory
+    /// profile so dependent views update without an extra fetch.
+    func updateBodyProfile(
+        sex: String?,
+        birthDate: Date?,
+        heightCm: Double?,
+        bodyWeightKg: Double?,
+        injuries: [String]?
+    ) async throws {
+        guard let profile else { return }
+        try await profileService.updateBodyProfile(
+            userId: profile.id,
+            sex: sex,
+            birthDate: birthDate,
+            heightCm: heightCm,
+            bodyWeightKg: bodyWeightKg,
+            injuries: injuries
+        )
+        self.profile?.sex = sex
+        self.profile?.birthDate = birthDate
+        self.profile?.heightCm = heightCm
+        self.profile?.bodyWeightKg = bodyWeightKg
+        self.profile?.injuries = injuries
+    }
+
     func signOut() async {
         do {
             try await authService.signOut()

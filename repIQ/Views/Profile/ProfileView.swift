@@ -122,6 +122,19 @@ struct ProfileView: View {
 
                             Divider().background(RQColors.surfaceTertiary)
 
+                            // Body & Health
+                            NavigationLink {
+                                BodyProfileView(viewModel: viewModel)
+                            } label: {
+                                settingsRow(
+                                    icon: "figure",
+                                    title: "Body & Health",
+                                    value: bodyProfileSummary
+                                )
+                            }
+
+                            Divider().background(RQColors.surfaceTertiary)
+
                             // Notifications
                             NavigationLink {
                                 NotificationSettingsView()
@@ -238,6 +251,23 @@ struct ProfileView: View {
                 Button("Cancel", role: .cancel) {}
             }
         }
+    }
+
+    /// Single short summary string for the Body & Health row. Picks the
+    /// most informative captured field so the user can glance at what's
+    /// already filled in. Empty when nothing is set.
+    private var bodyProfileSummary: String {
+        guard let profile = viewModel.profile else { return "" }
+        let unit = profile.safeWeightUnit
+        var parts: [String] = []
+        if let kg = profile.bodyWeightKg, kg > 0 {
+            let value = unit == .lbs ? kg / 0.45359237 : kg
+            parts.append(String(format: "%.0f \(unit.displayName)", value))
+        }
+        if let injuries = profile.injuries, !injuries.isEmpty {
+            parts.append("\(injuries.count) injur\(injuries.count == 1 ? "y" : "ies")")
+        }
+        return parts.joined(separator: " · ")
     }
 
     private func settingsRow(icon: String, title: String, value: String) -> some View {

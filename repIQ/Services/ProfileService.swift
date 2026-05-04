@@ -88,6 +88,42 @@ struct ProfileService: Sendable {
             .execute()
     }
 
+    /// Updates the body / injury fields collected at onboarding. All five
+    /// fields are independently nullable; passing `nil` clears the column.
+    /// Storage is canonical metric (kg / cm) — call sites convert from the
+    /// user's preferred unit before invoking.
+    func updateBodyProfile(
+        userId: UUID,
+        sex: String?,
+        birthDate: Date?,
+        heightCm: Double?,
+        bodyWeightKg: Double?,
+        injuries: [String]?
+    ) async throws {
+        struct Payload: Encodable {
+            let sex: String?
+            let birth_date: String?
+            let height_cm: Double?
+            let body_weight_kg: Double?
+            let injuries: [String]?
+        }
+        let dateFormatter: DateFormatter = {
+            let f = DateFormatter()
+            f.dateFormat = "yyyy-MM-dd"
+            return f
+        }()
+        try await supabase.from("profiles")
+            .update(Payload(
+                sex: sex,
+                birth_date: birthDate.map { dateFormatter.string(from: $0) },
+                height_cm: heightCm,
+                body_weight_kg: bodyWeightKg,
+                injuries: (injuries?.isEmpty ?? true) ? nil : injuries
+            ))
+            .eq("id", value: userId.uuidString)
+            .execute()
+    }
+
     func hasCompletedOnboarding(userId: UUID) async throws -> Bool {
         let profile: Profile = try await supabase.from("profiles")
             .select()
