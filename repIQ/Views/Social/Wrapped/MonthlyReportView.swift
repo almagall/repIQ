@@ -1,5 +1,6 @@
 import SwiftUI
 import Charts
+import Supabase
 
 /// Structured monthly training report — same schema every month so it can
 /// be scanned, compared month-over-month, and eventually placed side by
@@ -22,6 +23,8 @@ struct MonthlyReportView: View {
     @State private var payload: DigestService.ReportPayload?
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var showComparePicker = false
+    @State private var compareTarget: MonthlyWrapped?
 
     private let service = DigestService()
 
@@ -52,6 +55,27 @@ struct MonthlyReportView: View {
         .navigationTitle(monthLabel(wrapped.monthStart) + " Report")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showComparePicker = true
+                } label: {
+                    Image(systemName: "arrow.left.arrow.right")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(RQColors.accent)
+                }
+                .accessibilityLabel("Compare to another month")
+            }
+        }
+        .sheet(isPresented: $showComparePicker) {
+            ComparePickerSheet(currentWrappedId: wrapped.id) { selected in
+                showComparePicker = false
+                compareTarget = selected
+            }
+        }
+        .navigationDestination(item: $compareTarget) { other in
+            MonthlyComparisonView(primary: wrapped, secondary: other)
+        }
         .task { await load() }
     }
 
@@ -581,6 +605,128 @@ struct MonthlyReportView: View {
             return "\(minutes / 60)h \(minutes % 60)m"
         }
         return "\(minutes)m"
+    }
+
+    private func monthLabel(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "MMMM yyyy"
+        return f.string(from: date)
+    }
+}
+
+// MARK: - Compare Picker Sheet
+
+/// Sheet that lets the user pick a prior month's wrapped to compare
+/// against. Fetches the user's wrapped history on appear and excludes the
+/// month they're already viewing.
+private struct ComparePickerSheet: View {
+    let currentWrappedId: UUID
+    var onSelect: (MonthlyWrapped) -> Void
+
+    @State private var options: [MonthlyWrapped] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+
+    @Environment(\.dismiss) private var dismiss
+
+    private let service = DigestService()
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if isLoading {
+                    VStack {
+                        ProgressView().tint(RQColors.accent)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if options.isEmpty {
+                    emptyState
+                } else {
+                    ScrollView {
+                        VStack(spacing: RQSpacing.md) {
+                            ForEach(options) { option in
+                                Button { onSelect(option) } label: {
+                                    rowFor(option)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, RQSpacing.screenHorizontal)
+                        .padding(.top, RQSpacing.lg)
+                    }
+                }
+            }
+            .background(RQColors.background)
+            .navigationTitle("Compare to…")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundColor(RQColors.textSecondary)
+                }
+            }
+            .task { await load() }
+        }
+        .preferredColorScheme(.dark)
+    }
+
+    private func rowFor(_ option: MonthlyWrapped) -> some View {
+        RQCard {
+            HStack(spacing: RQSpacing.md) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(monthLabel(option.monthStart))
+                        .font(RQTypography.headline)
+                        .foregroundColor(RQColors.textPrimary)
+                    HStack(spacing: RQSpacing.md) {
+                        Label("\(option.totalSessions)", systemImage: "figure.strengthtraining.traditional")
+                        Label("\(option.totalPRs)", systemImage: "trophy.fill")
+                    }
+                    .font(RQTypography.caption)
+                    .foregroundColor(RQColors.textSecondary)
+                }
+                Spacer()
+                Image(systemName: "arrow.left.arrow.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(RQColors.accent)
+            }
+        }
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: RQSpacing.md) {
+            Image(systemName: "calendar.badge.exclamationmark")
+                .font(.system(size: 32))
+                .foregroundColor(RQColors.textTertiary)
+            Text("No other months yet")
+                .font(RQTypography.headline)
+                .foregroundColor(RQColors.textPrimary)
+            Text("You'll be able to compare once you have at least two months of training logged.")
+                .font(RQTypography.caption)
+                .multilineTextAlignment(.center)
+                .foregroundColor(RQColors.textTertiary)
+                .padding(.horizontal, RQSpacing.xl)
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(RQTypography.caption)
+                    .foregroundColor(RQColors.error)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func load() async {
+        guard let userId = try? await supabase.auth.session.user.id else {
+            errorMessage = "Not signed in."
+            isLoading = false
+            return
+        }
+        do {
+            let history = try await service.fetchWrappedHistory(userId: userId)
+            options = history.filter { $0.id != currentWrappedId }
+        } catch {
+            errorMessage = (error as NSError).localizedDescription
+        }
+        isLoading = false
     }
 
     private func monthLabel(_ date: Date) -> String {
