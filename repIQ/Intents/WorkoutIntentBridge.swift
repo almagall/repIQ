@@ -22,6 +22,11 @@ final class WorkoutIntentBridge {
     /// the active VM's SetEntry.
     var logSetHandler: (() async throws -> Void)?
 
+    /// Commits the upcoming working set with explicit values supplied by voice
+    /// ("Hey Siri, log 225 for 8 RPE 7"). Distinct from `logSetHandler` so the
+    /// Lock Screen LOG button keeps using the dialed-in steppers.
+    var logSetWithValuesHandler: ((Double, Int, Double?) async throws -> Void)?
+
     /// Bumps the chosen field on the upcoming set up or down by one
     /// increment, then pushes a Live Activity update.
     var adjustSetHandler: ((SetField, AdjustDirection) async throws -> Void)?
@@ -34,6 +39,13 @@ final class WorkoutIntentBridge {
             throw WorkoutIntentError.noActiveWorkout
         }
         try await handler()
+    }
+
+    func logSetWithValues(weight: Double, reps: Int, rpe: Double?) async throws {
+        guard let handler = logSetWithValuesHandler else {
+            throw WorkoutIntentError.noActiveWorkout
+        }
+        try await handler(weight, reps, rpe)
     }
 
     func adjustSet(field: SetField, direction: AdjustDirection) async throws {
