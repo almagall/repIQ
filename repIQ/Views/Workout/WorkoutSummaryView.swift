@@ -154,6 +154,22 @@ struct WorkoutSummaryView: View {
                     }
                 }
 
+                // Goal completions — fired when this workout pushed an active
+                // goal to (or past) its target.
+                if !summary.completedGoals.isEmpty {
+                    VStack(alignment: .leading, spacing: RQSpacing.md) {
+                        Text("Goal Completed")
+                            .font(RQTypography.label)
+                            .textCase(.uppercase)
+                            .tracking(1.5)
+                            .foregroundColor(RQColors.textSecondary)
+
+                        ForEach(summary.completedGoals) { goal in
+                            goalCompletedCard(goal)
+                        }
+                    }
+                }
+
                 // Muscle heatmap
                 if !summary.exerciseSummaries.isEmpty {
                     VStack(alignment: .leading, spacing: RQSpacing.md) {
@@ -409,6 +425,32 @@ struct WorkoutSummaryView: View {
                 Text(formatPRValue(pr.value, type: pr.recordType))
                     .font(RQTypography.numbersSmall)
                     .foregroundColor(RQColors.warning)
+            }
+        }
+    }
+
+    private func goalCompletedCard(_ goal: Goal) -> some View {
+        RQCard {
+            HStack(spacing: RQSpacing.md) {
+                Image(systemName: goal.goalType.icon)
+                    .font(.system(size: 20))
+                    .foregroundColor(RQColors.accent)
+
+                VStack(alignment: .leading, spacing: RQSpacing.xxs) {
+                    Text(goal.exerciseName ?? goal.goalType.displayName)
+                        .font(RQTypography.body)
+                        .foregroundColor(RQColors.textPrimary)
+
+                    Text("Reached \(goal.displayTarget) — completed!")
+                        .font(RQTypography.caption)
+                        .foregroundColor(RQColors.textSecondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 22))
+                    .foregroundColor(RQColors.accent)
             }
         }
     }

@@ -145,6 +145,48 @@ struct GoalService: Sendable {
         }
     }
 
+    /// Re-syncs every active goal against the user's current training data,
+    /// persists progress changes, and auto-completes any goal that has hit
+    /// its target. Returns goals that *just* transitioned to completed —
+    /// callers can use that list for celebrations / feed items.
+    ///
+    /// Designed to be called once per workout completion; evaluating per-set
+    /// is unnecessary noise. Failures on individual goals don't abort the
+    /// batch — the rest still get evaluated.
+    func evaluateActiveGoals(userId: UUID) async throws -> [Goal] {
+        let active = try await fetchActiveGoals(userId: userId)
+        var newlyCompleted: [Goal] = []
+
+        for goal in active {
+            let newCurrent: Double
+            do {
+                newCurrent = try await syncGoalProgress(goal: goal, userId: userId)
+            } catch {
+                continue
+            }
+
+            // Hit-or-exceeded → mark complete and persist the final value.
+            if newCurrent >= goal.targetValue {
+                try? await updateGoalProgress(goalId: goal.id, currentValue: newCurrent)
+                try? await completeGoal(goalId: goal.id)
+                var completed = goal
+                completed.currentValue = newCurrent
+                completed.status = .completed
+                completed.completedAt = Date()
+                newlyCompleted.append(completed)
+                continue
+            }
+
+            // Otherwise keep currentValue in sync. Skip the write if there's
+            // no meaningful drift to avoid unnecessary network chatter.
+            if abs(newCurrent - goal.currentValue) > 0.001 {
+                try? await updateGoalProgress(goalId: goal.id, currentValue: newCurrent)
+            }
+        }
+
+        return newlyCompleted
+    }
+
     /// Syncs goal progress based on actual training data.
     func syncGoalProgress(goal: Goal, userId: UUID) async throws -> Double {
         switch goal.goalType {

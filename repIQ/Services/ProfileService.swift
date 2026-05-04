@@ -48,17 +48,41 @@ struct ProfileService: Sendable {
 
     // MARK: - Onboarding
 
-    func updateOnboarding(userId: UUID, experienceLevel: String?, trainingGoal: String?) async throws {
+    func updateOnboarding(
+        userId: UUID,
+        experienceLevel: String?,
+        trainingGoal: String?,
+        sex: String? = nil,
+        birthDate: Date? = nil,
+        heightCm: Double? = nil,
+        bodyWeightKg: Double? = nil,
+        injuries: [String]? = nil
+    ) async throws {
         struct Payload: Encodable {
             let has_completed_onboarding: Bool
             let experience_level: String?
             let training_goal: String?
+            let sex: String?
+            let birth_date: String?
+            let height_cm: Double?
+            let body_weight_kg: Double?
+            let injuries: [String]?
         }
+        let dateFormatter: DateFormatter = {
+            let f = DateFormatter()
+            f.dateFormat = "yyyy-MM-dd"
+            return f
+        }()
         try await supabase.from("profiles")
             .update(Payload(
                 has_completed_onboarding: true,
                 experience_level: experienceLevel,
-                training_goal: trainingGoal
+                training_goal: trainingGoal,
+                sex: sex,
+                birth_date: birthDate.map { dateFormatter.string(from: $0) },
+                height_cm: heightCm,
+                body_weight_kg: bodyWeightKg,
+                injuries: (injuries?.isEmpty ?? true) ? nil : injuries
             ))
             .eq("id", value: userId.uuidString)
             .execute()

@@ -14,9 +14,16 @@ struct OnboardingView: View {
     @State private var isCreatingTemplate = false
     @State private var showGymSearch = false
     @State private var selectedGymName: String?
+    // Body & injury (step 6 — all optional)
+    @State private var bodySex: BodySex?
+    @State private var birthDate: Date = Calendar.current.date(byAdding: .year, value: -25, to: Date()) ?? Date()
+    @State private var hasBirthDate: Bool = false
+    @State private var heightInput: String = ""
+    @State private var weightInput: String = ""
+    @State private var selectedInjuries: Set<InjuryType> = []
     var onComplete: () -> Void
 
-    private let totalSteps = 7
+    private let totalSteps = 8
 
     var body: some View {
         ZStack {
@@ -42,7 +49,8 @@ struct OnboardingView: View {
                     programStep.tag(3)
                     goalBuilderStep.tag(4)
                     gymStep.tag(5)
-                    howItWorksStep.tag(6)
+                    bodyStep.tag(6)
+                    howItWorksStep.tag(7)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .animation(.easeInOut(duration: 0.3), value: currentStep)
@@ -500,7 +508,215 @@ struct OnboardingView: View {
         }
     }
 
-    // MARK: - Step 7: How It Works
+    // MARK: - Step 7: Body & Injuries (optional)
+
+    private var bodyStep: some View {
+        ScrollView {
+            VStack(spacing: RQSpacing.xl) {
+                VStack(spacing: RQSpacing.md) {
+                    Text("About You")
+                        .font(RQTypography.largeTitle)
+                        .foregroundColor(RQColors.accent)
+
+                    Text("Optional. Helps tailor your training and recovery suggestions. All fields can be edited later.")
+                        .font(RQTypography.subheadline)
+                        .foregroundColor(RQColors.textSecondary)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.top, RQSpacing.xl)
+
+                bodySexPicker
+                bodyHeightInput
+                bodyWeightInput
+                bodyBirthDatePicker
+                bodyInjuryPicker
+
+                HStack(spacing: RQSpacing.md) {
+                    RQButton(title: "Back", style: .secondary) {
+                        withAnimation { currentStep = 5 }
+                    }
+                    RQButton(title: bodyStepHasContent ? "Continue" : "Skip") {
+                        withAnimation { currentStep = 7 }
+                    }
+                }
+                .padding(.top, RQSpacing.md)
+
+                if !bodyStepHasContent {
+                    Text("You can fill any of this later from your profile.")
+                        .font(RQTypography.caption)
+                        .foregroundColor(RQColors.textTertiary)
+                }
+            }
+            .padding(.horizontal, RQSpacing.screenHorizontal)
+            .padding(.bottom, RQSpacing.xxxl)
+        }
+    }
+
+    private var bodyStepHasContent: Bool {
+        bodySex != nil
+            || hasBirthDate
+            || !heightInput.trimmingCharacters(in: .whitespaces).isEmpty
+            || !weightInput.trimmingCharacters(in: .whitespaces).isEmpty
+            || !selectedInjuries.isEmpty
+    }
+
+    @ViewBuilder
+    private var bodySexPicker: some View {
+        VStack(alignment: .leading, spacing: RQSpacing.sm) {
+            Text("SEX")
+                .font(RQTypography.label)
+                .textCase(.uppercase)
+                .tracking(1.5)
+                .foregroundColor(RQColors.textSecondary)
+
+            HStack(spacing: RQSpacing.sm) {
+                ForEach(BodySex.allCases, id: \.self) { value in
+                    Button {
+                        bodySex = (bodySex == value) ? nil : value
+                    } label: {
+                        Text(value.displayName)
+                            .font(RQTypography.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(bodySex == value ? .black : RQColors.textPrimary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, RQSpacing.sm)
+                            .background(bodySex == value ? RQColors.accent : RQColors.surfaceSecondary)
+                            .cornerRadius(RQRadius.medium)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var bodyHeightInput: some View {
+        VStack(alignment: .leading, spacing: RQSpacing.sm) {
+            Text("HEIGHT (INCHES)")
+                .font(RQTypography.label)
+                .textCase(.uppercase)
+                .tracking(1.5)
+                .foregroundColor(RQColors.textSecondary)
+
+            HStack {
+                TextField("e.g. 70", text: $heightInput)
+                    .keyboardType(.numberPad)
+                    .font(RQTypography.body)
+                    .padding(RQSpacing.md)
+                    .background(RQColors.surfaceSecondary)
+                    .cornerRadius(RQRadius.medium)
+                    .foregroundColor(RQColors.textPrimary)
+
+                Text("in")
+                    .font(RQTypography.caption)
+                    .foregroundColor(RQColors.textTertiary)
+                    .padding(.leading, RQSpacing.xs)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var bodyWeightInput: some View {
+        VStack(alignment: .leading, spacing: RQSpacing.sm) {
+            Text("BODY WEIGHT (LBS)")
+                .font(RQTypography.label)
+                .textCase(.uppercase)
+                .tracking(1.5)
+                .foregroundColor(RQColors.textSecondary)
+
+            HStack {
+                TextField("e.g. 175", text: $weightInput)
+                    .keyboardType(.decimalPad)
+                    .font(RQTypography.body)
+                    .padding(RQSpacing.md)
+                    .background(RQColors.surfaceSecondary)
+                    .cornerRadius(RQRadius.medium)
+                    .foregroundColor(RQColors.textPrimary)
+
+                Text("lbs")
+                    .font(RQTypography.caption)
+                    .foregroundColor(RQColors.textTertiary)
+                    .padding(.leading, RQSpacing.xs)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var bodyBirthDatePicker: some View {
+        VStack(alignment: .leading, spacing: RQSpacing.sm) {
+            HStack {
+                Text("BIRTH DATE")
+                    .font(RQTypography.label)
+                    .textCase(.uppercase)
+                    .tracking(1.5)
+                    .foregroundColor(RQColors.textSecondary)
+                Spacer()
+                Toggle("", isOn: $hasBirthDate)
+                    .tint(RQColors.accent)
+                    .labelsHidden()
+            }
+
+            if hasBirthDate {
+                DatePicker(
+                    "Birth Date",
+                    selection: $birthDate,
+                    in: ...Date(),
+                    displayedComponents: .date
+                )
+                .datePickerStyle(.compact)
+                .labelsHidden()
+                .tint(RQColors.accent)
+                .padding(RQSpacing.sm)
+                .background(RQColors.surfaceSecondary)
+                .cornerRadius(RQRadius.medium)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var bodyInjuryPicker: some View {
+        VStack(alignment: .leading, spacing: RQSpacing.sm) {
+            Text("ACTIVE INJURIES")
+                .font(RQTypography.label)
+                .textCase(.uppercase)
+                .tracking(1.5)
+                .foregroundColor(RQColors.textSecondary)
+
+            Text("Tap any that apply. Used to flag risky exercises later.")
+                .font(RQTypography.caption)
+                .foregroundColor(RQColors.textTertiary)
+
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 110), spacing: RQSpacing.sm)],
+                alignment: .leading,
+                spacing: RQSpacing.sm
+            ) {
+                ForEach(InjuryType.allCases, id: \.self) { injury in
+                    Button {
+                        if selectedInjuries.contains(injury) {
+                            selectedInjuries.remove(injury)
+                        } else {
+                            selectedInjuries.insert(injury)
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: injury.icon)
+                                .font(.system(size: 12, weight: .semibold))
+                            Text(injury.displayName)
+                                .font(RQTypography.caption)
+                                .fontWeight(.semibold)
+                        }
+                        .foregroundColor(selectedInjuries.contains(injury) ? .black : RQColors.textPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, RQSpacing.sm)
+                        .background(selectedInjuries.contains(injury) ? RQColors.accent : RQColors.surfaceSecondary)
+                        .cornerRadius(RQRadius.large)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Step 8: How It Works
 
     private var howItWorksStep: some View {
         ScrollView {
@@ -685,11 +901,25 @@ struct OnboardingView: View {
         do {
             guard let userId = try? await supabase.auth.session.user.id else { return }
 
+            // Convert UI inputs (inches, lbs) to canonical metric storage.
+            let heightCm = Double(heightInput.trimmingCharacters(in: .whitespaces))
+                .map { $0 * 2.54 }
+            let weightKg = Double(weightInput.trimmingCharacters(in: .whitespaces))
+                .map { $0 * 0.45359237 }
+            let injuriesArray = selectedInjuries.isEmpty
+                ? nil
+                : Array(selectedInjuries.map(\.rawValue)).sorted()
+
             // Save onboarding preferences
             try await ProfileService().updateOnboarding(
                 userId: userId,
                 experienceLevel: experienceLevel?.rawValue,
-                trainingGoal: trainingGoal?.rawValue
+                trainingGoal: trainingGoal?.rawValue,
+                sex: bodySex?.rawValue,
+                birthDate: hasBirthDate ? birthDate : nil,
+                heightCm: heightCm,
+                bodyWeightKg: weightKg,
+                injuries: injuriesArray
             )
 
             // Create template from selected program
@@ -921,6 +1151,51 @@ enum OnboardingExperienceLevel: String, CaseIterable {
         case .beginner: return "figure.walk"
         case .intermediate: return "figure.strengthtraining.traditional"
         case .advanced: return "trophy.fill"
+        }
+    }
+}
+
+enum BodySex: String, CaseIterable {
+    case male
+    case female
+    case preferNotToSay = "prefer_not_to_say"
+
+    var displayName: String {
+        switch self {
+        case .male: return "Male"
+        case .female: return "Female"
+        case .preferNotToSay: return "Prefer not"
+        }
+    }
+}
+
+enum InjuryType: String, CaseIterable {
+    case knee
+    case lowerBack = "lower_back"
+    case shoulder
+    case wrist
+    case hip
+    case neck
+
+    var displayName: String {
+        switch self {
+        case .knee: return "Knee"
+        case .lowerBack: return "Lower Back"
+        case .shoulder: return "Shoulder"
+        case .wrist: return "Wrist"
+        case .hip: return "Hip"
+        case .neck: return "Neck"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .knee: return "figure.walk"
+        case .lowerBack: return "figure.strengthtraining.traditional"
+        case .shoulder: return "figure.boxing"
+        case .wrist: return "hand.raised.fill"
+        case .hip: return "figure.run"
+        case .neck: return "person.crop.circle"
         }
     }
 }

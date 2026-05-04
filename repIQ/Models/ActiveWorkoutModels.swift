@@ -173,6 +173,9 @@ struct WorkoutSummaryData: Identifiable {
     var currentStreak: Int = 0
     var longestStreak: Int = 0
     var newBadges: [Badge] = []
+    /// Goals that just transitioned from active → completed because of this
+    /// workout. Surfaced as a celebration card on the summary screen.
+    var completedGoals: [Goal] = []
 
     // Performance grade
     var performanceGrade: SessionPerformanceGrade?
