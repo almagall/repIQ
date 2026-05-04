@@ -33,25 +33,11 @@ struct DashboardView: View {
                     }
 
                     // Quick Start
-                    QuickStartCard(
-                        lastDayName: viewModel.lastWorkoutDayName,
-                        lastTemplateName: viewModel.lastWorkoutTemplateName,
-                        lastCompletedAt: viewModel.lastWorkoutCompletedAt,
-                        onStartWorkout: {
-                            if !viewModel.templates.isEmpty {
-                                showTemplatePicker = true
-                            }
-                        },
-                        onRepeatLast: viewModel.lastWorkoutPair == nil ? nil : {
-                            if let pair = viewModel.lastWorkoutPair {
-                                workoutCoordinator.startWorkout(
-                                    template: pair.template,
-                                    day: pair.day,
-                                    date: Date()
-                                )
-                            }
+                    QuickStartCard {
+                        if !viewModel.templates.isEmpty {
+                            showTemplatePicker = true
                         }
-                    )
+                    }
 
                     // My Templates
                     templatesSection

@@ -21,25 +21,6 @@ final class DashboardViewModel {
     private let templateService = TemplateService()
     private let digestService = DigestService()
 
-    // MARK: - Repeat Last Workout
-
-    /// The template + workout day that the last completed session used, resolved
-    /// against the currently-loaded templates. `nil` if the user has never logged
-    /// a session, the source template was deleted, or the day no longer exists.
-    var lastWorkoutPair: (template: Template, day: WorkoutDay)? {
-        guard let session = recentSession,
-              let templateId = session.templateId,
-              let dayId = session.workoutDayId,
-              let template = templates.first(where: { $0.id == templateId }),
-              let day = template.workoutDays?.first(where: { $0.id == dayId })
-        else { return nil }
-        return (template, day)
-    }
-
-    var lastWorkoutDayName: String? { lastWorkoutPair?.day.name }
-    var lastWorkoutTemplateName: String? { lastWorkoutPair?.template.name }
-    var lastWorkoutCompletedAt: Date? { recentSession?.completedAt }
-
     /// Whether the dashboard should surface the "Your X Wrapped is ready"
     /// banner card. True only on the 1st–14th of a month, when the prior
     /// month's wrapped exists, and the user hasn't viewed it yet.
