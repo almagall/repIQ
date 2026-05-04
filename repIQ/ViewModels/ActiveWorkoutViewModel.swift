@@ -73,6 +73,7 @@ final class ActiveWorkoutViewModel {
     private let exerciseLibraryService = ExerciseLibraryService()
     private let gamificationService = GamificationService()
     private let feedService = FeedService()
+    private let goalService = GoalService()
     private var timerTask: Task<Void, Never>?
     private var restTimerTask: Task<Void, Never>?
     private var autoSaveTask: Task<Void, Never>?
@@ -546,6 +547,10 @@ final class ActiveWorkoutViewModel {
             guard let self else { throw WorkoutIntentError.noActiveWorkout }
             try await self.handleLogSetFromIntent()
         }
+        WorkoutIntentBridge.shared.logSetWithValuesHandler = { [weak self] weight, reps, rpe in
+            guard let self else { throw WorkoutIntentError.noActiveWorkout }
+            try await self.handleLogSetWithValuesFromIntent(weight: weight, reps: reps, rpe: rpe)
+        }
         WorkoutIntentBridge.shared.adjustSetHandler = { [weak self] field, direction in
             guard let self else { throw WorkoutIntentError.noActiveWorkout }
             try self.handleAdjustSetFromIntent(field: field, direction: direction)
@@ -560,6 +565,7 @@ final class ActiveWorkoutViewModel {
     /// taps to a workout that's already over.
     private func unregisterIntentHandlers() {
         WorkoutIntentBridge.shared.logSetHandler = nil
+        WorkoutIntentBridge.shared.logSetWithValuesHandler = nil
         WorkoutIntentBridge.shared.adjustSetHandler = nil
         WorkoutIntentBridge.shared.skipRestHandler = nil
     }
@@ -586,6 +592,39 @@ final class ActiveWorkoutViewModel {
         if target.reps <= 0 {
             throw WorkoutIntentError.missingTarget
         }
+        await completeSet(exerciseIndex: currentExerciseIndex, setIndex: upcomingIndex)
+    }
+
+    /// Called from `LogSetByVoiceIntent.perform()` via `WorkoutIntentBridge`.
+    /// Mutates the next un-completed working set with the spoken values, then
+    /// commits it through the same `completeSet` path so PR detection, rest
+    /// timer, autosave, and Live Activity all stay coherent.
+    private func handleLogSetWithValuesFromIntent(weight: Double, reps: Int, rpe: Double?) async throws {
+        guard exercises.indices.contains(currentExerciseIndex) else {
+            throw WorkoutIntentError.noUpcomingSet
+        }
+        guard let upcomingIndex = exercises[currentExerciseIndex].sets.firstIndex(where: {
+            !$0.isCompleted && $0.setType == .working
+        }) else {
+            throw WorkoutIntentError.noUpcomingSet
+        }
+        guard reps > 0 else {
+            throw WorkoutIntentError.missingTarget
+        }
+
+        // For bodyweight-only exercises, ignore any weight Siri parsed —
+        // there's no field for it. For everything else, voice always supplies
+        // an explicit number, so we don't reject zero (some people legitimately
+        // bench just the bar at 0 added load on assistance work).
+        let isBodyweight = exercises[currentExerciseIndex].isBodyweightOnly
+        if !isBodyweight {
+            exercises[currentExerciseIndex].sets[upcomingIndex].weight = max(0, weight)
+        }
+        exercises[currentExerciseIndex].sets[upcomingIndex].reps = reps
+        if let rpe {
+            exercises[currentExerciseIndex].sets[upcomingIndex].rpe = rpe
+        }
+
         await completeSet(exerciseIndex: currentExerciseIndex, setIndex: upcomingIndex)
     }
 
@@ -958,6 +997,13 @@ final class ActiveWorkoutViewModel {
             let streakResult = (try? await gamificationService.updateStreak(userId: userId))
                 ?? (currentStreak: 0, longestStreak: 0)
 
+            // Push the fresh streak to the home screen widget right away.
+            // The next dashboard load fills in weekly volume + last PR.
+            WidgetService.updateAfterWorkoutCompletion(
+                currentStreak: streakResult.currentStreak,
+                lastWorkoutDate: Date()
+            )
+
             // Award IQ points for actual training actions
             let iqEarned = (try? await gamificationService.awardWorkoutRewards(
                 userId: userId,
@@ -1065,6 +1111,11 @@ final class ActiveWorkoutViewModel {
                 }
             }
 
+            // Auto-evaluate active goals against fresh training data and pull
+            // back any that JUST hit their target. Best-effort: failure here
+            // shouldn't break workout completion.
+            let completedGoals = (try? await goalService.evaluateActiveGoals(userId: userId)) ?? []
+
             // Build summary with PR, progression, and gamification data
             var summary = WorkoutSummaryData(
                 duration: duration,
@@ -1078,6 +1129,7 @@ final class ActiveWorkoutViewModel {
                 longestStreak: streakResult.longestStreak,
                 newBadges: newBadges
             )
+            summary.completedGoals = completedGoals
             summary.workoutName = dayName.isEmpty ? templateName : "\(templateName) — \(dayName)"
             summary.dayName = dayName
             summary.workoutDate = startTime
@@ -1367,13 +1419,14 @@ final class ActiveWorkoutViewModel {
             if let firstInGroup = currentGroupIndices.first {
                 scrollToExerciseIndex = firstInGroup
             }
-            // Start rest timer after completing the full superset round
+            // Start rest timer after completing the full superset round.
+            // Use the trailing set's RPE so a hard finisher earns more rest.
             if restTimerEnabled {
-                startRestTimer(seconds: restTimerDuration)
+                startRestTimer(seconds: Self.smartRestSeconds(base: restTimerDuration, rpe: completedSet.rpe))
             }
         } else if restTimerEnabled {
-            // Normal flow: start rest timer
-            startRestTimer(seconds: restTimerDuration)
+            // Normal flow: start rest timer, scaled by the just-completed set's RPE.
+            startRestTimer(seconds: Self.smartRestSeconds(base: restTimerDuration, rpe: completedSet.rpe))
         }
 
         // Haptic feedback — always strong for PR, medium for normal sets
@@ -1868,6 +1921,27 @@ final class ActiveWorkoutViewModel {
     func adjustRestTimerDuration(by delta: Int) {
         let newDuration = restTimerDuration + delta
         restTimerDuration = max(15, min(600, newDuration)) // 15s – 10min
+    }
+
+    /// Returns the rest duration to actually use for the *next* rest period,
+    /// adjusting the user's chosen base by RPE when smart rest is enabled.
+    /// Hard sets (RPE ≥ 8.5) get a bump; easy sets (RPE ≤ 6) get a trim.
+    /// Sets with no RPE logged use the base unchanged.
+    static func smartRestSeconds(base: Int, rpe: Double?) -> Int {
+        let smartEnabled = UserDefaults.standard.object(forKey: AppConstants.UserDefaultsKeys.smartRestTimerEnabled) as? Bool
+            ?? AppConstants.Defaults.smartRestTimerEnabled
+        guard smartEnabled, let rpe else { return base }
+
+        let adjustment: Int
+        if rpe >= AppConstants.SmartRest.highRPEThreshold {
+            adjustment = AppConstants.SmartRest.highRPEBonusSeconds
+        } else if rpe <= AppConstants.SmartRest.lowRPEThreshold {
+            adjustment = AppConstants.SmartRest.lowRPEReductionSeconds
+        } else {
+            return base
+        }
+        return max(AppConstants.SmartRest.minSeconds,
+                   min(AppConstants.SmartRest.maxSeconds, base + adjustment))
     }
 
     /// Add time to the currently running rest timer.

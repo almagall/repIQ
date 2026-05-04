@@ -13,9 +13,41 @@ final class DashboardViewModel {
     var isLoading = false
     var templateCount: Int = 0
     var templates: [Template] = []
+    /// The prior month's wrapped, if it's been generated and not yet viewed.
+    /// Drives the dashboard banner that appears on the 1st–14th of a new month.
+    var priorMonthWrapped: MonthlyWrapped?
 
     private let workoutService = WorkoutService()
     private let templateService = TemplateService()
+    private let digestService = DigestService()
+
+    // MARK: - Repeat Last Workout
+
+    /// The template + workout day that the last completed session used, resolved
+    /// against the currently-loaded templates. `nil` if the user has never logged
+    /// a session, the source template was deleted, or the day no longer exists.
+    var lastWorkoutPair: (template: Template, day: WorkoutDay)? {
+        guard let session = recentSession,
+              let templateId = session.templateId,
+              let dayId = session.workoutDayId,
+              let template = templates.first(where: { $0.id == templateId }),
+              let day = template.workoutDays?.first(where: { $0.id == dayId })
+        else { return nil }
+        return (template, day)
+    }
+
+    var lastWorkoutDayName: String? { lastWorkoutPair?.day.name }
+    var lastWorkoutTemplateName: String? { lastWorkoutPair?.template.name }
+    var lastWorkoutCompletedAt: Date? { recentSession?.completedAt }
+
+    /// Whether the dashboard should surface the "Your X Wrapped is ready"
+    /// banner card. True only on the 1st–14th of a month, when the prior
+    /// month's wrapped exists, and the user hasn't viewed it yet.
+    var shouldShowWrappedBanner: Bool {
+        guard let wrapped = priorMonthWrapped, wrapped.viewedAt == nil else { return false }
+        let day = Calendar.current.component(.day, from: Date())
+        return (1...14).contains(day)
+    }
 
     func loadDashboard() async {
         isLoading = true
@@ -26,6 +58,8 @@ final class DashboardViewModel {
             async let setCount = workoutService.fetchWeeklySetCount(userId: userId)
             async let allSessions = workoutService.fetchAllSessions(userId: userId)
             async let templates = templateService.fetchTemplates(userId: userId)
+            async let streak = fetchCurrentStreak(userId: userId)
+            async let lastPR = fetchLastPRSummary(userId: userId)
 
             recentSession = try await sessions.first
             weeklySetCount = try await setCount
@@ -53,15 +87,95 @@ final class DashboardViewModel {
             self.templates = loadedTemplates
             templateCount = loadedTemplates.count
 
-            // Sync widget data
-            WidgetService.syncFromDashboard(
-                streak: 0,
-                weeklySetCount: weeklySetCount,
-                lastSession: recentSession?.completedAt
-            )
+            let resolvedStreak = (try? await streak) ?? 0
+            let resolvedLastPR = try? await lastPR
+
+            WidgetService.sync(WidgetService.Snapshot(
+                currentStreak: resolvedStreak,
+                weeklyWorkingSetCount: weeklySetCount,
+                lastWorkoutDate: recentSession?.completedAt,
+                lastPRSummary: resolvedLastPR
+            ))
+
+            await refreshPriorMonthWrapped(userId: userId)
         } catch {
             // Silently handle - dashboard is non-critical
         }
         isLoading = false
+    }
+
+    // MARK: - Monthly Wrapped
+
+    /// Auto-generates the prior month's wrapped on the 1st–7th of any new
+    /// month if it doesn't yet exist, then loads it for banner display.
+    /// Generation is idempotent (UNIQUE constraint on user_id + month_start),
+    /// so calling on later days is safe — the eq-check returns the existing row.
+    private func refreshPriorMonthWrapped(userId: UUID) async {
+        let day = Calendar.current.component(.day, from: Date())
+        do {
+            let existing = try await digestService.fetchPriorMonthWrapped(userId: userId)
+            if let existing {
+                priorMonthWrapped = existing
+                return
+            }
+            // Generate during the first week of a new month so the banner has
+            // something to show. After day 7 we wait for the user to navigate
+            // into the wrapped flow themselves rather than running the heavy
+            // aggregation on a cold dashboard load.
+            if (1...7).contains(day) {
+                priorMonthWrapped = try await digestService.generateMonthlyWrapped(userId: userId)
+            }
+        } catch {
+            // Banner is non-critical; failing silently is fine here, the user
+            // can still navigate to MonthlyWrappedView directly which surfaces
+            // any error in its own UI.
+        }
+    }
+
+    // MARK: - Widget Sync Helpers
+
+    /// Lightweight streak fetch — single column on profiles, avoids the heavier
+    /// `fetchMilestoneProgressData` round-trip on every dashboard load.
+    private func fetchCurrentStreak(userId: UUID) async throws -> Int {
+        struct StreakRow: Decodable { let current_streak: Int }
+        let row: StreakRow = try await supabase.from("profiles")
+            .select("current_streak")
+            .eq("id", value: userId.uuidString)
+            .single()
+            .execute()
+            .value
+        return row.current_streak
+    }
+
+    /// Fetches the most recent PR with the exercise name, formatted as a
+    /// glanceable string for the home screen widget. Returns `nil` if the
+    /// user has no PRs yet or the join can't resolve.
+    private func fetchLastPRSummary(userId: UUID) async throws -> String? {
+        struct PRRow: Decodable {
+            let value: Double
+            let reps_at_weight: Int?
+            let record_type: String
+            let exercises: ExerciseName?
+        }
+        struct ExerciseName: Decodable { let name: String }
+
+        let rows: [PRRow] = try await supabase.from("personal_records")
+            .select("value, reps_at_weight, record_type, exercises(name)")
+            .eq("user_id", value: userId.uuidString)
+            .order("achieved_at", ascending: false)
+            .limit(1)
+            .execute()
+            .value
+
+        guard let row = rows.first, let exerciseName = row.exercises?.name else {
+            return nil
+        }
+        let value = row.value.truncatingRemainder(dividingBy: 1) == 0
+            ? String(format: "%.0f", row.value)
+            : String(format: "%.1f", row.value)
+        if row.record_type == "weight", let reps = row.reps_at_weight, reps > 0 {
+            return "\(exerciseName) \(value)×\(reps)"
+        }
+        return "\(exerciseName) \(value)"
     }
 }

@@ -11,6 +11,7 @@ struct DashboardView: View {
     @State private var showCalendarView = false
     @State private var calendarMonth = Date()
     @State private var socialViewModel = SocialViewModel()
+    @State private var showMonthlyWrapped = false
     @AppStorage("hasSeenWelcomeCard") private var hasSeenWelcomeCard = false
 
     @Environment(WorkoutCoordinator.self) private var workoutCoordinator
@@ -24,12 +25,33 @@ struct DashboardView: View {
                         welcomeCard
                     }
 
-                    // Quick Start
-                    QuickStartCard {
-                        if !viewModel.templates.isEmpty {
-                            showTemplatePicker = true
+                    // Monthly Wrapped banner (1st–14th of month, prior month ready & unviewed)
+                    if viewModel.shouldShowWrappedBanner, let wrapped = viewModel.priorMonthWrapped {
+                        WrappedBannerCard(wrapped: wrapped) {
+                            showMonthlyWrapped = true
                         }
                     }
+
+                    // Quick Start
+                    QuickStartCard(
+                        lastDayName: viewModel.lastWorkoutDayName,
+                        lastTemplateName: viewModel.lastWorkoutTemplateName,
+                        lastCompletedAt: viewModel.lastWorkoutCompletedAt,
+                        onStartWorkout: {
+                            if !viewModel.templates.isEmpty {
+                                showTemplatePicker = true
+                            }
+                        },
+                        onRepeatLast: viewModel.lastWorkoutPair == nil ? nil : {
+                            if let pair = viewModel.lastWorkoutPair {
+                                workoutCoordinator.startWorkout(
+                                    template: pair.template,
+                                    day: pair.day,
+                                    date: Date()
+                                )
+                            }
+                        }
+                    )
 
                     // My Templates
                     templatesSection
@@ -195,6 +217,14 @@ struct DashboardView: View {
                     showProgramBrowser = false
                     Task { await templateListViewModel.loadTemplates() }
                 })
+            }
+            .navigationDestination(isPresented: $showMonthlyWrapped) {
+                MonthlyWrappedView(viewModel: socialViewModel)
+                    .onDisappear {
+                        // Banner clears once viewed_at is persisted server-side; refresh
+                        // the dashboard state so it disappears immediately on return.
+                        Task { await viewModel.loadDashboard() }
+                    }
             }
         }
     }

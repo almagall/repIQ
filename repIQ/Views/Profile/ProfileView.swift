@@ -10,6 +10,8 @@ struct ProfileView: View {
     @State private var gymName: String?
     @State private var gymAddress: String?
     @State private var showSignOutConfirmation = false
+    @AppStorage(AppConstants.UserDefaultsKeys.smartRestTimerEnabled)
+    private var smartRestTimerEnabled = AppConstants.Defaults.smartRestTimerEnabled
 
     private let restTimerOptions = [60, 90, 120, 150, 180, 210, 240]
 
@@ -95,6 +97,28 @@ struct ProfileView: View {
                                     value: "\(viewModel.profile?.restTimerDefault ?? 90)s"
                                 )
                             }
+
+                            Divider().background(RQColors.surfaceTertiary)
+
+                            // Smart Rest Timer
+                            Toggle(isOn: $smartRestTimerEnabled) {
+                                HStack {
+                                    Image(systemName: "bolt.heart")
+                                        .font(.system(size: 16))
+                                        .foregroundColor(RQColors.accent)
+                                        .frame(width: 24)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Smart Rest Timer")
+                                            .font(RQTypography.body)
+                                            .foregroundColor(RQColors.textPrimary)
+                                        Text("Adds rest after hard sets, trims it after easy ones")
+                                            .font(RQTypography.caption)
+                                            .foregroundColor(RQColors.textTertiary)
+                                            .lineLimit(2)
+                                    }
+                                }
+                            }
+                            .tint(RQColors.accent)
 
                             Divider().background(RQColors.surfaceTertiary)
 
