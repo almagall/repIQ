@@ -177,12 +177,26 @@ struct ProgressionService: Sendable {
                 }
 
             } else if percentChange >= -0.02 {
-                // e1RM flat — increase reps at same weight
-                decision = .increaseReps
-                tWeight = roundToIncrement(medWeight, increment)
-                tRepsLow = min(medReps + 1, effectiveUpperBound)
-                tRepsHigh = min(medReps + 2, effectiveUpperBound)
-                reasoning = "Strength is stable. Aim for more reps to drive adaptation."
+                // e1RM flat. Default move is double-progression — add reps at
+                // the same weight — but if you're already at the rep cap, the
+                // engine has nowhere to add reps and the prior code would
+                // re-prescribe the cap forever. When at cap, jump weight and
+                // reset reps to the bottom of the range. (Hitting cap with
+                // flat e1RM IS the trigger for a weight bump in
+                // double-progression.)
+                if medReps >= effectiveUpperBound {
+                    decision = .increaseWeight
+                    tWeight = roundToIncrement(currentE1RM * percentageOfE1RM(forReps: targetMidRep), increment)
+                    tRepsLow = repRange.lowerBound
+                    tRepsHigh = min(repRange.lowerBound + 2, effectiveUpperBound)
+                    reasoning = "You hit the rep cap. Increasing weight and resetting reps to the bottom of the range."
+                } else {
+                    decision = .increaseReps
+                    tWeight = roundToIncrement(medWeight, increment)
+                    tRepsLow = min(medReps + 1, effectiveUpperBound)
+                    tRepsHigh = min(medReps + 2, effectiveUpperBound)
+                    reasoning = "Strength is stable. Aim for more reps to drive adaptation."
+                }
 
             } else {
                 // e1RM declining — deload
