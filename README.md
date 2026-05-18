@@ -2,7 +2,7 @@
 
 **Intelligent Gym Workout Planning** — not just a logbook.
 
-repIQ is a SwiftUI iOS app that calculates per-set targets using a real progressive-overload engine. It blends e1RM trending, RPE-based autoregulation, mesocycle awareness, and stall detection to tell a lifter what to do next — not just what they did. Currently shipping at **v1.5 (build 9)**.
+repIQ is a SwiftUI iOS app that calculates per-set targets using a real progressive-overload engine. It blends e1RM trending, RPE-based autoregulation, mesocycle awareness, and stall detection to tell a lifter what to do next — not just what they did. Currently shipping at **v1.5 (build 10)**.
 
 ## What Makes repIQ Different
 
@@ -37,6 +37,16 @@ Design system in `repIQ/Design/` — dark theme, electric blue accent (`#00AAFF`
 
 ## Recent Ships
 
+- **v1.5 (build 10)** — Progression-engine correctness pass + Wrapped polish. Fixes:
+  - **Rep cap unstick** — `calculateTarget` now bumps weight + resets reps when you hit the rep cap with flat e1RM. Previously the flat-e1RM branch unconditionally chose "increase reps" and clamped back to the cap, producing the same target session after session.
+  - **PRs derived from `workout_sets`, not the cache** — `fetchCurrentPRs` no longer trusts the `personal_records` denormalized cache as source of truth. Empty/stale cache rows were causing every working set to flag as a new weight PR. Now computes weight / reps / e1RM / volume PRs from the canonical `workout_sets` history via an inner join to completed sessions.
+  - **Warmup history no longer bleeds into working sets** — `previousSets` on `ExerciseLogEntry` is filtered to working-only at the source, so the per-set "Last:" line and pre-fill values for working sets show prior working data, not prior warmups.
+  - **Inverted rep range** ("13-12") — three coordinated guards: `.maintain` branches in `calculateTarget` now clamp both bounds, `clampedTarget` normalizes legacy inverted rows on load, `targetRepRangeDisplay` uses `min/max` so a single number is shown when bounds collapse.
+  - **"Pick up where you left off"** dashboard pill removed. A split-day rotation makes pre-loading the prior workout cost more than it saves.
+  - **Side-by-side month comparison** — pushed from a new toolbar button on the Monthly Report. Renders matching sections in a phone-friendly layout: archetypes, vitals with deltas, top lifts, muscle volume, days-trained calendars, PR counts.
+  - **Editable Body & Health screen** — captured-at-onboarding body data is now editable post-onboarding via a new row in Settings. Inputs auto-switch units based on `weight_unit` pref; storage stays canonical metric.
+  - **Theme-consistency refactor** of the Wrapped story flow — replaced rounded fonts with monospaced (`RQTypography`), all colors via `RQColors`. Wrapped now reads as repIQ, not a Spotify clone.
+  - **Full Monthly Report** — pushed from the archetype slide. Vitals grid with M-o-M deltas, top 3 lifts, Swift Charts volume-by-muscle bars, days-trained calendar, full PR list, data-grounded archetype rationale.
 - **v1.5 (build 9)** — Auto-detect goal completion: workout completion now re-evaluates every active goal against fresh training data, marks any that hit target as `completed`, and surfaces a celebration card on the workout summary. New onboarding step for body context + injuries (sex, birth date, height, body weight, injury list) — all optional, stored in metric on the server, ready to feed future relative-strength stats and injury-aware programming.
 - **v1.5 (build 8)** — Monthly Wrapped rebuild: Spotify-style 10-slide story flow (tap-to-advance, swipe-to-dismiss), training-archetype reveal (PR Hunter / Volume Hammer / Consistency King / Variety Seeker / Steady Builder), memorable-unit volume comparisons ("3.2× a Toyota Corolla"), 9:16 share-card export via SwiftUI `ImageRenderer`, dashboard banner card on the 1st–14th, push notification on the 1st of each month, dot badge on the Progress tab until viewed. Fixed a long-standing silent bug where the wrapped query selected a non-existent `exercise_name` column on `personal_records`. Real consecutive-day streak calc replaces the placeholder. New `most_consistent_muscle` aggregation (the column existed but was never populated).
 - **v1.4 (build 7)** — Voice set logging via App Intents + AppShortcuts, RPE-aware smart rest timer with Profile toggle, "Repeat last workout" one-tap dashboard pill, real home screen widget suite (Small + Medium) replacing the stub, interactive Live Activity logging, minimize-bug fix.
