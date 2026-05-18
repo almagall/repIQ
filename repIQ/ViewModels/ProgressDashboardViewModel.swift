@@ -1,5 +1,6 @@
 import Foundation
 import Supabase
+import MuscleMap
 
 @Observable
 final class ProgressDashboardViewModel {
@@ -10,11 +11,14 @@ final class ProgressDashboardViewModel {
     var weeklySessionCount: Int = 0
     var totalVolume: Double = 0
     var totalPRCount: Int = 0
+    var totalSessions: Int = 0
     var volumeTrend: [WeeklyVolumeSummary] = []
-    var recentPRs: [(record: PersonalRecord, exerciseName: String)] = []
+    var recentPRs: [RecentPREntry] = []
     var muscleDistribution: [MuscleGroupVolume] = []
     var fractionalDistribution: [MuscleGroupVolume] = []
     var frequencyData: [(date: Date, count: Int)] = []
+    /// Calendar days within the heatmap window on which the user hit a PR.
+    var prDates: Set<Date> = []
     var insights: [InsightCard] = []
     var milestones: [MilestoneDefinition] = []
     var effectiveRepsSummary: [EffectiveRepsSummary] = []
@@ -27,9 +31,34 @@ final class ProgressDashboardViewModel {
     var topLifts: [TopLiftTrajectory] = []
     var monthlyStats: MonthlyStats?
     var lastWorkoutRecap: LastWorkoutRecap?
+    var pastMeSnapshot: PastMeSnapshot?
+
+    /// Body-diagram sex from the user's profile. Defaults to `.male` when the
+    /// profile field is missing or "prefer_not_to_say".
+    var bodyDiagramGender: BodyGender = .male
+
+    /// Raw profile sex string ("male", "female", "prefer_not_to_say"), used
+    /// for strength-standards lookups. Nil when never set.
+    var profileSex: String?
+
+    /// User bodyweight in pounds (converted from the canonical kg storage).
+    /// Nil when never set; strength-standards rows are hidden in that case.
+    var bodyweightLbs: Double?
 
     // UI toggle for fractional volume
     var showFractionalVolume: Bool = false
+
+    /// When non-nil, the volume chart shows weekly volume contributed only by
+    /// exercises whose primary muscle group matches this key. Nil means "all".
+    var volumeMuscleFilter: String? = nil
+    var isReloadingVolumeTrend = false
+
+    /// Time window that scopes the windowable analytics (volume trend,
+    /// muscle distribution, effective reps, PR markers). Defaults to
+    /// 12 weeks — the same span the heatmap shows — so the picker doesn't
+    /// alter the initial render.
+    var selectedTimeWindow: TimeWindow = .twelveWeeks
+    var isReloadingWindowedSections = false
 
     /// Returns the active muscle distribution based on the fractional toggle.
     var activeMuscleDistribution: [MuscleGroupVolume] {
@@ -69,6 +98,7 @@ final class ProgressDashboardViewModel {
     private let analyticsService = AnalyticsService()
     private let workoutService = WorkoutService()
     private let exerciseService = ExerciseLibraryService()
+    private let profileService = ProfileService()
 
     // MARK: - Computed
 
@@ -85,6 +115,78 @@ final class ProgressDashboardViewModel {
         let validWeeks = volumeTrend.suffix(4).filter { $0.totalVolume > 0 }
         guard !validWeeks.isEmpty else { return nil }
         return validWeeks.reduce(0) { $0 + $1.totalVolume } / Double(validWeeks.count)
+    }
+
+    /// One-sentence prescriptive caption for the muscle balance section.
+    /// Identifies the most over-represented and most neglected groups and
+    /// translates the imbalance into an actionable suggestion.
+    var muscleBalanceNarrative: String? {
+        let totals = activeMuscleDistribution
+        guard !totals.isEmpty else { return nil }
+        let totalVolume = totals.reduce(0.0) { $0 + $1.volume }
+        guard totalVolume > 0 else { return nil }
+
+        let nonZero = totals.filter { $0.volume > 0 }
+        guard let top = nonZero.max(by: { $0.volume < $1.volume }) else { return nil }
+        let topShare = top.volume / totalVolume
+
+        // Push/pull imbalance takes priority — strongest visible signal.
+        if let balance = pushPullBalance {
+            if balance.status == .pushDominant {
+                return "Push volume is dominating — add a pull day or extra back work this week."
+            }
+            if balance.status == .pullDominant {
+                return "Pull-heavy week — work in some pressing if chest/shoulders are a goal."
+            }
+        }
+
+        // One group taking >35% is usually a sign of an unbalanced split
+        if topShare > 0.35 {
+            return "\(top.displayName) is \(Int(topShare * 100))% of your volume — make sure the rest aren't sliding."
+        }
+
+        // Find the lowest non-zero share and a fully neglected group
+        let zeroed = totals.filter { $0.setCount == 0 }
+        if let neglected = zeroed.first {
+            return "No \(neglected.displayName.lowercased()) work in the window — add 2-3 direct sets per week."
+        }
+
+        let lowest = nonZero.min(by: { $0.volume < $1.volume })!
+        let lowestShare = lowest.volume / totalVolume
+        if lowestShare < 0.04 {
+            return "\(lowest.displayName) is under-trained at \(String(format: "%.0f%%", lowestShare * 100)) — bump it by a few sets."
+        }
+
+        return "Balanced distribution — keep stacking weeks like this."
+    }
+
+    /// Prescriptive caption for the consistency card. Uses the user's current
+    /// frequency, streak status, and consistency grade to pick the message.
+    var consistencyNarrative: String? {
+        guard let score = consistencyScore else { return nil }
+
+        // Use weeklySessionCount to detect drift from typical cadence
+        let recentCadence = weeklySessionCount
+        let streak = streakData?.currentStreak ?? 0
+
+        switch score.grade {
+        case .elite:
+            return "Elite consistency — \(streak)-week streak, you're showing up like clockwork."
+        case .strong:
+            if recentCadence == 0 {
+                return "Strong base but you haven't trained yet this week — keep the streak alive."
+            }
+            return "Strong rhythm — \(recentCadence) session\(recentCadence == 1 ? "" : "s") this week, stay locked in."
+        case .good:
+            return "Decent groove — pick one extra session per week to push into Strong territory."
+        case .developing:
+            if streak == 0 {
+                return "Inconsistent recently — start a new streak with a short session this week."
+            }
+            return "Patchy stretches lately — aim for a steady 3-day cadence to lock in gains."
+        case .beginning:
+            return "Just getting started — one session a week beats none, build the habit first."
+        }
     }
 
     /// An interpreted narrative for the volume trend (replaces the raw percent delta).
@@ -187,46 +289,65 @@ final class ProgressDashboardViewModel {
             async let topLiftsTask = analyticsService.fetchTopLiftsTrajectory(userId: userId, limit: 5)
             async let monthlyStatsTask = analyticsService.fetchMonthlyStats(userId: userId)
             async let lastRecapTask = analyticsService.fetchLastWorkoutRecap(userId: userId)
+            async let profileTask = profileService.fetchProfile(userId: userId)
+            async let prDatesTask = analyticsService.fetchPRDates(userId: userId, days: 84)
 
-            // Await all
-            let fetchedStreak = try await streakTask
-            let fetchedTrend = try await volumeTrendTask
-            let fetchedMuscle = try await muscleTask
-            let fetchedFractional = try await fractionalTask
-            let fetchedPRs = try await prTask
-            let fetchedFrequency = try await frequencyTask
+            // Progressive assignment: each result is published the moment
+            // its task completes, ordered roughly fastest-first so the user
+            // sees the hero header (monthly stats, last workout, lifetime
+            // totals) as soon as those queries return. Slower aggregates
+            // (top lifts, volume landmarks) trickle in afterward.
+
+            if let fetched = try? await monthlyStatsTask { monthlyStats = fetched }
+            if let fetched = try? await lastRecapTask { lastWorkoutRecap = fetched }
             let fetchedMilestoneData = try await milestoneTask
-            let fetchedSessions = try await sessionsTask
-            let fetchedEffectiveReps = try await effectiveRepsTask
-            let fetchedRPE = try await rpeTask
-            let fetchedPushPull = try await pushPullTask
-            let fetchedConsistency = try await consistencyTask
-            let fetchedLandmarks = try await landmarkTask
-            let fetchedTopLifts = (try? await topLiftsTask) ?? []
-            let fetchedMonthlyStats = try? await monthlyStatsTask
-            let fetchedLastRecap = try? await lastRecapTask
-
-            // Update state
-            streakData = fetchedStreak
-            volumeTrend = fetchedTrend
-            muscleDistribution = fetchedMuscle
-            fractionalDistribution = fetchedFractional
-            recentPRs = fetchedPRs
-            frequencyData = fetchedFrequency
-            sessions = fetchedSessions
-            milestones = MilestoneCatalog.evaluate(with: fetchedMilestoneData)
-            effectiveRepsSummary = fetchedEffectiveReps
-            averageRPE = fetchedRPE
-            pushPullBalance = fetchedPushPull
-            consistencyScore = fetchedConsistency
-            volumeLandmarks = fetchedLandmarks
-            topLifts = fetchedTopLifts
-            monthlyStats = fetchedMonthlyStats
-            lastWorkoutRecap = fetchedLastRecap ?? nil
-
-            // Compute overview stats
             totalVolume = fetchedMilestoneData.totalVolume
             totalPRCount = fetchedMilestoneData.totalPRs
+            totalSessions = fetchedMilestoneData.totalSessions
+            milestones = MilestoneCatalog.evaluate(with: fetchedMilestoneData)
+
+            if let fetched = try? await streakTask { streakData = fetched }
+
+            let fetchedProfile = try? await profileTask
+            bodyDiagramGender = Self.genderForBodyDiagram(profileSex: fetchedProfile?.sex)
+            profileSex = fetchedProfile?.sex
+            bodyweightLbs = fetchedProfile?.bodyWeightKg.map { $0 * 2.20462 }
+
+            let fetchedTopLifts = (try? await topLiftsTask) ?? []
+            topLifts = fetchedTopLifts
+
+            let fetchedSessions = (try? await sessionsTask) ?? []
+            sessions = fetchedSessions
+
+            let fetchedTrend = (try? await volumeTrendTask) ?? []
+            volumeTrend = fetchedTrend
+
+            let fetchedMuscle = (try? await muscleTask) ?? []
+            muscleDistribution = fetchedMuscle
+
+            if let fetched = try? await fractionalTask { fractionalDistribution = fetched }
+            if let fetched = try? await prTask { recentPRs = fetched }
+            if let fetched = try? await frequencyTask { frequencyData = fetched }
+            if let fetched = try? await effectiveRepsTask { effectiveRepsSummary = fetched }
+            let fetchedRPE = try? await rpeTask
+            averageRPE = fetchedRPE
+            if let fetched = try? await pushPullTask { pushPullBalance = fetched }
+            if let fetched = try? await consistencyTask { consistencyScore = fetched }
+            if let fetched = try? await landmarkTask { volumeLandmarks = fetched }
+            prDates = (try? await prDatesTask) ?? []
+
+            // Past-me snapshot: compare the user's top tracked lift to where
+            // they were ~3 months ago. Skipped silently if there's not enough
+            // history.
+            if let topLift = fetchedTopLifts.first {
+                pastMeSnapshot = (try? await analyticsService.fetchPastMeSnapshot(
+                    userId: userId,
+                    exerciseId: topLift.exerciseId,
+                    exerciseName: topLift.exerciseName
+                )) ?? nil
+            } else {
+                pastMeSnapshot = nil
+            }
 
             if let currentWeek = fetchedTrend.last {
                 weeklyVolume = currentWeek.totalVolume
@@ -237,10 +358,10 @@ final class ProgressDashboardViewModel {
             insights = InsightEngine.generateInsights(
                 volumeTrend: fetchedTrend,
                 muscleDistribution: fetchedMuscle,
-                streakData: fetchedStreak,
-                recentPRs: fetchedPRs,
+                streakData: streakData,
+                recentPRs: recentPRs,
                 totalSessions: fetchedSessions.count,
-                lastWorkoutDate: fetchedStreak.lastWorkoutDate,
+                lastWorkoutDate: streakData?.lastWorkoutDate,
                 averageRPE: fetchedRPE,
                 topLifts: fetchedTopLifts,
                 weeklySessionCount: weeklySessionCount
@@ -259,6 +380,76 @@ final class ProgressDashboardViewModel {
             // Silently handle - non-critical
         }
         isLoading = false
+    }
+
+    /// Maps the profile.sex string to MuscleMap's BodyGender. Anything other than
+    /// "female" falls back to `.male` so the diagram still renders for users
+    /// who chose "prefer_not_to_say" or never set the field.
+    static func genderForBodyDiagram(profileSex: String?) -> BodyGender {
+        profileSex?.lowercased() == "female" ? .female : .male
+    }
+
+    /// Updates `selectedTimeWindow` and re-fetches every section whose data
+    /// is scoped by that window: weekly volume trend, muscle distribution
+    /// (direct + fractional), effective reps, and PR markers for the
+    /// heatmap.
+    func setTimeWindow(_ window: TimeWindow) async {
+        guard window != selectedTimeWindow else { return }
+        selectedTimeWindow = window
+        isReloadingWindowedSections = true
+        defer { isReloadingWindowedSections = false }
+        guard let userId = try? await supabase.auth.session.user.id else { return }
+
+        async let trendTask = analyticsService.fetchWeeklyVolumeTrend(
+            userId: userId,
+            weeks: window.weeks,
+            muscleGroup: volumeMuscleFilter
+        )
+        async let muscleTask = analyticsService.fetchMuscleGroupDistribution(userId: userId, days: window.days)
+        async let fractionalTask = analyticsService.fetchFractionalMuscleDistribution(userId: userId, days: window.days)
+        async let effectiveTask = analyticsService.fetchEffectiveRepsSummary(userId: userId, days: window.days)
+        async let prDatesTask = analyticsService.fetchPRDates(userId: userId, days: window.days)
+
+        let fetchedTrend = (try? await trendTask) ?? []
+        let fetchedMuscle = (try? await muscleTask) ?? []
+        let fetchedFractional = (try? await fractionalTask) ?? []
+        let fetchedEffective = (try? await effectiveTask) ?? []
+        let fetchedPRDates = (try? await prDatesTask) ?? []
+
+        volumeTrend = fetchedTrend
+        muscleDistribution = fetchedMuscle
+        fractionalDistribution = fetchedFractional
+        effectiveRepsSummary = fetchedEffective
+        prDates = fetchedPRDates
+    }
+
+    /// Updates `volumeMuscleFilter` and re-fetches the weekly volume trend
+    /// filtered to that muscle group (or unfiltered when nil).
+    func setVolumeMuscleFilter(_ muscle: String?) async {
+        volumeMuscleFilter = muscle
+        isReloadingVolumeTrend = true
+        defer { isReloadingVolumeTrend = false }
+        guard let userId = try? await supabase.auth.session.user.id else { return }
+        let fetched = (try? await analyticsService.fetchWeeklyVolumeTrend(
+            userId: userId,
+            weeks: 8,
+            muscleGroup: muscle
+        )) ?? []
+        volumeTrend = fetched
+    }
+
+    /// Sessions whose completedAt (or startedAt fallback) lands in the
+    /// calendar week containing `weekStart`. Used by the volume chart's
+    /// tap-to-drill week detail sheet.
+    func sessions(inWeekStartingOn weekStart: Date) -> [WorkoutSession] {
+        let calendar = Calendar.current
+        return sessions.filter { session in
+            let date = session.completedAt ?? session.startedAt
+            guard let sessionWeekStart = calendar.dateInterval(of: .weekOfYear, for: date)?.start else {
+                return false
+            }
+            return calendar.isDate(sessionWeekStart, inSameDayAs: weekStart)
+        }
     }
 
     func loadSessionDetail(sessionId: UUID) async {

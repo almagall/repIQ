@@ -191,6 +191,93 @@ struct PlateauAnalysis {
     let causes: [PlateauCause]
 }
 
+// MARK: - Time Window
+
+/// User-selected window that scopes the windowable Progress-tab analytics
+/// (volume trend, muscle distribution, effective reps, PR markers). Sections
+/// whose meaning is independent of the window — current month stats, last
+/// workout, weekly volume zones — ignore this.
+enum TimeWindow: String, CaseIterable, Sendable {
+    case fourWeeks
+    case twelveWeeks
+    case sixMonths
+    case oneYear
+    case all
+
+    var label: String {
+        switch self {
+        case .fourWeeks: return "4W"
+        case .twelveWeeks: return "12W"
+        case .sixMonths: return "6M"
+        case .oneYear: return "1Y"
+        case .all: return "ALL"
+        }
+    }
+
+    /// Approximate days the window spans; "all" capped at two years.
+    var days: Int {
+        switch self {
+        case .fourWeeks: return 28
+        case .twelveWeeks: return 84
+        case .sixMonths: return 180
+        case .oneYear: return 365
+        case .all: return 730
+        }
+    }
+
+    /// Number of weeks for trend-style fetches.
+    var weeks: Int {
+        switch self {
+        case .fourWeeks: return 4
+        case .twelveWeeks: return 12
+        case .sixMonths: return 26
+        case .oneYear: return 52
+        case .all: return 104
+        }
+    }
+}
+
+// MARK: - Past Me Snapshot
+
+/// Compares the user's current top lift to where they were ~3 months ago.
+/// Powers the "vs past you" card under the Last Workout recap.
+struct PastMeSnapshot: Sendable {
+    let exerciseId: UUID
+    let exerciseName: String
+    /// Most recent best e1RM for this exercise.
+    let currentE1RM: Double
+    /// Best e1RM the user achieved in the snapshot closest to `comparisonDate`.
+    let pastE1RM: Double
+    /// The actual date of the past snapshot (may not be exactly 3 months).
+    let pastDate: Date
+    /// Best single-set weight × reps at the past snapshot, for the "you used
+    /// to lift X for Y reps" narrative.
+    let pastWeight: Double
+    let pastReps: Int
+
+    /// Pounds gained from past to current. May be negative.
+    var delta: Double { currentE1RM - pastE1RM }
+}
+
+// MARK: - Recent PR Entry
+
+/// A PR with the exercise name and previous-best value for delta display.
+/// `previousValue` is nil when this PR is the user's first record of this
+/// type for that exercise.
+struct RecentPREntry: Identifiable, Sendable {
+    let record: PersonalRecord
+    let exerciseName: String
+    let previousValue: Double?
+
+    var id: UUID { record.id }
+
+    /// Absolute difference vs the previous best. Nil when there is no prior.
+    var delta: Double? {
+        guard let previousValue else { return nil }
+        return record.value - previousValue
+    }
+}
+
 // MARK: - Effective Reps
 
 struct EffectiveRepsSummary: Identifiable {

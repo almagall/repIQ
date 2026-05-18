@@ -188,8 +188,9 @@ struct AnalyticsService: Sendable {
 
     // MARK: - Recent PRs
 
-    /// Fetches recent personal records with exercise names.
-    func fetchRecentPRs(userId: UUID, limit: Int = 10) async throws -> [(record: PersonalRecord, exerciseName: String)] {
+    /// Fetches recent personal records with exercise names and the
+    /// previous-best value per record (used to render "+X vs previous").
+    func fetchRecentPRs(userId: UUID, limit: Int = 10) async throws -> [RecentPREntry] {
         let records: [PersonalRecord] = try await supabase.from("personal_records")
             .select()
             .eq("user_id", value: userId.uuidString)
@@ -201,11 +202,230 @@ struct AnalyticsService: Sendable {
         guard !records.isEmpty else { return [] }
 
         let exerciseIds = Array(Set(records.map(\.exerciseId)))
-        let names = try await exerciseService.fetchExercisesByIds(exerciseIds)
+        async let namesTask = exerciseService.fetchExercisesByIds(exerciseIds)
+        async let previousTask = fetchPreviousPRValues(userId: userId, records: records)
+        let names = try await namesTask
+        let previous = (try? await previousTask) ?? [:]
 
         return records.map { record in
-            (record: record, exerciseName: names[record.exerciseId] ?? "Unknown")
+            RecentPREntry(
+                record: record,
+                exerciseName: names[record.exerciseId] ?? "Unknown",
+                previousValue: previous[record.id]
+            )
         }
+    }
+
+    /// For each PR in `records`, returns the best value of the same record type
+    /// for that exercise achieved strictly before the PR's `achievedAt`. Used
+    /// to compute the "+X vs previous best" delta on PR cards.
+    private func fetchPreviousPRValues(userId: UUID, records: [PersonalRecord]) async throws -> [UUID: Double] {
+        let exerciseIds = Array(Set(records.map(\.exerciseId)))
+        guard !exerciseIds.isEmpty else { return [:] }
+
+        struct WorkingSetRow: Decodable {
+            let session_id: UUID
+            let exercise_id: UUID
+            let weight: Double
+            let reps: Int
+            let completed_at: String?
+        }
+
+        let rows: [WorkingSetRow] = try await supabase.from("workout_sets")
+            .select("session_id, exercise_id, weight, reps, completed_at, workout_sessions!inner(user_id, status)")
+            .eq("workout_sessions.user_id", value: userId.uuidString)
+            .eq("workout_sessions.status", value: "completed")
+            .in("exercise_id", values: exerciseIds.map(\.uuidString))
+            .eq("set_type", value: "working")
+            .execute()
+            .value
+
+        let isoFractional = ISO8601DateFormatter()
+        isoFractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let isoPlain = ISO8601DateFormatter()
+        isoPlain.formatOptions = [.withInternetDateTime]
+        func parseDate(_ str: String?) -> Date? {
+            guard let str else { return nil }
+            return isoFractional.date(from: str) ?? isoPlain.date(from: str)
+        }
+
+        // Pre-bucket sets by exercise so we don't scan the full list per PR
+        var setsByExercise: [UUID: [(date: Date, weight: Double, reps: Int, sessionId: UUID)]] = [:]
+        for row in rows {
+            guard let date = parseDate(row.completed_at) else { continue }
+            setsByExercise[row.exercise_id, default: []].append((date, row.weight, row.reps, row.session_id))
+        }
+
+        var result: [UUID: Double] = [:]
+        for record in records {
+            guard let allSets = setsByExercise[record.exerciseId] else { continue }
+            let prior = allSets.filter { $0.date < record.achievedAt }
+            guard !prior.isEmpty else { continue }
+
+            let previousBest: Double?
+            switch record.recordType {
+            case .weight:
+                previousBest = prior.map(\.weight).max()
+            case .reps:
+                previousBest = prior.map { Double($0.reps) }.max()
+            case .estimated1rm:
+                previousBest = prior.map { $0.weight * (1.0 + Double($0.reps) / 30.0) }.max()
+            case .volume:
+                // Volume PRs are per-session; sum each prior session's volume
+                // and pick the largest.
+                var sessionVolumes: [UUID: Double] = [:]
+                for s in prior {
+                    sessionVolumes[s.sessionId, default: 0] += s.weight * Double(s.reps)
+                }
+                previousBest = sessionVolumes.values.max()
+            }
+
+            if let value = previousBest, value > 0 {
+                result[record.id] = value
+            }
+        }
+        return result
+    }
+
+    // MARK: - Weekly Volume by Muscle
+
+    /// Returns weekly volume summaries for the past N weeks, restricted to
+    /// exercises whose primary muscle group matches `muscleGroup`. When
+    /// `muscleGroup` is nil the result equals `fetchWeeklyVolumeTrend`.
+    func fetchWeeklyVolumeTrend(userId: UUID, weeks: Int = 8, muscleGroup: String?) async throws -> [WeeklyVolumeSummary] {
+        guard let muscleGroup else {
+            return try await fetchWeeklyVolumeTrend(userId: userId, weeks: weeks)
+        }
+
+        let calendar = Calendar.current
+        guard let startDate = calendar.date(byAdding: .weekOfYear, value: -weeks, to: Date()) else {
+            return []
+        }
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        let sessions: [WorkoutSession] = try await supabase.from("workout_sessions")
+            .select()
+            .eq("user_id", value: userId.uuidString)
+            .eq("status", value: "completed")
+            .gte("completed_at", value: formatter.string(from: startDate))
+            .order("completed_at", ascending: true)
+            .execute()
+            .value
+
+        guard !sessions.isEmpty else {
+            return buildEmptyWeeks(from: startDate, count: weeks)
+        }
+
+        let sessionIds = sessions.map(\.id)
+        let allSets = try await fetchSetsForSessions(sessionIds)
+        let workingSets = allSets.filter { $0.setType == .working }
+
+        let exerciseIds = Array(Set(workingSets.map(\.exerciseId)))
+        let exercises = try await fetchExercisesFull(ids: exerciseIds)
+        let exerciseMap = Dictionary(uniqueKeysWithValues: exercises.map { ($0.id, $0) })
+
+        // Filter sets to the requested muscle group via primary muscle match
+        let filteredSets = workingSets.filter { set in
+            exerciseMap[set.exerciseId]?.muscleGroup == muscleGroup
+        }
+
+        var setsBySession: [UUID: [WorkoutSet]] = [:]
+        for set in filteredSets {
+            setsBySession[set.sessionId, default: []].append(set)
+        }
+
+        var weekBuckets: [Date: (volume: Double, sessions: Int)] = [:]
+        for session in sessions {
+            let date = session.completedAt ?? session.startedAt
+            guard let weekStart = calendar.dateInterval(of: .weekOfYear, for: date)?.start else { continue }
+            let sessionVolume = (setsBySession[session.id] ?? [])
+                .reduce(0.0) { $0 + $1.volume }
+            // Only count the session if it contained matching volume
+            if sessionVolume > 0 {
+                weekBuckets[weekStart, default: (0, 0)].volume += sessionVolume
+                weekBuckets[weekStart, default: (0, 0)].sessions += 1
+            } else {
+                _ = weekBuckets[weekStart, default: (0, 0)]
+            }
+        }
+
+        var results: [WeeklyVolumeSummary] = []
+        var current = calendar.dateInterval(of: .weekOfYear, for: startDate)?.start ?? startDate
+        let now = Date()
+        while current <= now {
+            let bucket = weekBuckets[current]
+            results.append(WeeklyVolumeSummary(
+                weekStart: current,
+                totalVolume: bucket?.volume ?? 0,
+                sessionCount: bucket?.sessions ?? 0
+            ))
+            guard let next = calendar.date(byAdding: .weekOfYear, value: 1, to: current) else { break }
+            current = next
+        }
+
+        return results
+    }
+
+    // MARK: - Past Me Snapshot
+
+    /// Builds a "you vs ~3 months ago" snapshot for an exercise. Returns nil
+    /// when the user doesn't have enough history (no snapshot at least
+    /// ~45 days old).
+    func fetchPastMeSnapshot(userId: UUID, exerciseId: UUID, exerciseName: String, monthsAgo: Int = 3) async throws -> PastMeSnapshot? {
+        let snapshots = try await fetchExerciseHistory(userId: userId, exerciseId: exerciseId)
+        guard snapshots.count >= 2, let currentSnapshot = snapshots.last else { return nil }
+
+        let calendar = Calendar.current
+        guard let comparisonDate = calendar.date(byAdding: .month, value: -monthsAgo, to: Date()) else {
+            return nil
+        }
+
+        // Pick the snapshot closest to comparisonDate among those that are
+        // at least ~45 days older than the current snapshot. This avoids
+        // comparing this week to last week for users who only have a month
+        // of data.
+        let minimumGap: TimeInterval = 45 * 24 * 60 * 60
+        let eligible = snapshots.filter {
+            currentSnapshot.date.timeIntervalSince($0.date) >= minimumGap
+        }
+        guard !eligible.isEmpty else { return nil }
+
+        let past = eligible.min(by: { abs($0.date.timeIntervalSince(comparisonDate)) < abs($1.date.timeIntervalSince(comparisonDate)) }) ?? eligible.first!
+
+        return PastMeSnapshot(
+            exerciseId: exerciseId,
+            exerciseName: exerciseName,
+            currentE1RM: currentSnapshot.estimated1RM,
+            pastE1RM: past.estimated1RM,
+            pastDate: past.date,
+            pastWeight: past.bestWeight,
+            pastReps: past.bestReps
+        )
+    }
+
+    // MARK: - PR Dates (for heatmap overlay)
+
+    /// Returns the set of calendar days within the past `days` window on
+    /// which the user hit at least one PR. Used to overlay gold markers on
+    /// the consistency heatmap.
+    func fetchPRDates(userId: UUID, days: Int = 84) async throws -> Set<Date> {
+        let calendar = Calendar.current
+        guard let startDate = calendar.date(byAdding: .day, value: -days, to: Date()) else {
+            return []
+        }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        let records: [PersonalRecord] = try await supabase.from("personal_records")
+            .select()
+            .eq("user_id", value: userId.uuidString)
+            .gte("achieved_at", value: formatter.string(from: startDate))
+            .execute()
+            .value
+
+        return Set(records.map { calendar.startOfDay(for: $0.achievedAt) })
     }
 
     // MARK: - Training Frequency

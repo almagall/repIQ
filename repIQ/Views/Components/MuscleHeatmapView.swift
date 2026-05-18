@@ -6,13 +6,14 @@ import MuscleMap
 struct MuscleHeatmapView: View {
     /// Maps muscle group name (lowercase) → sets completed this session
     let muscleVolume: [String: Int]
+    var gender: BodyGender = .male
 
     var body: some View {
         VStack(spacing: RQSpacing.md) {
             // Front + Back diagrams side by side
             HStack(spacing: RQSpacing.sm) {
                 VStack(spacing: RQSpacing.xxs) {
-                    BodyView(gender: .male, side: .front)
+                    BodyView(gender: gender, side: .front)
                         .heatmap(heatmapData, colorScale: .workout)
                         .bodyStyle(.neon)
                         .frame(maxWidth: .infinity)
@@ -23,7 +24,7 @@ struct MuscleHeatmapView: View {
                 }
 
                 VStack(spacing: RQSpacing.xxs) {
-                    BodyView(gender: .male, side: .back)
+                    BodyView(gender: gender, side: .back)
                         .heatmap(heatmapData, colorScale: .workout)
                         .bodyStyle(.neon)
                         .frame(maxWidth: .infinity)

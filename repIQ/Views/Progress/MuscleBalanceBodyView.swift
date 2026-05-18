@@ -9,6 +9,7 @@ import MuscleMap
 /// Tapping a muscle on either silhouette opens a detail sheet for that group.
 struct MuscleBalanceBodyView: View {
     let distribution: [MuscleGroupVolume]
+    var gender: BodyGender = .male
     @State private var selectedGroup: MuscleGroupVolume?
 
     // MARK: - Data derivations
@@ -60,7 +61,7 @@ struct MuscleBalanceBodyView: View {
     private var bodyDiagramSection: some View {
         HStack(alignment: .top, spacing: RQSpacing.sm) {
             VStack(spacing: RQSpacing.xs) {
-                BodyView(gender: .male, side: .front)
+                BodyView(gender: gender, side: .front)
                     .heatmap(heatmapData, colorScale: .workout)
                     .bodyStyle(.neon)
                     .onMuscleSelected { muscle, _ in
@@ -75,7 +76,7 @@ struct MuscleBalanceBodyView: View {
             }
 
             VStack(spacing: RQSpacing.xs) {
-                BodyView(gender: .male, side: .back)
+                BodyView(gender: gender, side: .back)
                     .heatmap(heatmapData, colorScale: .workout)
                     .bodyStyle(.neon)
                     .onMuscleSelected { muscle, _ in

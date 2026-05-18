@@ -6,6 +6,9 @@ import SwiftUI
 /// would just be visual noise.
 struct ConsistencyHeatmap: View {
     let dailyData: [(date: Date, count: Int)]
+    /// Days within the heatmap window on which the user hit a PR. Rendered
+    /// with a small gold dot in the corner of the cell.
+    var prDates: Set<Date> = []
 
     private let weekCount = 12
     private let dayCount = 7
@@ -63,10 +66,19 @@ struct ConsistencyHeatmap: View {
     private func dayCell(weekIdx: Int, dayOfWeek: Int) -> some View {
         let date = dateFor(weekIdx: weekIdx, dayOfWeek: dayOfWeek)
         let trained = countFor(date: date) > 0
+        let isPRDay = prDates.contains(date)
 
         return RoundedRectangle(cornerRadius: 2)
             .fill(trained ? RQColors.accent : RQColors.surfaceTertiary)
             .frame(width: cellSize, height: cellSize)
+            .overlay(alignment: .topTrailing) {
+                if isPRDay {
+                    Circle()
+                        .fill(RQColors.supersetGold)
+                        .frame(width: 5, height: 5)
+                        .offset(x: 1, y: -1)
+                }
+            }
     }
 
     // MARK: - Date Math

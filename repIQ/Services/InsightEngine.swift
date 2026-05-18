@@ -9,7 +9,7 @@ struct InsightEngine {
         volumeTrend: [WeeklyVolumeSummary],
         muscleDistribution: [MuscleGroupVolume],
         streakData: StreakData?,
-        recentPRs: [(record: PersonalRecord, exerciseName: String)],
+        recentPRs: [RecentPREntry],
         totalSessions: Int,
         lastWorkoutDate: Date?,
         averageRPE: Double? = nil,
@@ -197,7 +197,7 @@ struct InsightEngine {
     }
 
     /// Celebrates a PR achieved in the last 7 days.
-    private static func prCelebration(recentPRs: [(record: PersonalRecord, exerciseName: String)]) -> InsightCard? {
+    private static func prCelebration(recentPRs: [RecentPREntry]) -> InsightCard? {
         let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
         guard let recentPR = recentPRs.first(where: { $0.record.achievedAt >= sevenDaysAgo }) else {
             return nil

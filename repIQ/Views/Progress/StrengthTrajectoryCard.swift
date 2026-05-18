@@ -5,19 +5,22 @@ import SwiftUI
 /// 4-week delta, velocity status, a tiny sparkline, and a coaching narrative.
 struct StrengthTrajectoryCard: View {
     let lifts: [TopLiftTrajectory]
+    /// Bodyweight in lbs, used to classify each lift against the strength
+    /// standards. Nil hides the tier chip.
+    var bodyweightLbs: Double? = nil
+    /// Profile sex ("male"/"female"/"prefer_not_to_say"). Drives which
+    /// standards table is consulted.
+    var profileSex: String? = nil
     var onSelect: ((TopLiftTrajectory) -> Void)? = nil
     var onBrowseAll: (() -> Void)? = nil
+    var onCompare: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: RQSpacing.md) {
-            HStack {
-                Text("STRENGTH TRAJECTORY")
-                    .font(RQTypography.label)
-                    .textCase(.uppercase)
-                    .tracking(1.5)
-                    .foregroundColor(RQColors.textSecondary)
-                Spacer()
-            }
+            RQSectionHeader(
+                title: "STRENGTH TRAJECTORY",
+                trailing: lifts.count >= 2 ? AnyView(compareButton) : nil
+            )
 
             if lifts.isEmpty {
                 RQCard {
@@ -70,6 +73,22 @@ struct StrengthTrajectoryCard: View {
         }
     }
 
+    private var compareButton: some View {
+        Button {
+            onCompare?()
+        } label: {
+            HStack(spacing: 2) {
+                Text("COMPARE")
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(0.5)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 8, weight: .semibold))
+            }
+            .foregroundColor(RQColors.accent)
+        }
+        .buttonStyle(.plain)
+    }
+
     private func liftRow(_ lift: TopLiftTrajectory) -> some View {
         Button {
             onSelect?(lift)
@@ -114,6 +133,18 @@ struct StrengthTrajectoryCard: View {
                                 .lineLimit(1)
                         }
                     }
+
+                    // Strength tier chip (squat/bench/deadlift/OHP/row only).
+                    // Shown when we have the user's bodyweight on file.
+                    if let bw = bodyweightLbs,
+                       let classification = StrengthStandards.classify(
+                           exerciseName: lift.exerciseName,
+                           e1RM: lift.currentE1RM,
+                           bodyweightLbs: bw,
+                           sex: profileSex
+                       ) {
+                        strengthTierChip(classification: classification, bodyweightLbs: bw)
+                    }
                 }
 
                 Spacer(minLength: RQSpacing.sm)
@@ -147,6 +178,47 @@ struct StrengthTrajectoryCard: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    private func strengthTierChip(
+        classification: (category: StrengthStandards.Category, tier: StrengthStandards.Tier, ratio: Double),
+        bodyweightLbs: Double
+    ) -> some View {
+        let nextTarget = StrengthStandards.nextThreshold(
+            category: classification.category,
+            tier: classification.tier,
+            bodyweightLbs: bodyweightLbs,
+            sex: nil // ignored — already encoded in the classifying call
+        )
+
+        return HStack(spacing: RQSpacing.xs) {
+            HStack(spacing: 3) {
+                Circle()
+                    .fill(classification.tier.color)
+                    .frame(width: 5, height: 5)
+                Text(classification.tier.displayName.uppercased())
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(0.5)
+            }
+            .foregroundColor(classification.tier.color)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+            .overlay(
+                RoundedRectangle(cornerRadius: RQRadius.small)
+                    .stroke(classification.tier.color.opacity(0.6), lineWidth: 0.5)
+            )
+
+            Text(String(format: "%.2f× BW", classification.ratio))
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(RQColors.textTertiary)
+
+            if let target = nextTarget {
+                Text("· \(Int(target.rounded())) lb to next")
+                    .font(.system(size: 10))
+                    .foregroundColor(RQColors.textTertiary)
+                    .lineLimit(1)
+            }
+        }
     }
 
     private func sparkline(_ values: [Double], color: Color) -> some View {

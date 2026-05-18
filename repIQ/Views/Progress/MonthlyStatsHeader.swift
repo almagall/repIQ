@@ -14,14 +14,7 @@ struct MonthlyStatsHeader: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: RQSpacing.sm) {
-            HStack {
-                Text("THIS MONTH · \(monthLabel)")
-                    .font(RQTypography.label)
-                    .textCase(.uppercase)
-                    .tracking(1.5)
-                    .foregroundColor(RQColors.textSecondary)
-                Spacer()
-            }
+            RQSectionHeader(title: "THIS MONTH · \(monthLabel)")
 
             RQCard {
                 HStack(spacing: 0) {

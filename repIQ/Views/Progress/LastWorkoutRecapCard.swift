@@ -50,14 +50,7 @@ struct LastWorkoutRecapCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: RQSpacing.md) {
-            HStack {
-                Text("LAST WORKOUT")
-                    .font(RQTypography.label)
-                    .textCase(.uppercase)
-                    .tracking(1.5)
-                    .foregroundColor(RQColors.textSecondary)
-                Spacer()
-            }
+            RQSectionHeader(title: "LAST WORKOUT")
 
             NavigationLink(value: recap.sessionId) {
                 RQCard {
