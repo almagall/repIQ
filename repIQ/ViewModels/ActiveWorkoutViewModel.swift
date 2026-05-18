@@ -740,7 +740,15 @@ final class ActiveWorkoutViewModel {
 
             // 4. Build ExerciseLogEntry array
             exercises = dayExercises.sorted(by: { $0.sortOrder < $1.sortOrder }).map { dayExercise in
-                let prevSets = previousData[dayExercise.exerciseId] ?? []
+                // Filter prior-session sets to WORKING ONLY before storage + positional
+                // indexing. Otherwise warmups at the front of the prior session's set
+                // list shift the alignment — working set 1 (this session) ends up
+                // matched to prev warmup #1, working set 2 to prev warmup #2, etc.
+                // Downstream consumers (per-set "Last:" lines, deload retargets, set
+                // feedback) all want working-only context anyway.
+                let prevSets = (previousData[dayExercise.exerciseId] ?? []).filter {
+                    $0.setType == .working
+                }
                 // Defense-in-depth: re-clamp the loaded target's rep range against
                 // the current rep cap. Saved targets may have been computed when the
                 // cap was different (or unset), so we always re-apply the cap on load.
@@ -1774,7 +1782,8 @@ final class ActiveWorkoutViewModel {
         let original = exercises[exerciseIndex]
 
         // Fetch previous session data for the NEW exercise (if user has logged it before
-        // on this same workout day)
+        // on this same workout day). Filter to working-only so the warmup-bleed-into-
+        // working-set bug doesn't reappear via the substitution path.
         var previousSets: [WorkoutSet] = []
         if let userId = try? await supabase.auth.session.user.id {
             let history = (try? await workoutService.fetchPreviousSetsForExercise(
@@ -1783,7 +1792,7 @@ final class ActiveWorkoutViewModel {
                 workoutDayId: currentWorkoutDayId,
                 limit: 1
             )) ?? []
-            previousSets = history.first ?? []
+            previousSets = (history.first ?? []).filter { $0.setType == .working }
         }
 
         // Build new sets: pre-fill from substitute's history or leave blank
