@@ -657,13 +657,95 @@ struct ProgressionService: Sendable {
         return result
     }
 
+    /// Derives the user's current PRs for an exercise from the canonical
+    /// `workout_sets` history rather than the `personal_records` table.
+    ///
+    /// Why: `personal_records` is populated only at workout completion via
+    /// `detectPRs`, so if the table was ever cleared, missed an insert, or
+    /// pre-dates a user's training history, it doesn't reflect reality.
+    /// When that happens, inline PR detection compares this set's weight
+    /// against 0 and flags every working set ≥ 1 lb as a new weight PR.
+    /// Deriving from `workout_sets` makes the source of truth the actual
+    /// logged sets, not the (denormalized) PR cache.
     func fetchCurrentPRs(userId: UUID, exerciseId: UUID) async throws -> [PersonalRecord] {
-        try await supabase.from("personal_records")
-            .select()
-            .eq("user_id", value: userId.uuidString)
+        struct WorkingSetRow: Decodable {
+            let session_id: UUID
+            let weight: Double
+            let reps: Int
+            let completed_at: String?
+        }
+
+        let rows: [WorkingSetRow] = try await supabase.from("workout_sets")
+            .select("session_id, weight, reps, completed_at, workout_sessions!inner(user_id, status)")
+            .eq("workout_sessions.user_id", value: userId.uuidString)
+            .eq("workout_sessions.status", value: "completed")
             .eq("exercise_id", value: exerciseId.uuidString)
+            .eq("set_type", value: "working")
             .execute()
             .value
+
+        guard !rows.isEmpty else { return [] }
+
+        let isoFractional = ISO8601DateFormatter()
+        isoFractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let isoPlain = ISO8601DateFormatter()
+        isoPlain.formatOptions = [.withInternetDateTime]
+        func parseDate(_ str: String?) -> Date {
+            guard let str else { return Date() }
+            return isoFractional.date(from: str) ?? isoPlain.date(from: str) ?? Date()
+        }
+
+        var prs: [PersonalRecord] = []
+
+        // Heaviest weight ever (with the reps achieved at that weight)
+        if let best = rows.max(by: { $0.weight < $1.weight }), best.weight > 0 {
+            prs.append(PersonalRecord(
+                id: UUID(), userId: userId, exerciseId: exerciseId,
+                recordType: .weight, value: best.weight,
+                repsAtWeight: best.reps, sessionId: best.session_id,
+                achievedAt: parseDate(best.completed_at), createdAt: parseDate(best.completed_at)
+            ))
+        }
+
+        // Most reps ever (any weight)
+        if let best = rows.max(by: { $0.reps < $1.reps }), best.reps > 0 {
+            prs.append(PersonalRecord(
+                id: UUID(), userId: userId, exerciseId: exerciseId,
+                recordType: .reps, value: Double(best.reps),
+                repsAtWeight: nil, sessionId: best.session_id,
+                achievedAt: parseDate(best.completed_at), createdAt: parseDate(best.completed_at)
+            ))
+        }
+
+        // Best estimated 1RM (Epley): weight * (1 + reps/30)
+        let withE1RM = rows.map { ($0, $0.weight * (1.0 + Double($0.reps) / 30.0)) }
+        if let best = withE1RM.max(by: { $0.1 < $1.1 }), best.1 > 0 {
+            prs.append(PersonalRecord(
+                id: UUID(), userId: userId, exerciseId: exerciseId,
+                recordType: .estimated1rm, value: best.1,
+                repsAtWeight: nil, sessionId: best.0.session_id,
+                achievedAt: parseDate(best.0.completed_at), createdAt: parseDate(best.0.completed_at)
+            ))
+        }
+
+        // Best per-session volume (sum of weight*reps across the session's
+        // working sets for this exercise)
+        var volumeBySession: [UUID: Double] = [:]
+        for row in rows {
+            volumeBySession[row.session_id, default: 0] += row.weight * Double(row.reps)
+        }
+        if let (bestSessionId, maxVolume) = volumeBySession.max(by: { $0.value < $1.value }),
+           maxVolume > 0 {
+            let representativeDate = rows.first(where: { $0.session_id == bestSessionId })?.completed_at
+            prs.append(PersonalRecord(
+                id: UUID(), userId: userId, exerciseId: exerciseId,
+                recordType: .volume, value: maxVolume,
+                repsAtWeight: nil, sessionId: bestSessionId,
+                achievedAt: parseDate(representativeDate), createdAt: parseDate(representativeDate)
+            ))
+        }
+
+        return prs
     }
 
     func upsertPR(_ pr: PersonalRecord) async throws {
