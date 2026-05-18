@@ -18,7 +18,12 @@ private let postgrestDecoder: JSONDecoder = {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
         f.locale = Locale(identifier: "en_US_POSIX")
-        f.timeZone = TimeZone(identifier: "UTC")
+        // Decode bare DATE columns (monthly_wrapped.month_start, weekly_digests.week_start,
+        // birth_date, target_date) into the device's local timezone. Writes use a default-
+        // timezone DateFormatter, so reading back as UTC was shifting dates backward by a
+        // day in negative offsets — manifesting as the Wrapped header showing the wrong
+        // month. Pinning the decoder to local timezone keeps display and storage aligned.
+        f.timeZone = TimeZone.current
         return f
     }()
     let plainTimestamp: DateFormatter = {

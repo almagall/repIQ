@@ -55,6 +55,9 @@ struct WrappedStoryView: View {
             }
 
             // Tap zones: left third = previous, right two-thirds = next.
+            // Disabled on the archetype (last) slide so its "View Full Report",
+            // "Share my Wrapped", and "View past months" buttons receive taps
+            // instead of being intercepted into a no-op slide-advance.
             HStack(spacing: 0) {
                 Color.clear
                     .frame(maxWidth: .infinity)
@@ -66,7 +69,7 @@ struct WrappedStoryView: View {
                     .onTapGesture { advance(by: 1) }
                     .frame(maxWidth: .infinity)
             }
-            .allowsHitTesting(true)
+            .allowsHitTesting(currentIndex < slides.count - 1)
         }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
