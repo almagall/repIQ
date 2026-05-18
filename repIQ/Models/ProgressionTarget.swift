@@ -77,10 +77,15 @@ struct ProgressionTarget: Sendable {
     }
 
     var targetRepRangeDisplay: String {
-        if targetRepsLow == targetRepsHigh {
-            return "\(targetRepsLow)"
+        // Defensive ordering: if a saved row has low > high (legacy data from
+        // before the rep-cap clamping bug was fixed), collapse to a single value
+        // rather than rendering as "13-12".
+        let lo = min(targetRepsLow, targetRepsHigh)
+        let hi = max(targetRepsLow, targetRepsHigh)
+        if lo == hi {
+            return "\(lo)"
         }
-        return "\(targetRepsLow)-\(targetRepsHigh)"
+        return "\(lo)-\(hi)"
     }
 
     /// Effective RPE accounting for mesocycle progression

@@ -99,11 +99,14 @@ struct ProgressionService: Sendable {
             reasoning = "You've been training \(weeks) weeks without a deload. Scheduled recovery week to prevent overtraining and break through plateaus."
 
         } else if sessionE1RMs.count < 2 {
-            // Only 1 session — maintain (repeat what they did)
+            // Only 1 session — maintain (repeat what they did, but never above the rep cap).
+            // Without clamping low+high to the cap, a prior over-cap rep count
+            // (e.g. logged 13 with a 12 cap) leaks through as an inverted "13-12" range.
             decision = .maintain
             tWeight = roundToIncrement(medWeight, increment)
-            tRepsLow = medReps
-            tRepsHigh = min(medReps, effectiveUpperBound)
+            let cappedReps = min(medReps, effectiveUpperBound)
+            tRepsLow = cappedReps
+            tRepsHigh = cappedReps
             reasoning = "First session tracked. Repeat to establish a baseline."
 
         } else {
@@ -129,11 +132,14 @@ struct ProgressionService: Sendable {
                 reasoning = "Performance has declined for multiple sessions. Deloading to allow recovery."
 
             } else if rpeFatigueDetected && percentChange >= -0.02 {
-                // RPE rising at same e1RM → approaching fatigue ceiling (Gap 7)
+                // RPE rising at same e1RM → approaching fatigue ceiling (Gap 7).
+                // Clamp both bounds to the cap so over-cap reps from the prior
+                // session don't produce an inverted "13-12" style range.
                 decision = .maintain
                 tWeight = roundToIncrement(medWeight, increment)
-                tRepsLow = medReps
-                tRepsHigh = min(medReps, effectiveUpperBound)
+                let cappedReps = min(medReps, effectiveUpperBound)
+                tRepsLow = cappedReps
+                tRepsHigh = cappedReps
                 reasoning = "Weight is stable but effort is increasing. Maintaining to manage fatigue before it impacts performance."
 
             } else if medWeight < bestRecentWeight * 0.90 {
@@ -245,9 +251,12 @@ struct ProgressionService: Sendable {
             reasoning = "Scheduled recovery week after \(weeks) weeks of training."
 
         } else if recentSessions.count < 2 {
+            // Maintain — but cap both bounds to avoid an inverted range when the
+            // prior session went above the rep cap.
             decision = .maintain
-            tRepsLow = medReps
-            tRepsHigh = min(medReps, effectiveUpperBound)
+            let cappedReps = min(medReps, effectiveUpperBound)
+            tRepsLow = cappedReps
+            tRepsHigh = cappedReps
             reasoning = "First session tracked. Repeat to establish a baseline."
 
         } else {

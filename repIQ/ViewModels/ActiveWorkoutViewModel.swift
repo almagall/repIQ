@@ -228,13 +228,21 @@ final class ActiveWorkoutViewModel {
         let modeUpper = trainingMode.repRange.upperBound
         let effectiveUpper = min(repCap ?? modeUpper, modeUpper)
 
-        // Already within bounds — no rebuild needed
-        if target.targetRepsLow <= effectiveUpper && target.targetRepsHigh <= effectiveUpper {
-            return target
-        }
+        // Bail early when the saved range is already in-range AND ordered correctly.
+        // (Old rows in progression_log can have low > high when the engine bug
+        // generated an inverted range — those still need normalizing.)
+        let alreadyValid = target.targetRepsLow <= effectiveUpper
+            && target.targetRepsHigh <= effectiveUpper
+            && target.targetRepsLow <= target.targetRepsHigh
+        if alreadyValid { return target }
 
-        let clampedLow = min(target.targetRepsLow, effectiveUpper)
+        var clampedLow = min(target.targetRepsLow, effectiveUpper)
         let clampedHigh = min(target.targetRepsHigh, effectiveUpper)
+        // Final guard: if the saved row was inverted, collapse to a single value
+        // rather than letting it propagate as a nonsense "low-high" display.
+        if clampedLow > clampedHigh {
+            clampedLow = clampedHigh
+        }
         return ProgressionTarget(
             exerciseId: target.exerciseId,
             trainingMode: target.trainingMode,
