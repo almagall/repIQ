@@ -155,23 +155,41 @@ struct StrengthTrajectoryCard: View {
                         .frame(width: 48, height: 24)
                 }
 
-                // Right: e1RM + delta
+                // Right: e1RM + delta. Bodyweight-only movements (Tricep Dips,
+                // Pull-Ups, Push-Ups) record weight = 0 so the e1RM formula
+                // collapses; show the rep count instead with a small "BW"
+                // qualifier so the row reads correctly.
                 VStack(alignment: .trailing, spacing: RQSpacing.xxs) {
-                    Text(formatWeight(lift.currentE1RM))
-                        .font(RQTypography.numbersSmall)
-                        .foregroundColor(RQColors.textPrimary)
-                    if abs(lift.fourWeekDelta) >= 1 {
-                        HStack(spacing: 2) {
-                            Image(systemName: lift.fourWeekDelta >= 0 ? "arrow.up" : "arrow.down")
-                                .font(.system(size: 8, weight: .bold))
-                            Text(String(format: "%.0f lb", abs(lift.fourWeekDelta)))
-                                .font(.system(size: 10, weight: .semibold))
+                    if lift.isBodyweightOnly {
+                        HStack(alignment: .firstTextBaseline, spacing: 3) {
+                            Text("\(lift.bestReps)")
+                                .font(RQTypography.numbersSmall)
+                                .foregroundColor(RQColors.textPrimary)
+                            Text("reps")
+                                .font(.system(size: 11))
+                                .foregroundColor(RQColors.textTertiary)
                         }
-                        .foregroundColor(lift.fourWeekDelta >= 0 ? RQColors.success : RQColors.warning)
-                    } else {
-                        Text("—")
-                            .font(.system(size: 10))
+                        Text("BW")
+                            .font(.system(size: 9, weight: .bold))
+                            .tracking(0.5)
                             .foregroundColor(RQColors.textTertiary)
+                    } else {
+                        Text(formatWeight(lift.currentE1RM))
+                            .font(RQTypography.numbersSmall)
+                            .foregroundColor(RQColors.textPrimary)
+                        if abs(lift.fourWeekDelta) >= 1 {
+                            HStack(spacing: 2) {
+                                Image(systemName: lift.fourWeekDelta >= 0 ? "arrow.up" : "arrow.down")
+                                    .font(.system(size: 8, weight: .bold))
+                                Text(String(format: "%.0f lb", abs(lift.fourWeekDelta)))
+                                    .font(.system(size: 10, weight: .semibold))
+                            }
+                            .foregroundColor(lift.fourWeekDelta >= 0 ? RQColors.success : RQColors.warning)
+                        } else {
+                            Text("—")
+                                .font(.system(size: 10))
+                                .foregroundColor(RQColors.textTertiary)
+                        }
                     }
                 }
             }

@@ -234,13 +234,24 @@ struct DigestService: Sendable {
         let avgDuration = durations.isEmpty ? nil : durations.reduce(0, +) / durations.count
 
         // 8) Favorite day of week.
+        // Database completed_at timestamps include fractional seconds. The
+        // default `ISO8601DateFormatter()` (options = [.withInternetDateTime])
+        // returns nil for those strings, which silently dropped every session
+        // from sessionDates / dayCounts and made longestStreak / favoriteDay
+        // resolve to 0 / nil regardless of activity.
         let dayFormatter = DateFormatter()
         dayFormatter.dateFormat = "EEEE"
-        let isoFormatter = ISO8601DateFormatter()
+        let isoFractional = ISO8601DateFormatter()
+        isoFractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let isoPlain = ISO8601DateFormatter()
+        isoPlain.formatOptions = [.withInternetDateTime]
+        func parseTimestamp(_ str: String) -> Date? {
+            isoFractional.date(from: str) ?? isoPlain.date(from: str)
+        }
         var dayCounts: [String: Int] = [:]
         var sessionDates: [Date] = []
         for s in sessions {
-            guard let dateStr = s.completed_at, let date = isoFormatter.date(from: dateStr) else { continue }
+            guard let dateStr = s.completed_at, let date = parseTimestamp(dateStr) else { continue }
             sessionDates.append(date)
             let dayName = dayFormatter.string(from: date)
             dayCounts[dayName, default: 0] += 1

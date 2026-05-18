@@ -1312,7 +1312,8 @@ struct AnalyticsService: Sendable {
                             sessionCount: snapshots.count
                         ),
                         sparkline: snapshots.map(\.estimated1RM),
-                        projection: projection
+                        projection: projection,
+                        bestReps: last.bestReps
                     ))
                     continue
                 }
@@ -1347,7 +1348,8 @@ struct AnalyticsService: Sendable {
                 weeklyPercent: weeklyPercent,
                 narrative: narrative,
                 sparkline: snapshots.suffix(12).map(\.estimated1RM),
-                projection: projection
+                projection: projection,
+                bestReps: last.bestReps
             ))
         }
 

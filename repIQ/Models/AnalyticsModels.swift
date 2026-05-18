@@ -565,6 +565,14 @@ struct TopLiftTrajectory: Identifiable, Sendable {
     let narrative: String
     let sparkline: [Double] // recent e1RM values for the mini chart
     let projection: StrengthPrediction? // 4-week e1RM projection (only when reliable)
+    /// Best single-set rep count in the most recent session, used as the
+    /// display fallback for bodyweight-only exercises where currentE1RM is 0.
+    let bestReps: Int
+
+    /// True when the latest snapshot has no recorded weight — typically a
+    /// bodyweight-only movement like dips, pull-ups, or push-ups. Display
+    /// surfaces should show "N reps" rather than "0 lb" in this case.
+    var isBodyweightOnly: Bool { currentE1RM <= 0 && bestReps > 0 }
 
     /// Unique ID combining exercise + workout day so the same exercise
     /// on different days appears as distinct entries.
