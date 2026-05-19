@@ -6,11 +6,15 @@ struct ExerciseProgressView: View {
     let exercise: Exercise
     @State private var snapshots: [ExerciseSessionSnapshot] = []
     @State private var currentPRs: [PersonalRecord] = []
+    @State private var topTips: [ExerciseTip] = []
     @State private var isLoading = false
     @State private var selectedMetric: ProgressMetric = .weight
+    @State private var socialViewModel = SocialViewModel()
+    @State private var showAllTips = false
 
     private let analyticsService = AnalyticsService()
     private let progressionService = ProgressionService()
+    private let tipsService = TipsService()
 
     enum ProgressMetric: String, CaseIterable {
         case weight = "Weight"
@@ -153,6 +157,14 @@ struct ExerciseProgressView: View {
                     if !snapshots.isEmpty {
                         recentSessionsSection
                     }
+
+                    // Community tips (top 2 — full list reachable via "All tips").
+                    // Placed last so it doesn't push the actual training data
+                    // below the fold; community knowledge supplements the
+                    // user's own numbers, not the other way around.
+                    if !topTips.isEmpty {
+                        communityTipsSection
+                    }
                 }
                 .padding(.horizontal, RQSpacing.screenHorizontal)
                 .padding(.top, RQSpacing.lg)
@@ -165,6 +177,88 @@ struct ExerciseProgressView: View {
         .toolbarColorScheme(.dark, for: .navigationBar)
         .task {
             await loadData()
+            await socialViewModel.loadSocialData()
+            await loadTopTips()
+        }
+        .navigationDestination(isPresented: $showAllTips) {
+            ExerciseTipsView(viewModel: socialViewModel,
+                             initialExercise: (id: exercise.id, name: exercise.name))
+        }
+    }
+
+    // MARK: - Community Tips
+
+    private var communityTipsSection: some View {
+        VStack(alignment: .leading, spacing: RQSpacing.sm) {
+            HStack {
+                Image(systemName: "lightbulb.fill")
+                    .font(.system(size: 12))
+                    .foregroundColor(RQColors.accent)
+                Text("COMMUNITY TIPS")
+                    .font(RQTypography.label)
+                    .tracking(1.5)
+                    .foregroundColor(RQColors.textSecondary)
+                Spacer()
+                Button {
+                    showAllTips = true
+                } label: {
+                    HStack(spacing: RQSpacing.xxs) {
+                        Text("All")
+                            .font(RQTypography.caption)
+                            .fontWeight(.semibold)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .foregroundColor(RQColors.accent)
+                }
+            }
+
+            ForEach(topTips.prefix(2)) { tip in
+                RQCard {
+                    VStack(alignment: .leading, spacing: RQSpacing.sm) {
+                        HStack(spacing: RQSpacing.sm) {
+                            HStack(spacing: RQSpacing.xxs) {
+                                Image(systemName: tip.tipType.icon)
+                                    .font(.system(size: 10))
+                                Text(tip.tipType.displayName)
+                                    .font(RQTypography.label)
+                            }
+                            .foregroundColor(RQColors.accent)
+                            .padding(.horizontal, RQSpacing.sm)
+                            .padding(.vertical, RQSpacing.xxs)
+                            .background(RQColors.accent.opacity(0.15))
+                            .cornerRadius(RQRadius.small)
+
+                            Spacer()
+
+                            Text("\(tip.upvoteCount) ▲")
+                                .font(RQTypography.numbersSmall)
+                                .foregroundColor(RQColors.success)
+
+                            Text("@\(tip.userProfile?.username ?? "user")")
+                                .font(RQTypography.caption)
+                                .foregroundColor(RQColors.textTertiary)
+                        }
+
+                        Text(tip.content)
+                            .font(RQTypography.body)
+                            .foregroundColor(RQColors.textPrimary)
+                    }
+                }
+            }
+        }
+    }
+
+    private func loadTopTips() async {
+        guard let userId = socialViewModel.currentUserId else { return }
+        do {
+            topTips = try await tipsService.fetchTips(
+                exerciseId: exercise.id,
+                userId: userId,
+                limit: 3
+            )
+        } catch {
+            topTips = []
         }
     }
 

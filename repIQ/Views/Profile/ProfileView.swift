@@ -248,6 +248,8 @@ struct ProfileView: View {
                         .navigationBarTitleDisplayMode(.inline)
                 case .achievements:
                     AchievementsView(viewModel: socialViewModel)
+                case .clubs:
+                    ClubsListView(viewModel: socialViewModel)
                 case .socialProfile:
                     SocialProfileView(viewModel: socialViewModel)
                 case .challenges:

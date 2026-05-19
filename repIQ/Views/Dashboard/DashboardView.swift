@@ -234,6 +234,8 @@ struct DashboardView: View {
                         .navigationBarTitleDisplayMode(.inline)
                 case .achievements:
                     AchievementsView(viewModel: socialViewModel)
+                case .clubs:
+                    ClubsListView(viewModel: socialViewModel)
                 case .weeklyDigest:
                     WeeklyDigestView(viewModel: socialViewModel)
                 case .matchmaking:

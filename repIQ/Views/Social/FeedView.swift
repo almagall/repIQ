@@ -225,6 +225,24 @@ struct FeedView: View {
 
     private func workoutCompletedContent(_ item: FeedItem) -> some View {
         VStack(alignment: .leading, spacing: RQSpacing.md) {
+            // Comeback pill — a friend returning after 14+ days off. Renders
+            // above the workout title and only for items the client has
+            // flagged in `comebackItemIds`.
+            if comebackItemIds.contains(item.id) {
+                HStack(spacing: RQSpacing.xxs) {
+                    Image(systemName: "hand.raised.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                    Text("WELCOME BACK")
+                        .font(.system(size: 10, weight: .heavy))
+                        .tracking(1.5)
+                }
+                .foregroundColor(RQColors.success)
+                .padding(.horizontal, RQSpacing.sm)
+                .padding(.vertical, RQSpacing.xxs)
+                .background(RQColors.success.opacity(0.15))
+                .cornerRadius(RQRadius.small)
+            }
+
             // Workout title — prefers a narrative line ("Crushed a heavy
             // Pull session — 4 PRs") that mixes the day name with the most
             // impressive signal in the workout data. Falls back to a plain
@@ -458,6 +476,33 @@ struct FeedView: View {
     /// Feed items from friends only (excludes current user's own items)
     private var friendFeedItems: [FeedItem] {
         viewModel.feedItems.filter { $0.userId != viewModel.currentUserId }
+    }
+
+    /// Set of workout-completed feed item IDs that count as a "comeback" —
+    /// the friend's previous workout (within the loaded feed window) was
+    /// 14+ days before this one. Purely client-side decoration; doesn't
+    /// require a new `FeedItemType`.
+    ///
+    /// A friend with no prior workout in the feed window is *not* flagged,
+    /// since we can't tell from this data alone whether they're new or
+    /// just have history that fell off the feed.
+    private var comebackItemIds: Set<UUID> {
+        var result: Set<UUID> = []
+        let workoutItems = viewModel.feedItems
+            .filter { $0.itemType == .workoutCompleted }
+        let byUser = Dictionary(grouping: workoutItems, by: \.userId)
+        for (_, items) in byUser {
+            let sorted = items.sorted { $0.createdAt > $1.createdAt }
+            for index in 0..<(sorted.count - 1) {
+                let current = sorted[index]
+                let prior = sorted[index + 1]
+                let gap = current.createdAt.timeIntervalSince(prior.createdAt)
+                if gap >= 14 * 24 * 60 * 60 {
+                    result.insert(current.id)
+                }
+            }
+        }
+        return result
     }
 
     /// Build a one-line narrative for a completed-workout feed item. Looks
