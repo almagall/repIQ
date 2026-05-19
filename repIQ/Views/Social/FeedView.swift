@@ -225,18 +225,14 @@ struct FeedView: View {
 
     private func workoutCompletedContent(_ item: FeedItem) -> some View {
         VStack(alignment: .leading, spacing: RQSpacing.md) {
-            // Workout title
-            if let dayName = item.data.workoutDayName, !dayName.isEmpty {
-                Text("Completed \(dayName)")
-                    .font(RQTypography.body)
-                    .fontWeight(.semibold)
-                    .foregroundColor(RQColors.textPrimary)
-            } else {
-                Text("Completed a workout")
-                    .font(RQTypography.body)
-                    .fontWeight(.semibold)
-                    .foregroundColor(RQColors.textPrimary)
-            }
+            // Workout title — prefers a narrative line ("Crushed a heavy
+            // Pull session — 4 PRs") that mixes the day name with the most
+            // impressive signal in the workout data. Falls back to a plain
+            // "Completed X" when nothing stands out.
+            Text(workoutNarrative(item))
+                .font(RQTypography.body)
+                .fontWeight(.semibold)
+                .foregroundColor(RQColors.textPrimary)
 
             // Exercise list — expandable
             if let exercises = item.data.exerciseNames, !exercises.isEmpty {
@@ -305,7 +301,10 @@ struct FeedView: View {
             if let volume = data.totalVolume {
                 statPill(icon: "scalemass.fill", value: formatVolume(volume), label: "volume")
             }
-            if let duration = data.duration {
+            // Hide duration when it's missing or less than a minute (logged
+            // workouts with no live timer record duration as 0, which looks
+            // like a bug on the feed).
+            if let duration = data.duration, duration >= 60 {
                 statPill(icon: "clock.fill", value: formatDuration(duration), label: "duration")
             }
             if let prs = data.prCount, prs > 0 {
@@ -459,6 +458,37 @@ struct FeedView: View {
     /// Feed items from friends only (excludes current user's own items)
     private var friendFeedItems: [FeedItem] {
         viewModel.feedItems.filter { $0.userId != viewModel.currentUserId }
+    }
+
+    /// Build a one-line narrative for a completed-workout feed item. Looks
+    /// at PRs, volume, and set count to pick the most-noteworthy framing —
+    /// "Completed Pull" alone is forgettable; "Crushed Pull — 4 PRs" pulls
+    /// the eye.
+    private func workoutNarrative(_ item: FeedItem) -> String {
+        let day = (item.data.workoutDayName?.isEmpty == false) ? item.data.workoutDayName! : "a workout"
+        let prs = item.data.prCount ?? 0
+        let sets = item.data.totalSets ?? 0
+        let volume = item.data.totalVolume ?? 0
+
+        if prs >= 3 {
+            return "Crushed \(day) — \(prs) PRs"
+        }
+        if prs == 2 {
+            return "Strong \(day) session — 2 PRs"
+        }
+        if prs == 1 {
+            return "Hit a PR on \(day)"
+        }
+        if volume >= 20_000 {
+            return "Big \(day) day — \(formatVolume(volume)) lifted"
+        }
+        if sets >= 25 {
+            return "Marathon \(day) — \(sets) sets"
+        }
+        if day == "a workout" {
+            return "Completed a workout"
+        }
+        return "Completed \(day)"
     }
 
     private func displayName(for item: FeedItem) -> String {

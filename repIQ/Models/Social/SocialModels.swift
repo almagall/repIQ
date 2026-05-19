@@ -104,7 +104,7 @@ enum FriendshipStatus: String, Codable, Sendable {
     case declined
 }
 
-struct Friendship: Codable, Identifiable, Sendable {
+struct Friendship: Codable, Identifiable, Sendable, Hashable {
     let id: UUID
     let userId: UUID
     let friendId: UUID
@@ -126,6 +126,13 @@ struct Friendship: Codable, Identifiable, Sendable {
         case createdAt = "created_at"
         case friendProfile = "profiles"
     }
+
+    // Identity-only Hashable so the type can be used as a navigation value.
+    // friendProfile is intentionally excluded — two snapshots of the same
+    // friendship with different cached profile state should still navigate
+    // to the same destination.
+    static func == (lhs: Friendship, rhs: Friendship) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
 // MARK: - Feed Item Type

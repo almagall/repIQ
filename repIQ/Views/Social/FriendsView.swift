@@ -89,38 +89,55 @@ struct FriendsView: View {
     private func friendRow(_ friendship: Friendship) -> some View {
         let name = friendDisplayName(friendship)
 
-        return RQCard {
-            HStack(spacing: RQSpacing.md) {
-                profileAvatar(name: name, size: 44)
+        return NavigationLink(value: SocialDestination.friendProfile(friendship)) {
+            RQCard {
+                HStack(spacing: RQSpacing.md) {
+                    profileAvatar(name: name, size: 44)
 
-                VStack(alignment: .leading, spacing: RQSpacing.xxs) {
-                    Text(name)
-                        .font(RQTypography.headline)
-                        .foregroundColor(RQColors.textPrimary)
+                    VStack(alignment: .leading, spacing: RQSpacing.xxs) {
+                        Text(name)
+                            .font(RQTypography.headline)
+                            .foregroundColor(RQColors.textPrimary)
 
-                    if let username = friendship.friendProfile?.username, !username.isEmpty {
-                        Text("@\(username)")
-                            .font(RQTypography.caption)
-                            .foregroundColor(RQColors.textTertiary)
+                        if let username = friendship.friendProfile?.username, !username.isEmpty {
+                            Text("@\(username)")
+                                .font(RQTypography.caption)
+                                .foregroundColor(RQColors.textTertiary)
+                        }
+
+                        // Training-partner pill (uses an existing field that
+                        // never had a UI surface). Only renders when the
+                        // friendship has been promoted to training-partner
+                        // status, so most cards stay clean.
+                        if friendship.safeIsTrainingPartner {
+                            HStack(spacing: 4) {
+                                Image(systemName: "figure.2")
+                                    .font(.system(size: 9, weight: .semibold))
+                                Text("Training partner")
+                                    .font(.system(size: 10, weight: .semibold))
+                                if friendship.safePartnerStreak > 1 {
+                                    Text("· \(friendship.safePartnerStreak)wk")
+                                        .font(.system(size: 10, weight: .semibold))
+                                }
+                            }
+                            .foregroundColor(RQColors.success)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(RQColors.success.opacity(0.15))
+                            .cornerRadius(4)
+                            .padding(.top, 2)
+                        }
                     }
-                }
 
-                Spacer()
+                    Spacer()
 
-                Menu {
-                    Button(role: .destructive) {
-                        Task { await viewModel.removeFriend(friendship) }
-                    } label: {
-                        Label("Remove Friend", systemImage: "person.badge.minus")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 16))
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(RQColors.textTertiary)
-                        .frame(width: 32, height: 32)
                 }
             }
         }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Requests List

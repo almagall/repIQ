@@ -62,7 +62,35 @@ struct SocialTabView: View {
                                 .foregroundColor(RQColors.accent)
                         }
 
-                        // Profile avatar removed — profile accessible via Profile tab
+                        // Overflow menu — entry points for League, Challenges,
+                        // Achievements, Weekly Digest, Matchmaking, and the
+                        // user's own public profile editor. Without this menu
+                        // these views are unreachable from the running app.
+                        Menu {
+                            NavigationLink(value: SocialDestination.league) {
+                                Label("Leagues", systemImage: "trophy.fill")
+                            }
+                            NavigationLink(value: SocialDestination.challenges) {
+                                Label("Challenges", systemImage: "flag.checkered")
+                            }
+                            NavigationLink(value: SocialDestination.achievements) {
+                                Label("Achievements", systemImage: "medal.fill")
+                            }
+                            NavigationLink(value: SocialDestination.weeklyDigest) {
+                                Label("Weekly Digest", systemImage: "newspaper.fill")
+                            }
+                            Divider()
+                            NavigationLink(value: SocialDestination.matchmaking) {
+                                Label("Find Training Partners", systemImage: "sparkles")
+                            }
+                            NavigationLink(value: SocialDestination.socialProfile) {
+                                Label("My Public Profile", systemImage: "person.crop.circle")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                                .font(.system(size: 16))
+                                .foregroundColor(RQColors.accent)
+                        }
                     }
                 }
 
@@ -78,6 +106,30 @@ struct SocialTabView: View {
                                 .foregroundColor(RQColors.textPrimary)
                         }
                     }
+                }
+            }
+            .navigationDestination(for: SocialDestination.self) { destination in
+                switch destination {
+                case .league:
+                    LeagueView(viewModel: viewModel)
+                        .navigationTitle("Leagues")
+                        .navigationBarTitleDisplayMode(.inline)
+                case .challenges:
+                    ChallengesView(viewModel: viewModel)
+                        .navigationTitle("Challenges")
+                        .navigationBarTitleDisplayMode(.inline)
+                case .achievements:
+                    AchievementsView(viewModel: viewModel)
+                case .weeklyDigest:
+                    WeeklyDigestView(viewModel: viewModel)
+                case .matchmaking:
+                    MatchmakingView(viewModel: viewModel)
+                case .socialProfile:
+                    SocialProfileView(viewModel: viewModel)
+                case .friendProfile(let friendship):
+                    FriendProfileView(viewModel: viewModel, friendship: friendship)
+                case .progressionRace(let friendship):
+                    ProgressionRaceView(viewModel: viewModel, friend: friendship)
                 }
             }
             .task {
@@ -184,3 +236,18 @@ struct SocialTabView: View {
 
     // Discover tab removed — Achievements moved to Home, Monthly Report moved to Progress
 }
+
+/// Push destinations reachable from SocialTabView's overflow menu and from
+/// friend cards. Identified by an enum (rather than per-view `NavigationLink`s)
+/// so a single `.navigationDestination(for:)` keeps the wiring centralized.
+enum SocialDestination: Hashable {
+    case league
+    case challenges
+    case achievements
+    case weeklyDigest
+    case matchmaking
+    case socialProfile
+    case friendProfile(Friendship)
+    case progressionRace(Friendship)
+}
+

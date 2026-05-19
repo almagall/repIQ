@@ -3,6 +3,7 @@ import Supabase
 
 struct ProfileView: View {
     @State private var viewModel = ProfileViewModel()
+    @State private var socialViewModel = SocialViewModel()
     @State private var showWeightUnitPicker = false
     @State private var showRestTimerPicker = false
     @State private var username = ""
@@ -64,6 +65,11 @@ struct ProfileView: View {
                             Spacer()
                         }
                     }
+
+                    // My Stats — surfaces the user's public-profile data
+                    // (league, IQ, streak, badges) that previously had no
+                    // home on the Profile tab.
+                    myStatsCard
 
                     // Settings Section
                     RQCard {
@@ -213,6 +219,7 @@ struct ProfileView: View {
             .task {
                 await viewModel.loadProfile()
                 username = viewModel.profile?.username ?? ""
+                await socialViewModel.loadSocialData()
                 // Load gym info directly
                 if let userId = try? await supabase.auth.session.user.id {
                     struct GymFields: Decodable {
@@ -233,6 +240,30 @@ struct ProfileView: View {
                     gymAddress = fields?.gymAddress
                 }
             }
+            .navigationDestination(for: SocialDestination.self) { destination in
+                switch destination {
+                case .league:
+                    LeagueView(viewModel: socialViewModel)
+                        .navigationTitle("Leagues")
+                        .navigationBarTitleDisplayMode(.inline)
+                case .achievements:
+                    AchievementsView(viewModel: socialViewModel)
+                case .socialProfile:
+                    SocialProfileView(viewModel: socialViewModel)
+                case .challenges:
+                    ChallengesView(viewModel: socialViewModel)
+                        .navigationTitle("Challenges")
+                        .navigationBarTitleDisplayMode(.inline)
+                case .weeklyDigest:
+                    WeeklyDigestView(viewModel: socialViewModel)
+                case .matchmaking:
+                    MatchmakingView(viewModel: socialViewModel)
+                case .friendProfile(let friendship):
+                    FriendProfileView(viewModel: socialViewModel, friendship: friendship)
+                case .progressionRace(let friendship):
+                    ProgressionRaceView(viewModel: socialViewModel, friend: friendship)
+                }
+            }
             .confirmationDialog("Weight Unit", isPresented: $showWeightUnitPicker) {
                 Button("lbs") {
                     Task { await viewModel.updateWeightUnit(.lbs) }
@@ -251,6 +282,95 @@ struct ProfileView: View {
                 Button("Cancel", role: .cancel) {}
             }
         }
+    }
+
+    // MARK: - My Stats card
+
+    private var myStatsCard: some View {
+        VStack(spacing: RQSpacing.md) {
+            NavigationLink(value: SocialDestination.league) {
+                HStack(spacing: RQSpacing.lg) {
+                    statCell(icon: socialViewModel.currentTier.icon,
+                             color: RQColors.accent,
+                             value: socialViewModel.currentTier.displayName,
+                             label: "LEAGUE")
+                    Divider().frame(height: 36).overlay(RQColors.surfaceTertiary)
+                    statCell(icon: "bolt.fill",
+                             color: RQColors.accent,
+                             value: "\(socialViewModel.totalIQ)",
+                             label: "IQ")
+                    Divider().frame(height: 36).overlay(RQColors.surfaceTertiary)
+                    statCell(icon: "flame.fill",
+                             color: RQColors.warning,
+                             value: "\(socialViewModel.currentStreak)",
+                             label: "STREAK")
+                }
+                .padding(RQSpacing.cardPadding)
+                .background(RQColors.surfacePrimary)
+                .cornerRadius(RQRadius.medium)
+            }
+            .buttonStyle(.plain)
+
+            HStack(spacing: RQSpacing.sm) {
+                NavigationLink(value: SocialDestination.achievements) {
+                    profileQuickAction(icon: "medal.fill",
+                                       title: "Achievements",
+                                       count: socialViewModel.earnedBadges.count)
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink(value: SocialDestination.socialProfile) {
+                    profileQuickAction(icon: "person.crop.circle",
+                                       title: "Public Profile",
+                                       count: nil)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func statCell(icon: String, color: Color, value: String, label: String) -> some View {
+        VStack(spacing: RQSpacing.xxs) {
+            Image(systemName: icon)
+                .font(.system(size: 14))
+                .foregroundColor(color)
+            Text(value)
+                .font(RQTypography.numbersSmall)
+                .foregroundColor(RQColors.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text(label)
+                .font(.system(size: 9, weight: .semibold))
+                .tracking(1)
+                .foregroundColor(RQColors.textTertiary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func profileQuickAction(icon: String, title: String, count: Int?) -> some View {
+        HStack(spacing: RQSpacing.sm) {
+            Image(systemName: icon)
+                .font(.system(size: 14))
+                .foregroundColor(RQColors.accent)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(title)
+                    .font(RQTypography.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(RQColors.textPrimary)
+                if let count {
+                    Text("\(count) earned")
+                        .font(.system(size: 10))
+                        .foregroundColor(RQColors.textTertiary)
+                }
+            }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(RQColors.textTertiary)
+        }
+        .padding(RQSpacing.md)
+        .background(RQColors.surfacePrimary)
+        .cornerRadius(RQRadius.medium)
     }
 
     /// Single short summary string for the Body & Health row. Picks the

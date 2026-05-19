@@ -357,6 +357,11 @@ struct CreateChallengeView: View {
     @State private var challengeType: ChallengeType = .iqPoints
     @State private var durationDays = 7
 
+    init(viewModel: SocialViewModel, preselectedFriend: Friendship? = nil) {
+        self.viewModel = viewModel
+        _selectedFriendId = State(initialValue: preselectedFriend?.friendId)
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: RQSpacing.lg) {

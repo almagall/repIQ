@@ -12,8 +12,6 @@ struct MonthlyWrappedView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showHistorySheet = false
-    @State private var shareImage: UIImage?
-    @State private var showWrappedShareSheet = false
     @State private var showFullReport = false
 
     private let service = DigestService()
@@ -40,6 +38,7 @@ struct MonthlyWrappedView: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar)
         .preferredColorScheme(.dark)
         .task { await load() }
         .sheet(isPresented: $showHistorySheet) {
@@ -50,11 +49,6 @@ struct MonthlyWrappedView: View {
                     wrapped = selected
                 }
             )
-        }
-        .sheet(isPresented: $showWrappedShareSheet) {
-            if let img = shareImage {
-                WrappedShareSheet(items: [img])
-            }
         }
         .navigationDestination(isPresented: $showFullReport) {
             if let wrapped {
@@ -125,19 +119,41 @@ struct MonthlyWrappedView: View {
 
     @MainActor
     private func share(wrapped: MonthlyWrapped) {
+        // Render the share card to a 1080x1920 PNG (Instagram Story 9:16).
+        // proposedSize already specifies the final pixel dimensions, so scale
+        // is 1.0 — multiplying further produces a ~75MP image that hangs the
+        // main thread and leaves the story flow in a black, unresponsive state.
         let card = WrappedShareCard(wrapped: wrapped)
         let renderer = ImageRenderer(content: card)
-        // Render at the active scene's display scale so the PNG is crisp
-        // across devices. Fall back to 3 (iPhone Pro / Plus) if no scene found.
-        let scale = UIApplication.shared.connectedScenes
-            .compactMap { ($0 as? UIWindowScene)?.screen.scale }
-            .first ?? 3.0
-        renderer.scale = scale
-        renderer.proposedSize = .init(width: 1080, height: 1920) // 9:16
-        if let image = renderer.uiImage {
-            shareImage = image
-            showWrappedShareSheet = true
+        renderer.scale = 1.0
+        renderer.proposedSize = .init(width: 1080, height: 1920)
+        guard let image = renderer.uiImage else { return }
+        presentShareSheet(items: [image])
+    }
+
+    @MainActor
+    private func presentShareSheet(items: [Any]) {
+        // Present the UIActivityViewController directly off the active scene
+        // instead of via SwiftUI `.sheet`. SwiftUI's sheet bridge wraps the
+        // activity controller inside an extra hosting controller that races
+        // with this view's hidden status bar / hidden tab bar modifiers and
+        // can fail to attach to a window — leaving the screen black.
+        guard let scene = UIApplication.shared.connectedScenes
+                .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene,
+              let root = scene.keyWindow?.rootViewController else { return }
+        var presenter = root
+        while let presented = presenter.presentedViewController {
+            presenter = presented
         }
+        let vc = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        if let popover = vc.popoverPresentationController {
+            popover.sourceView = presenter.view
+            popover.sourceRect = CGRect(x: presenter.view.bounds.midX,
+                                        y: presenter.view.bounds.midY,
+                                        width: 0, height: 0)
+            popover.permittedArrowDirections = []
+        }
+        presenter.present(vc, animated: true)
     }
 }
 
@@ -291,12 +307,3 @@ private struct WrappedShareCard: View {
     }
 }
 
-// MARK: - UIKit share sheet bridge
-
-private struct WrappedShareSheet: UIViewControllerRepresentable {
-    let items: [Any]
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
-    }
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
-}
