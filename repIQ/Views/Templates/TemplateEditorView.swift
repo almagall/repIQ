@@ -47,6 +47,14 @@ struct TemplateEditorView: View {
                                 text: $viewModel.templateDescription
                             )
                         }
+
+                        // Share with friends — only meaningful once the
+                        // template has been saved (we need its id to write
+                        // is_shared). Hidden until then to keep the editor
+                        // honest about what's persisted.
+                        if viewModel.isSaved {
+                            shareTemplateRow
+                        }
                     }
                 }
 
@@ -166,6 +174,31 @@ struct TemplateEditorView: View {
     }
 
     // MARK: - Save Status Indicator
+
+    @ViewBuilder
+    private var shareTemplateRow: some View {
+        VStack(alignment: .leading, spacing: RQSpacing.sm) {
+            HStack {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 14))
+                    .foregroundColor(RQColors.accent)
+                Toggle(isOn: Binding(
+                    get: { viewModel.isShared },
+                    set: { newValue in
+                        Task { await viewModel.setIsShared(newValue) }
+                    }
+                )) {
+                    Text("Share with friends")
+                        .font(RQTypography.body)
+                        .foregroundColor(RQColors.textPrimary)
+                }
+                .tint(RQColors.accent)
+            }
+            Text("When on, friends can see and copy this template from your profile.")
+                .font(RQTypography.caption)
+                .foregroundColor(RQColors.textTertiary)
+        }
+    }
 
     @ViewBuilder
     private var saveStatusView: some View {
