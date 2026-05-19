@@ -437,6 +437,34 @@ final class ActiveWorkoutViewModel {
     /// Starts the Live Activity once exercises are loaded. Called from
     /// `startWorkout()` and the recovery flow.
     ///
+    // MARK: - Training-now presence
+
+    private let presenceService = PresenceService()
+
+    /// Best-effort presence write. Failure is silent and intentionally
+    /// non-blocking — the workout itself must continue regardless. The
+    /// gym place id read happens on the auth user's profile row.
+    private func markPresenceTraining(userId: UUID) async {
+        struct PlaceRow: Decodable { let gym_place_id: String? }
+        let row: PlaceRow? = try? await supabase.from("profiles")
+            .select("gym_place_id")
+            .eq("id", value: userId.uuidString)
+            .single()
+            .execute()
+            .value
+        try? await presenceService.setTraining(
+            userId: userId,
+            gymPlaceId: row?.gym_place_id
+        )
+    }
+
+    /// Wipes the presence row. Triggered on complete or abandon. The
+    /// 2-hour TTL serves as a safety net if the call fails.
+    private func clearPresence() async {
+        guard let userId = try? await supabase.auth.session.user.id else { return }
+        try? await presenceService.clear(userId: userId)
+    }
+
     /// Async because `LiveActivityService.start` ends any orphaned
     /// activities before requesting a new one — without awaiting that, we
     /// could end up with two activities visible on the Lock Screen at
@@ -812,6 +840,11 @@ final class ActiveWorkoutViewModel {
             // 7. Start Live Activity (Lock Screen + Dynamic Island)
             await startLiveActivity()
 
+            // 7b. Set "training now" presence so friends at the same gym
+            // see the user is active. Best-effort — a failure here must
+            // not block the workout itself.
+            await markPresenceTraining(userId: userId)
+
             // 8. Check if proactive deload should be suggested
             if let templateId = template.id as UUID? {
                 deloadSuggestion = try? await progressionService.shouldSuggestDeload(
@@ -890,6 +923,11 @@ final class ActiveWorkoutViewModel {
         autoSaveTask?.cancel()
         autoSaveTask = nil
         WorkoutAutoSave.clear()
+
+        // Clear "training now" presence so the Gym Hub doesn't keep
+        // showing this user as active. Fire-and-forget — failure here is
+        // benign (TTL kicks in within 2h).
+        Task { await clearPresence() }
 
         // End the Live Activity immediately so the Lock Screen / Dynamic Island
         // don't keep showing a stale workout while post-processing runs.
@@ -1209,6 +1247,7 @@ final class ActiveWorkoutViewModel {
         // End the Live Activity so the Lock Screen / Dynamic Island clear
         LiveActivityService.shared.endNow()
         unregisterIntentHandlers()
+        Task { await clearPresence() }
 
         do {
             try await workoutService.abandonSession(sessionId: sessionId)

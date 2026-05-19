@@ -9,9 +9,12 @@ struct GymHubView: View {
     @State private var gymPlaceId: String?
     @State private var gymMembers: [GymService.GymMember] = []
     @State private var gymFeedItems: [FeedItem] = []
+    @State private var trainingNow: [TrainingNowEntry] = []
     @State private var isLoadingMembers = false
     @State private var isLoadingFeed = false
     @State private var showGymSearch = false
+
+    private let presenceService = PresenceService()
 
     var body: some View {
         ScrollView {
@@ -19,6 +22,11 @@ struct GymHubView: View {
                 if let name = gymName, !name.isEmpty {
                     // Gym header
                     gymHeader(name: name)
+
+                    // Friends actively training right now
+                    if !trainingNow.isEmpty {
+                        trainingNowBanner
+                    }
 
                     // Gym members
                     gymMembersSection
@@ -36,9 +44,11 @@ struct GymHubView: View {
         }
         .task {
             await loadGymData()
+            await loadTrainingNow()
         }
         .refreshable {
             await loadGymData()
+            await loadTrainingNow()
         }
         .navigationDestination(isPresented: $showGymSearch) {
             GymSearchView()
@@ -46,6 +56,83 @@ struct GymHubView: View {
     }
 
     // MARK: - No Gym State
+
+    // MARK: - Training Now
+
+    private var trainingNowBanner: some View {
+        VStack(alignment: .leading, spacing: RQSpacing.sm) {
+            HStack(spacing: RQSpacing.xs) {
+                Circle()
+                    .fill(RQColors.success)
+                    .frame(width: 8, height: 8)
+                Text("TRAINING NOW")
+                    .font(RQTypography.label)
+                    .tracking(1.5)
+                    .foregroundColor(RQColors.success)
+                Spacer()
+                Text("\(trainingNow.count) active")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(RQColors.textTertiary)
+            }
+
+            ForEach(trainingNow) { entry in
+                let name = nameFor(userId: entry.userId)
+                HStack(spacing: RQSpacing.md) {
+                    Circle()
+                        .fill(RQColors.success.opacity(0.2))
+                        .frame(width: 32, height: 32)
+                        .overlay(
+                            Text(String(name.prefix(1)).uppercased())
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(RQColors.success)
+                        )
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(name)
+                            .font(RQTypography.body)
+                            .foregroundColor(RQColors.textPrimary)
+                        Text("Started \(relativeMinutes(entry.startedAt)) ago")
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.textTertiary)
+                    }
+                    Spacer()
+                    Image(systemName: "figure.strengthtraining.traditional")
+                        .font(.system(size: 14))
+                        .foregroundColor(RQColors.success)
+                }
+            }
+        }
+        .padding(RQSpacing.cardPadding)
+        .background(RQColors.success.opacity(0.08))
+        .overlay(
+            RoundedRectangle(cornerRadius: RQRadius.medium)
+                .stroke(RQColors.success.opacity(0.3), lineWidth: 1)
+        )
+        .cornerRadius(RQRadius.medium)
+    }
+
+    private func nameFor(userId: UUID) -> String {
+        viewModel.friends
+            .first { $0.friendId == userId }
+            .flatMap { $0.friendProfile?.username }
+            ?? "Friend"
+    }
+
+    private func relativeMinutes(_ start: Date) -> String {
+        let elapsed = Int(Date().timeIntervalSince(start) / 60)
+        if elapsed < 1 { return "just now" }
+        if elapsed < 60 { return "\(elapsed)m" }
+        let hours = elapsed / 60
+        return "\(hours)h"
+    }
+
+    private func loadTrainingNow() async {
+        let friendIds = Array(viewModel.friendIds)
+        do {
+            trainingNow = try await presenceService.fetchFriendsTraining(friendIds: friendIds)
+        } catch {
+            trainingNow = []
+        }
+    }
 
     private var noGymState: some View {
         VStack(spacing: RQSpacing.xl) {

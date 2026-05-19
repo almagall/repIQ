@@ -6,11 +6,25 @@ struct ExerciseProgressView: View {
     let exercise: Exercise
     @State private var snapshots: [ExerciseSessionSnapshot] = []
     @State private var currentPRs: [PersonalRecord] = []
+    @State private var topTips: [ExerciseTip] = []
     @State private var isLoading = false
     @State private var selectedMetric: ProgressMetric = .weight
+    @State private var socialViewModel = SocialViewModel()
+    @State private var showAllTips = false
+    @State private var friendsPercentile: Int?
+    @State private var tierPercentile: Int?
 
     private let analyticsService = AnalyticsService()
     private let progressionService = ProgressionService()
+    private let tipsService = TipsService()
+    private let percentileService = LiftPercentileService()
+
+    /// User's best e1RM on this exercise over the loaded snapshot window.
+    /// `nil` when there are no working snapshots.
+    private var userBestE1RM: Double? {
+        let value = snapshots.map(\.estimated1RM).max() ?? 0
+        return value > 0 ? value : nil
+    }
 
     enum ProgressMetric: String, CaseIterable {
         case weight = "Weight"
@@ -128,6 +142,12 @@ struct ExerciseProgressView: View {
                         velocityBadge(vel)
                     }
 
+                    // Lift percentile vs friends and league tier. Renders
+                    // only if we have a meaningful cohort.
+                    if friendsPercentile != nil || tierPercentile != nil {
+                        liftPercentileCard
+                    }
+
                     // Strength Prediction
                     if let prediction = strengthPrediction, prediction.isReliable {
                         strengthPredictionCard(prediction)
@@ -153,6 +173,14 @@ struct ExerciseProgressView: View {
                     if !snapshots.isEmpty {
                         recentSessionsSection
                     }
+
+                    // Community tips (top 2 — full list reachable via "All tips").
+                    // Placed last so it doesn't push the actual training data
+                    // below the fold; community knowledge supplements the
+                    // user's own numbers, not the other way around.
+                    if !topTips.isEmpty {
+                        communityTipsSection
+                    }
                 }
                 .padding(.horizontal, RQSpacing.screenHorizontal)
                 .padding(.top, RQSpacing.lg)
@@ -165,6 +193,184 @@ struct ExerciseProgressView: View {
         .toolbarColorScheme(.dark, for: .navigationBar)
         .task {
             await loadData()
+            await socialViewModel.loadSocialData()
+            await loadTopTips()
+            await loadPercentiles()
+        }
+        .navigationDestination(isPresented: $showAllTips) {
+            ExerciseTipsView(viewModel: socialViewModel,
+                             initialExercise: (id: exercise.id, name: exercise.name))
+        }
+    }
+
+    // MARK: - Community Tips
+
+    private var communityTipsSection: some View {
+        VStack(alignment: .leading, spacing: RQSpacing.sm) {
+            HStack {
+                Image(systemName: "lightbulb.fill")
+                    .font(.system(size: 12))
+                    .foregroundColor(RQColors.accent)
+                Text("COMMUNITY TIPS")
+                    .font(RQTypography.label)
+                    .tracking(1.5)
+                    .foregroundColor(RQColors.textSecondary)
+                Spacer()
+                Button {
+                    showAllTips = true
+                } label: {
+                    HStack(spacing: RQSpacing.xxs) {
+                        Text("All")
+                            .font(RQTypography.caption)
+                            .fontWeight(.semibold)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .foregroundColor(RQColors.accent)
+                }
+            }
+
+            ForEach(topTips.prefix(2)) { tip in
+                RQCard {
+                    VStack(alignment: .leading, spacing: RQSpacing.sm) {
+                        HStack(spacing: RQSpacing.sm) {
+                            HStack(spacing: RQSpacing.xxs) {
+                                Image(systemName: tip.tipType.icon)
+                                    .font(.system(size: 10))
+                                Text(tip.tipType.displayName)
+                                    .font(RQTypography.label)
+                            }
+                            .foregroundColor(RQColors.accent)
+                            .padding(.horizontal, RQSpacing.sm)
+                            .padding(.vertical, RQSpacing.xxs)
+                            .background(RQColors.accent.opacity(0.15))
+                            .cornerRadius(RQRadius.small)
+
+                            Spacer()
+
+                            Text("\(tip.upvoteCount) ▲")
+                                .font(RQTypography.numbersSmall)
+                                .foregroundColor(RQColors.success)
+
+                            Text("@\(tip.userProfile?.username ?? "user")")
+                                .font(RQTypography.caption)
+                                .foregroundColor(RQColors.textTertiary)
+                        }
+
+                        Text(tip.content)
+                            .font(RQTypography.body)
+                            .foregroundColor(RQColors.textPrimary)
+                    }
+                }
+            }
+        }
+    }
+
+    private func loadTopTips() async {
+        guard let userId = socialViewModel.currentUserId else { return }
+        do {
+            topTips = try await tipsService.fetchTips(
+                exerciseId: exercise.id,
+                userId: userId,
+                limit: 3
+            )
+        } catch {
+            topTips = []
+        }
+    }
+
+    // MARK: - Lift Percentile
+
+    private var liftPercentileCard: some View {
+        RQCard {
+            VStack(alignment: .leading, spacing: RQSpacing.md) {
+                HStack(spacing: RQSpacing.xs) {
+                    Image(systemName: "chart.bar.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(RQColors.accent)
+                    Text("HOW YOU STACK UP")
+                        .font(RQTypography.label)
+                        .tracking(1.5)
+                        .foregroundColor(RQColors.textSecondary)
+                    Spacer()
+                    if let e1rm = userBestE1RM {
+                        Text("\(Int(e1rm)) e1RM")
+                            .font(RQTypography.numbersSmall)
+                            .foregroundColor(RQColors.textPrimary)
+                    }
+                }
+
+                HStack(spacing: RQSpacing.md) {
+                    if let p = friendsPercentile {
+                        percentilePill(value: p, label: "vs friends")
+                    }
+                    if let p = tierPercentile {
+                        percentilePill(value: p,
+                                       label: "vs \(socialViewModel.currentTier.displayName)")
+                    }
+                }
+            }
+        }
+    }
+
+    private func percentilePill(value: Int, label: String) -> some View {
+        let color: Color = {
+            if value >= 75 { return RQColors.success }
+            if value >= 50 { return RQColors.accent }
+            if value >= 25 { return RQColors.warning }
+            return RQColors.textSecondary
+        }()
+        return VStack(alignment: .leading, spacing: RQSpacing.xxs) {
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text("\(value)")
+                    .font(RQTypography.numbers)
+                    .foregroundColor(color)
+                Text(percentileSuffix(value))
+                    .font(.system(size: 10, weight: .heavy))
+                    .foregroundColor(color)
+            }
+            Text(label.uppercased())
+                .font(.system(size: 9, weight: .semibold))
+                .tracking(1)
+                .foregroundColor(RQColors.textTertiary)
+        }
+        .padding(.horizontal, RQSpacing.md)
+        .padding(.vertical, RQSpacing.sm)
+        .background(color.opacity(0.12))
+        .cornerRadius(RQRadius.medium)
+    }
+
+    private func percentileSuffix(_ n: Int) -> String {
+        let mod10 = n % 10
+        let mod100 = n % 100
+        if mod10 == 1 && mod100 != 11 { return "ST" }
+        if mod10 == 2 && mod100 != 12 { return "ND" }
+        if mod10 == 3 && mod100 != 13 { return "RD" }
+        return "TH"
+    }
+
+    private func loadPercentiles() async {
+        guard let e1rm = userBestE1RM else { return }
+        async let friends = percentileService.friendsPercentile(
+            exerciseId: exercise.id,
+            userE1RM: e1rm,
+            friendIds: Array(socialViewModel.friendIds)
+        )
+        async let tier = percentileService.tierPercentile(
+            exerciseId: exercise.id,
+            userE1RM: e1rm,
+            tier: socialViewModel.currentTier
+        )
+        do {
+            friendsPercentile = try await friends
+        } catch {
+            friendsPercentile = nil
+        }
+        do {
+            tierPercentile = try await tier
+        } catch {
+            // RPC may not be deployed yet — fall back silently
+            tierPercentile = nil
         }
     }
 

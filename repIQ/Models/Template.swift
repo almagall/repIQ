@@ -13,6 +13,9 @@ struct Template: Codable, Identifiable, Sendable, Hashable {
     var updatedAt: Date
     var workoutDays: [WorkoutDay]?
     var sourceProgram: String?
+    var isShared: Bool?
+
+    var safeIsShared: Bool { isShared ?? false }
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -24,5 +27,6 @@ struct Template: Codable, Identifiable, Sendable, Hashable {
         case updatedAt = "updated_at"
         case workoutDays = "workout_days"
         case sourceProgram = "source_program"
+        case isShared = "is_shared"
     }
 }

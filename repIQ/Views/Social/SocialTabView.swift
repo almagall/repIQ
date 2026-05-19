@@ -76,6 +76,9 @@ struct SocialTabView: View {
                             NavigationLink(value: SocialDestination.achievements) {
                                 Label("Achievements", systemImage: "medal.fill")
                             }
+                            NavigationLink(value: SocialDestination.clubs) {
+                                Label("Clubs", systemImage: "person.3.fill")
+                            }
                             NavigationLink(value: SocialDestination.weeklyDigest) {
                                 Label("Weekly Digest", systemImage: "newspaper.fill")
                             }
@@ -120,6 +123,8 @@ struct SocialTabView: View {
                         .navigationBarTitleDisplayMode(.inline)
                 case .achievements:
                     AchievementsView(viewModel: viewModel)
+                case .clubs:
+                    ClubsListView(viewModel: viewModel)
                 case .weeklyDigest:
                     WeeklyDigestView(viewModel: viewModel)
                 case .matchmaking:
@@ -244,6 +249,7 @@ enum SocialDestination: Hashable {
     case league
     case challenges
     case achievements
+    case clubs
     case weeklyDigest
     case matchmaking
     case socialProfile

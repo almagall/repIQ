@@ -2,8 +2,15 @@ import SwiftUI
 import Supabase
 
 /// Crowdsourced exercise tips feed with upvote/downvote system.
+///
+/// When `initialExercise` is passed (typical for the inline drill-in from
+/// `ExerciseProgressView`), the picker is hidden and the view loads tips
+/// for that exercise immediately. The standalone entry point passes nil
+/// and lets the user browse.
 struct ExerciseTipsView: View {
     @Bindable var viewModel: SocialViewModel
+    let initialExercise: (id: UUID, name: String)?
+
     @State private var tips: [ExerciseTip] = []
     @State private var isLoading = false
     @State private var showingAddTip = false
@@ -16,10 +23,20 @@ struct ExerciseTipsView: View {
     @State private var searchQuery = ""
     @State private var showingExercisePicker = false
 
+    init(viewModel: SocialViewModel, initialExercise: (id: UUID, name: String)? = nil) {
+        self.viewModel = viewModel
+        self.initialExercise = initialExercise
+        _selectedExerciseId = State(initialValue: initialExercise?.id)
+        _selectedExerciseName = State(initialValue: initialExercise?.name ?? "")
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            // Exercise selector
-            exerciseSelector
+            // Exercise selector — hidden when the view is scoped to a
+            // specific exercise via initialExercise.
+            if initialExercise == nil {
+                exerciseSelector
+            }
 
             // Filter tabs
             filterTabs
@@ -58,7 +75,11 @@ struct ExerciseTipsView: View {
             }
         }
         .task {
-            await loadExercises()
+            if initialExercise == nil {
+                await loadExercises()
+            } else {
+                await loadTips()
+            }
         }
         .sheet(isPresented: $showingAddTip) {
             addTipSheet

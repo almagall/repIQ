@@ -58,6 +58,33 @@ enum LeagueTier: String, Codable, Sendable, CaseIterable {
         case .elite: return "elite"
         }
     }
+
+    /// Minimum total IQ required to reach this tier. Client-side only —
+    /// server-side promotion happens elsewhere (or doesn't yet); this is
+    /// used by the LeagueView promotion-race UI to compute "X IQ to
+    /// promotion" hints. Adjust if/when a tier-promotion service lands.
+    var minIQ: Int {
+        switch self {
+        case .bronze:   return 0
+        case .silver:   return 5_000
+        case .gold:     return 15_000
+        case .platinum: return 35_000
+        case .diamond:  return 75_000
+        case .elite:    return 150_000
+        }
+    }
+
+    /// The tier immediately above this one, or nil if already at Elite.
+    var nextTier: LeagueTier? {
+        switch self {
+        case .bronze:   return .silver
+        case .silver:   return .gold
+        case .gold:     return .platinum
+        case .platinum: return .diamond
+        case .diamond:  return .elite
+        case .elite:    return nil
+        }
+    }
 }
 
 // MARK: - Social Profile

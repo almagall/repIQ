@@ -11,9 +11,13 @@ struct FriendProfileView: View {
     @State private var profile: SocialProfile?
     @State private var isLoading = true
     @State private var showCreateChallenge = false
+    @State private var sharedTemplates: [Template] = []
+    @State private var cloningTemplateId: UUID?
+    @State private var cloneSuccessTemplate: Template?
     @Environment(\.dismiss) private var dismiss
 
     private let service = SocialService()
+    private let templateService = TemplateService()
 
     private var displayName: String {
         friendship.friendProfile?.username ?? "User"
@@ -31,6 +35,9 @@ struct FriendProfileView: View {
                 } else {
                     statsRow
                     actionsSection
+                    if !sharedTemplates.isEmpty {
+                        sharedTemplatesSection
+                    }
                 }
             }
             .padding(.horizontal, RQSpacing.screenHorizontal)
@@ -39,9 +46,105 @@ struct FriendProfileView: View {
         .background(RQColors.background)
         .navigationTitle(displayName)
         .navigationBarTitleDisplayMode(.inline)
-        .task { await loadProfile() }
+        .task {
+            await loadProfile()
+            await loadSharedTemplates()
+        }
         .sheet(isPresented: $showCreateChallenge) {
             CreateChallengeView(viewModel: viewModel, preselectedFriend: friendship)
+        }
+        .alert("Template copied",
+               isPresented: Binding(
+                get: { cloneSuccessTemplate != nil },
+                set: { if !$0 { cloneSuccessTemplate = nil } }
+               ),
+               presenting: cloneSuccessTemplate
+        ) { _ in
+            Button("OK") { cloneSuccessTemplate = nil }
+        } message: { template in
+            Text("\"\(template.name) (Copy)\" is now in your templates.")
+        }
+    }
+
+    // MARK: - Shared templates
+
+    private var sharedTemplatesSection: some View {
+        VStack(alignment: .leading, spacing: RQSpacing.sm) {
+            HStack(spacing: RQSpacing.xs) {
+                Image(systemName: "square.and.arrow.down.on.square")
+                    .font(.system(size: 12))
+                    .foregroundColor(RQColors.accent)
+                Text("SHARED TEMPLATES")
+                    .font(RQTypography.label)
+                    .tracking(1.5)
+                    .foregroundColor(RQColors.textSecondary)
+            }
+
+            ForEach(sharedTemplates) { template in
+                RQCard {
+                    HStack(spacing: RQSpacing.md) {
+                        VStack(alignment: .leading, spacing: RQSpacing.xxs) {
+                            Text(template.name)
+                                .font(RQTypography.headline)
+                                .foregroundColor(RQColors.textPrimary)
+                            if let desc = template.description, !desc.isEmpty {
+                                Text(desc)
+                                    .font(RQTypography.caption)
+                                    .foregroundColor(RQColors.textTertiary)
+                                    .lineLimit(2)
+                            }
+                        }
+                        Spacer()
+                        Button {
+                            Task { await cloneTemplate(template) }
+                        } label: {
+                            if cloningTemplateId == template.id {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: RQColors.background))
+                                    .scaleEffect(0.7)
+                                    .padding(.horizontal, RQSpacing.md)
+                                    .padding(.vertical, RQSpacing.sm)
+                                    .background(RQColors.accent)
+                                    .cornerRadius(RQRadius.large)
+                            } else {
+                                Text("Try It")
+                                    .font(RQTypography.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(RQColors.background)
+                                    .padding(.horizontal, RQSpacing.md)
+                                    .padding(.vertical, RQSpacing.sm)
+                                    .background(RQColors.accent)
+                                    .cornerRadius(RQRadius.large)
+                            }
+                        }
+                        .disabled(cloningTemplateId != nil)
+                    }
+                }
+            }
+        }
+    }
+
+    private func loadSharedTemplates() async {
+        do {
+            sharedTemplates = try await templateService.fetchSharedTemplates(of: friendship.friendId)
+        } catch {
+            sharedTemplates = []
+        }
+    }
+
+    private func cloneTemplate(_ template: Template) async {
+        guard let uid = viewModel.currentUserId else { return }
+        cloningTemplateId = template.id
+        defer { cloningTemplateId = nil }
+        do {
+            let copy = try await templateService.duplicateTemplate(
+                templateId: template.id,
+                userId: uid
+            )
+            cloneSuccessTemplate = copy
+        } catch {
+            // Silently fail — surfacing this would need an error toast,
+            // which we don't have a primitive for yet.
         }
     }
 
