@@ -11,11 +11,167 @@ struct LeagueView: View {
                 // User's league card
                 userLeagueCard
 
+                // Promotion race — sits between league card and leaderboard
+                // so the "how much to climb" signal is visible without
+                // scrolling past the leaderboard scoring guide.
+                promotionRaceCard
+
                 // Leaderboard
                 leaderboardSection
             }
             .padding(.horizontal, RQSpacing.screenHorizontal)
             .padding(.vertical, RQSpacing.lg)
+        }
+    }
+
+    // MARK: - Promotion Race
+
+    /// Number of leaderboard slots that promote each cycle. Mirrors the
+    /// existing "Top 5 promote" caption rendered below the leaderboard.
+    private let promotionSlots = 5
+
+    private var nextTier: LeagueTier? { viewModel.currentTier.nextTier }
+
+    /// IQ needed for the next tier; nil at Elite (top tier).
+    private var iqToNextTier: Int? {
+        guard let next = nextTier else { return nil }
+        let delta = next.minIQ - viewModel.totalIQ
+        return max(0, delta)
+    }
+
+    /// User's 1-indexed leaderboard rank, if present.
+    private var myRank: Int? {
+        guard let uid = viewModel.currentUserId else { return nil }
+        return viewModel.leaderboard.firstIndex { $0.id == uid }.map { $0 + 1 }
+    }
+
+    /// IQ delta to the leaderboard slot immediately above the user. Nil
+    /// when the user is already at #1.
+    private var iqToOvertakeNext: Int? {
+        guard let rank = myRank, rank > 1 else { return nil }
+        let aboveIdx = rank - 2 // 0-indexed slot above
+        guard aboveIdx >= 0 && aboveIdx < viewModel.leaderboard.count else { return nil }
+        let aboveIQ = viewModel.leaderboard[aboveIdx].totalIQ ?? 0
+        return max(0, aboveIQ - viewModel.totalIQ)
+    }
+
+    /// IQ buffer the user has over the slot immediately below them.
+    /// Negative if no one is below; nil when the user isn't on the
+    /// leaderboard.
+    private var iqBufferBelow: Int? {
+        guard let rank = myRank else { return nil }
+        let belowIdx = rank // user is at rank-1; the next index is `rank`
+        guard belowIdx < viewModel.leaderboard.count else { return nil }
+        let belowIQ = viewModel.leaderboard[belowIdx].totalIQ ?? 0
+        return max(0, viewModel.totalIQ - belowIQ)
+    }
+
+    @ViewBuilder
+    private var promotionRaceCard: some View {
+        if let _ = nextTier {
+            VStack(alignment: .leading, spacing: RQSpacing.md) {
+                HStack(spacing: RQSpacing.xs) {
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                        .font(.system(size: 12))
+                        .foregroundColor(RQColors.accent)
+                    Text("PROMOTION RACE")
+                        .font(RQTypography.label)
+                        .tracking(1.5)
+                        .foregroundColor(RQColors.textSecondary)
+                    Spacer()
+                    if let rank = myRank {
+                        Text("RANK #\(rank)")
+                            .font(.system(size: 10, weight: .heavy))
+                            .tracking(1)
+                            .foregroundColor(rank <= promotionSlots ? RQColors.success : RQColors.textTertiary)
+                    }
+                }
+
+                // Tier threshold progress
+                tierThresholdBar
+
+                // Live race against neighbors on the leaderboard
+                neighborRace
+            }
+            .padding(RQSpacing.cardPadding)
+            .background(RQColors.surfacePrimary)
+            .cornerRadius(RQRadius.medium)
+        }
+    }
+
+    @ViewBuilder
+    private var tierThresholdBar: some View {
+        if let next = nextTier, let toGo = iqToNextTier {
+            let floor = viewModel.currentTier.minIQ
+            let ceiling = next.minIQ
+            let range = max(1, ceiling - floor)
+            let into = max(0, min(range, viewModel.totalIQ - floor))
+            let progress = Double(into) / Double(range)
+
+            VStack(alignment: .leading, spacing: RQSpacing.sm) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(toGo == 0 ? "Ready to promote" : "\(toGo) IQ to \(next.displayName)")
+                        .font(RQTypography.headline)
+                        .foregroundColor(RQColors.textPrimary)
+                    Spacer()
+                    Text("\(Int(progress * 100))%")
+                        .font(RQTypography.numbersSmall)
+                        .foregroundColor(RQColors.accent)
+                }
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(RQColors.surfaceTertiary)
+                            .frame(height: 6)
+                        Capsule()
+                            .fill(RQColors.accent)
+                            .frame(width: geo.size.width * progress, height: 6)
+                    }
+                }
+                .frame(height: 6)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var neighborRace: some View {
+        if myRank != nil {
+            VStack(spacing: RQSpacing.xs) {
+                if let toOvertake = iqToOvertakeNext {
+                    raceRow(
+                        icon: "arrow.up.circle",
+                        text: "\(toOvertake) IQ to catch the rank above",
+                        color: RQColors.warning
+                    )
+                }
+                if let buffer = iqBufferBelow {
+                    raceRow(
+                        icon: "shield.fill",
+                        text: "\(buffer) IQ buffer over the rank below",
+                        color: RQColors.success
+                    )
+                }
+                if let rank = myRank, rank <= promotionSlots {
+                    raceRow(
+                        icon: "checkmark.seal.fill",
+                        text: "In the top \(promotionSlots) — promoting at cycle end",
+                        color: RQColors.success
+                    )
+                }
+            }
+        }
+    }
+
+    private func raceRow(icon: String, text: String, color: Color) -> some View {
+        HStack(spacing: RQSpacing.sm) {
+            Image(systemName: icon)
+                .font(.system(size: 11))
+                .foregroundColor(color)
+                .frame(width: 16)
+            Text(text)
+                .font(RQTypography.footnote)
+                .foregroundColor(RQColors.textSecondary)
+            Spacer()
         }
     }
 

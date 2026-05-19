@@ -11,10 +11,20 @@ struct ExerciseProgressView: View {
     @State private var selectedMetric: ProgressMetric = .weight
     @State private var socialViewModel = SocialViewModel()
     @State private var showAllTips = false
+    @State private var friendsPercentile: Int?
+    @State private var tierPercentile: Int?
 
     private let analyticsService = AnalyticsService()
     private let progressionService = ProgressionService()
     private let tipsService = TipsService()
+    private let percentileService = LiftPercentileService()
+
+    /// User's best e1RM on this exercise over the loaded snapshot window.
+    /// `nil` when there are no working snapshots.
+    private var userBestE1RM: Double? {
+        let value = snapshots.map(\.estimated1RM).max() ?? 0
+        return value > 0 ? value : nil
+    }
 
     enum ProgressMetric: String, CaseIterable {
         case weight = "Weight"
@@ -132,6 +142,12 @@ struct ExerciseProgressView: View {
                         velocityBadge(vel)
                     }
 
+                    // Lift percentile vs friends and league tier. Renders
+                    // only if we have a meaningful cohort.
+                    if friendsPercentile != nil || tierPercentile != nil {
+                        liftPercentileCard
+                    }
+
                     // Strength Prediction
                     if let prediction = strengthPrediction, prediction.isReliable {
                         strengthPredictionCard(prediction)
@@ -179,6 +195,7 @@ struct ExerciseProgressView: View {
             await loadData()
             await socialViewModel.loadSocialData()
             await loadTopTips()
+            await loadPercentiles()
         }
         .navigationDestination(isPresented: $showAllTips) {
             ExerciseTipsView(viewModel: socialViewModel,
@@ -259,6 +276,101 @@ struct ExerciseProgressView: View {
             )
         } catch {
             topTips = []
+        }
+    }
+
+    // MARK: - Lift Percentile
+
+    private var liftPercentileCard: some View {
+        RQCard {
+            VStack(alignment: .leading, spacing: RQSpacing.md) {
+                HStack(spacing: RQSpacing.xs) {
+                    Image(systemName: "chart.bar.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(RQColors.accent)
+                    Text("HOW YOU STACK UP")
+                        .font(RQTypography.label)
+                        .tracking(1.5)
+                        .foregroundColor(RQColors.textSecondary)
+                    Spacer()
+                    if let e1rm = userBestE1RM {
+                        Text("\(Int(e1rm)) e1RM")
+                            .font(RQTypography.numbersSmall)
+                            .foregroundColor(RQColors.textPrimary)
+                    }
+                }
+
+                HStack(spacing: RQSpacing.md) {
+                    if let p = friendsPercentile {
+                        percentilePill(value: p, label: "vs friends")
+                    }
+                    if let p = tierPercentile {
+                        percentilePill(value: p,
+                                       label: "vs \(socialViewModel.currentTier.displayName)")
+                    }
+                }
+            }
+        }
+    }
+
+    private func percentilePill(value: Int, label: String) -> some View {
+        let color: Color = {
+            if value >= 75 { return RQColors.success }
+            if value >= 50 { return RQColors.accent }
+            if value >= 25 { return RQColors.warning }
+            return RQColors.textSecondary
+        }()
+        return VStack(alignment: .leading, spacing: RQSpacing.xxs) {
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text("\(value)")
+                    .font(RQTypography.numbers)
+                    .foregroundColor(color)
+                Text(percentileSuffix(value))
+                    .font(.system(size: 10, weight: .heavy))
+                    .foregroundColor(color)
+            }
+            Text(label.uppercased())
+                .font(.system(size: 9, weight: .semibold))
+                .tracking(1)
+                .foregroundColor(RQColors.textTertiary)
+        }
+        .padding(.horizontal, RQSpacing.md)
+        .padding(.vertical, RQSpacing.sm)
+        .background(color.opacity(0.12))
+        .cornerRadius(RQRadius.medium)
+    }
+
+    private func percentileSuffix(_ n: Int) -> String {
+        let mod10 = n % 10
+        let mod100 = n % 100
+        if mod10 == 1 && mod100 != 11 { return "ST" }
+        if mod10 == 2 && mod100 != 12 { return "ND" }
+        if mod10 == 3 && mod100 != 13 { return "RD" }
+        return "TH"
+    }
+
+    private func loadPercentiles() async {
+        guard let e1rm = userBestE1RM else { return }
+        async let friends = percentileService.friendsPercentile(
+            exerciseId: exercise.id,
+            userE1RM: e1rm,
+            friendIds: Array(socialViewModel.friendIds)
+        )
+        async let tier = percentileService.tierPercentile(
+            exerciseId: exercise.id,
+            userE1RM: e1rm,
+            tier: socialViewModel.currentTier
+        )
+        do {
+            friendsPercentile = try await friends
+        } catch {
+            friendsPercentile = nil
+        }
+        do {
+            tierPercentile = try await tier
+        } catch {
+            // RPC may not be deployed yet — fall back silently
+            tierPercentile = nil
         }
     }
 
