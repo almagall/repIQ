@@ -97,9 +97,13 @@ CREATE TABLE IF NOT EXISTS public.user_presence (
     expires_at timestamptz NOT NULL DEFAULT (now() + interval '2 hours')
 );
 
+-- Composite index for the (expires_at, gym_place_id) lookup the gym hub
+-- runs. A `WHERE expires_at > now()` partial predicate would be ideal
+-- but Postgres rejects it because `now()` is STABLE, not IMMUTABLE;
+-- partial-index predicates can only reference immutable functions. The
+-- full composite index is plenty fast for the row volume we expect.
 CREATE INDEX IF NOT EXISTS idx_user_presence_active
-    ON public.user_presence(expires_at, gym_place_id)
-    WHERE expires_at > now();
+    ON public.user_presence(expires_at, gym_place_id);
 
 ALTER TABLE public.user_presence ENABLE ROW LEVEL SECURITY;
 
