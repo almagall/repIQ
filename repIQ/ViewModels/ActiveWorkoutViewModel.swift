@@ -43,6 +43,16 @@ final class ActiveWorkoutViewModel {
     // MARK: - Deload Suggestion
     var deloadSuggestion: ProgressionService.DeloadSuggestion?
 
+    // MARK: - Performance Deload Prompt
+    /// Set when one or more of this day's exercises loaded with a performance-based
+    /// deload target. The user is prompted to take the deload or keep progressing
+    /// instead of having the lighter weights applied silently.
+    struct PendingDeload {
+        let exerciseIndices: [Int]
+        let exerciseNames: [String]
+    }
+    var pendingDeload: PendingDeload?
+
     // MARK: - Rest Timer
     var restTimerRemaining: Int = 0
     var restTimerTarget: Int = 0
@@ -845,8 +855,26 @@ final class ActiveWorkoutViewModel {
             // not block the workout itself.
             await markPresenceTraining(userId: userId)
 
-            // 8. Check if proactive deload should be suggested
-            if let templateId = template.id as UUID? {
+            // 8. Detect performance-based deload targets and offer a choice.
+            //    These were baked in at the previous session's completion; rather
+            //    than apply the lighter weights silently, prompt the user.
+            let deloadIndices = exercises.indices.filter { i in
+                switch exercises[i].progressionTarget?.decision {
+                case .deload, .deloadVolume: return true
+                default: return false
+                }
+            }
+            if !deloadIndices.isEmpty {
+                pendingDeload = PendingDeload(
+                    exerciseIndices: deloadIndices,
+                    exerciseNames: deloadIndices.map { exercises[$0].exerciseName }
+                )
+            }
+
+            // 9. Check if proactive (time-based) deload should be suggested. Skip
+            //    when a performance deload prompt is already pending so the user
+            //    isn't shown two deload prompts at once.
+            if pendingDeload == nil, let templateId = template.id as UUID? {
                 deloadSuggestion = try? await progressionService.shouldSuggestDeload(
                     userId: userId,
                     templateId: templateId
@@ -904,6 +932,71 @@ final class ActiveWorkoutViewModel {
             }
         }
         deloadSuggestion = nil
+    }
+
+    // MARK: - Performance Deload Prompt Actions
+
+    /// User accepted the performance-based deload — keep the loaded deload targets.
+    func takeDeload() {
+        pendingDeload = nil
+    }
+
+    /// User declined the deload — recompute each flagged exercise's target with
+    /// deload suppressed so they continue progressing normally, and rebuild the
+    /// not-yet-completed pre-filled sets (and their GOAL snapshots) to match.
+    func keepProgressing() async {
+        guard let pending = pendingDeload else { return }
+        guard let userId = try? await supabase.auth.session.user.id else {
+            pendingDeload = nil
+            return
+        }
+
+        for i in pending.exerciseIndices where exercises.indices.contains(i) {
+            let exercise = exercises[i]
+            let recentSessions = (try? await workoutService.fetchPreviousSetsForExercise(
+                exerciseId: exercise.exerciseId,
+                userId: userId,
+                workoutDayId: currentWorkoutDayId,
+                limit: 3
+            )) ?? []
+
+            guard let newTarget = progressionService.calculateTarget(
+                exerciseId: exercise.exerciseId,
+                trainingMode: exercise.trainingMode,
+                equipment: exercise.equipment,
+                recentSessions: recentSessions,
+                repCap: exercise.repCap,
+                allowDeload: false
+            ) else { continue }
+
+            exercises[i].progressionTarget = newTarget
+
+            for j in exercises[i].sets.indices
+            where !exercises[i].sets[j].isCompleted && exercises[i].sets[j].setType == .working {
+                let old = exercises[i].sets[j]
+                let prev = exercises[i].previousSets.first?[safe: j]
+                let (w, r, rpe) = Self.perSetTarget(
+                    decision: newTarget,
+                    previousSet: prev,
+                    trainingMode: exercises[i].trainingMode,
+                    setPosition: j,
+                    totalSets: exercises[i].targetSets,
+                    equipment: exercises[i].equipment
+                )
+                exercises[i].sets[j] = SetEntry(
+                    setNumber: old.setNumber,
+                    setType: old.setType,
+                    weight: w,
+                    reps: r,
+                    targetWeight: w,
+                    targetReps: r,
+                    targetRPE: rpe
+                )
+            }
+        }
+
+        pendingDeload = nil
+        pushActivityUpdate()
     }
 
     func completeWorkout() async {

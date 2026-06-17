@@ -12,13 +12,17 @@ struct ProgressionService: Sendable {
     /// - Mesocycle RPE progression (Gap 5 from RP framework)
     /// - Proactive deload ceiling (Gap 3)
     /// - Off-day escalation (Gap 6)
+    /// - Parameter allowDeload: When false, every branch that would prescribe a
+    ///   deload is suppressed and routed into normal progression instead — used
+    ///   when the user is offered a deload and chooses to keep progressing.
     func calculateTarget(
         exerciseId: UUID,
         trainingMode: TrainingMode,
         equipment: String,
         recentSessions: [[WorkoutSet]],
         repCap: Int? = nil,
-        weeksSinceDeload: Int? = nil
+        weeksSinceDeload: Int? = nil,
+        allowDeload: Bool = true
     ) -> ProgressionTarget? {
         guard let latestSession = recentSessions.first, !latestSession.isEmpty else {
             return nil
@@ -32,7 +36,8 @@ struct ProgressionService: Sendable {
                 trainingMode: trainingMode,
                 recentSessions: recentSessions,
                 repCap: repCap,
-                weeksSinceDeload: weeksSinceDeload
+                weeksSinceDeload: weeksSinceDeload,
+                allowDeload: allowDeload
             )
         }
 
@@ -90,7 +95,7 @@ struct ProgressionService: Sendable {
         let reasoning: String
 
         // Proactive deload ceiling (Gap 3): force deload after 7+ weeks regardless of trend
-        if let weeks = weeksSinceDeload, weeks >= 7 {
+        if let weeks = weeksSinceDeload, weeks >= 7, allowDeload {
             let deloadedE1RM = currentE1RM * 0.90
             decision = .deload
             tWeight = roundToIncrement(deloadedE1RM * percentageOfE1RM(forReps: targetMidRep), increment)
@@ -122,7 +127,7 @@ struct ProgressionService: Sendable {
             // Off-day escalation (Gap 6): consecutive bad sessions → deload
             let consecutiveBadSessions = countConsecutiveBadSessions(recentSessions: recentSessions)
 
-            if consecutiveBadSessions >= 2 {
+            if consecutiveBadSessions >= 2 && allowDeload {
                 // Two or more consecutive >10% drops → real fatigue, not just off days
                 let deloadedE1RM = currentE1RM * 0.90
                 decision = .deload
@@ -176,8 +181,9 @@ struct ProgressionService: Sendable {
                     }
                 }
 
-            } else if percentChange >= -0.02 {
-                // e1RM flat. Default move is double-progression — add reps at
+            } else if percentChange >= -0.02 || !allowDeload {
+                // e1RM flat (or declining with deload suppressed — the user chose to
+                // keep progressing). Default move is double-progression — add reps at
                 // the same weight — but if you're already at the rep cap, the
                 // engine has nowhere to add reps and the prior code would
                 // re-prescribe the cap forever. When at cap, jump weight and
@@ -235,7 +241,8 @@ struct ProgressionService: Sendable {
         trainingMode: TrainingMode,
         recentSessions: [[WorkoutSet]],
         repCap: Int?,
-        weeksSinceDeload: Int?
+        weeksSinceDeload: Int?,
+        allowDeload: Bool
     ) -> ProgressionTarget? {
         guard let latestSession = recentSessions.first else { return nil }
 
@@ -258,7 +265,7 @@ struct ProgressionService: Sendable {
         let reasoning: String
 
         // Proactive deload ceiling
-        if let weeks = weeksSinceDeload, weeks >= 7 {
+        if let weeks = weeksSinceDeload, weeks >= 7, allowDeload {
             decision = .deloadVolume
             tRepsLow = max(medReps - 2, repRange.lowerBound)
             tRepsHigh = max(medReps - 1, repRange.lowerBound)
@@ -295,11 +302,19 @@ struct ProgressionService: Sendable {
                 tRepsHigh = min(medReps + 1, effectiveUpperBound)
                 reasoning = "Reps are holding steady. Aim for one more rep per set."
 
-            } else {
+            } else if allowDeload {
                 decision = .deloadVolume
                 tRepsLow = max(medReps - 1, repRange.lowerBound)
                 tRepsHigh = medReps
                 reasoning = "Rep count has dropped. Consider reducing sets or taking a lighter session."
+
+            } else {
+                // Reps dropped but the user chose to keep progressing — hold the
+                // line and aim to win the rep back rather than backing off.
+                decision = .increaseReps
+                tRepsLow = min(medReps + 1, effectiveUpperBound)
+                tRepsHigh = min(medReps + 1, effectiveUpperBound)
+                reasoning = "Aim to win back the rep you dropped last session."
             }
         }
 

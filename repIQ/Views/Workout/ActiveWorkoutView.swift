@@ -217,6 +217,11 @@ struct ActiveWorkoutView: View {
                 workoutProgressBar
             }
 
+            // Performance-based deload prompt (take it or keep progressing)
+            if let pending = viewModel.pendingDeload {
+                performanceDeloadBanner(pending)
+            }
+
             // Proactive deload suggestion banner
             if let suggestion = viewModel.deloadSuggestion {
                 deloadSuggestionBanner(suggestion)
@@ -351,6 +356,73 @@ struct ActiveWorkoutView: View {
         }
         .padding(RQSpacing.md)
         .background(RQColors.accent.opacity(0.08))
+        .cornerRadius(RQRadius.large)
+        .padding(.horizontal, RQSpacing.screenHorizontal)
+        .padding(.top, RQSpacing.sm)
+        .transition(.move(edge: .top).combined(with: .opacity))
+    }
+
+    // MARK: - Performance Deload Banner
+
+    private func performanceDeloadBanner(_ pending: ActiveWorkoutViewModel.PendingDeload) -> some View {
+        let names = pending.exerciseNames
+        let detail: String
+        switch names.count {
+        case 1:
+            detail = "\(names[0]) has been declining, so a lighter recovery week is recommended. Take the deload, or keep progressing as you have been."
+        case 2:
+            detail = "\(names[0]) and \(names[1]) have been declining, so a lighter recovery week is recommended. Take the deload, or keep progressing as you have been."
+        default:
+            detail = "\(names.count) lifts have been declining, so a lighter recovery week is recommended. Take the deload, or keep progressing as you have been."
+        }
+
+        return VStack(alignment: .leading, spacing: RQSpacing.sm) {
+            HStack(spacing: RQSpacing.sm) {
+                Image(systemName: "arrow.down.heart.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(RQColors.warning)
+
+                Text("Recovery Recommended")
+                    .font(RQTypography.headline)
+                    .foregroundColor(RQColors.textPrimary)
+
+                Spacer()
+            }
+
+            Text(detail)
+                .font(RQTypography.caption)
+                .foregroundColor(RQColors.textSecondary)
+
+            HStack(spacing: RQSpacing.md) {
+                Button {
+                    withAnimation { viewModel.takeDeload() }
+                } label: {
+                    Text("Take Deload")
+                        .font(RQTypography.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(RQColors.background)
+                        .padding(.horizontal, RQSpacing.lg)
+                        .padding(.vertical, RQSpacing.sm)
+                        .background(RQColors.warning)
+                        .cornerRadius(RQRadius.medium)
+                }
+
+                Button {
+                    Task { await viewModel.keepProgressing() }
+                } label: {
+                    Text("Keep Progressing")
+                        .font(RQTypography.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(RQColors.textPrimary)
+                        .padding(.horizontal, RQSpacing.lg)
+                        .padding(.vertical, RQSpacing.sm)
+                        .background(RQColors.surfaceTertiary)
+                        .cornerRadius(RQRadius.medium)
+                }
+            }
+        }
+        .padding(RQSpacing.md)
+        .background(RQColors.warning.opacity(0.08))
         .cornerRadius(RQRadius.large)
         .padding(.horizontal, RQSpacing.screenHorizontal)
         .padding(.top, RQSpacing.sm)
