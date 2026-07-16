@@ -1,5 +1,4 @@
 import SwiftUI
-import Supabase
 
 struct MainTabView: View {
     let workoutCoordinator: WorkoutCoordinator
@@ -7,7 +6,6 @@ struct MainTabView: View {
     @State private var selectedTab = 0
     @State private var showRecoveryAlert = false
     @State private var recoveredState: SavedWorkoutState?
-    @State private var unviewedWrappedCount: Int = 0
 
     /// Binding for the full-screen cover. Reads `coordinator.isExpanded`.
     /// On dismiss (set to false), the cover becomes hidden — but if the workout is
@@ -55,7 +53,6 @@ struct MainTabView: View {
                 .tabItem {
                     Label("Progress", systemImage: "chart.line.uptrend.xyaxis")
                 }
-                .badge(unviewedWrappedCount)
                 .tag(1)
 
             withMiniBar { ProfileView() }
@@ -87,17 +84,6 @@ struct MainTabView: View {
                     WorkoutAutoSave.clear()
                 }
             }
-            await refreshWrappedBadge()
-        }
-        .onChange(of: selectedTab) { _, newTab in
-            // When the user lands on Progress, the wrapped will be marked viewed
-            // by MonthlyWrappedView itself; refresh the badge after a brief delay.
-            if newTab == 1 {
-                Task {
-                    try? await Task.sleep(for: .seconds(1))
-                    await refreshWrappedBadge()
-                }
-            }
         }
         .alert("Resume Workout?", isPresented: $showRecoveryAlert) {
             Button("Resume") {
@@ -115,16 +101,5 @@ struct MainTabView: View {
                 Text("You have an unfinished \(state.dayName.isEmpty ? "workout" : state.dayName) from \(state.savedAt.relativeDisplay). Would you like to pick up where you left off?")
             }
         }
-    }
-
-    /// Pulls the prior month's wrapped status to drive the Progress-tab dot
-    /// badge. Shows a "1" until the user views (or dismisses) the wrapped.
-    private func refreshWrappedBadge() async {
-        guard let userId = try? await supabase.auth.session.user.id else {
-            unviewedWrappedCount = 0
-            return
-        }
-        let wrapped = try? await DigestService().fetchPriorMonthWrapped(userId: userId)
-        unviewedWrappedCount = (wrapped?.viewedAt == nil && wrapped != nil) ? 1 : 0
     }
 }
