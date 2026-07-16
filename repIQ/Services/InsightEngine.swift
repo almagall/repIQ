@@ -8,7 +8,6 @@ struct InsightEngine {
     static func generateInsights(
         volumeTrend: [WeeklyVolumeSummary],
         muscleDistribution: [MuscleGroupVolume],
-        streakData: StreakData?,
         recentPRs: [RecentPREntry],
         totalSessions: Int,
         lastWorkoutDate: Date?,
@@ -190,7 +189,7 @@ struct InsightEngine {
         return InsightCard(
             icon: "clock.badge.exclamationmark",
             title: "Time to Train",
-            message: "It's been \(daysSince) days since your last session. A quick workout keeps your streak alive.",
+            message: "It's been \(daysSince) days since your last session. A quick workout gets you back on track.",
             accentColor: RQColors.warning,
             priority: 5
         )

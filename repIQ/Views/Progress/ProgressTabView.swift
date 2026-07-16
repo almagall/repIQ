@@ -9,7 +9,6 @@ struct ProgressTabView: View {
     @State private var showAllPRs = false
     @State private var showCompareLifts = false
     @State private var selectedExerciseId: UUID?
-    @State private var socialViewModel = SocialViewModel()
     /// Set when the user taps a bar in the volume chart; presents the
     /// per-week session sheet.
     @State private var selectedVolumeWeek: Date?
@@ -86,8 +85,8 @@ struct ProgressTabView: View {
                             }
                         )
 
-                        // 3. Streak + Consistency (merged)
-                        streakConsistencySection
+                        // 3. Consistency
+                        consistencySection
 
                         // 3. Smart Insights — prescriptive coaching (promoted from #6)
                         if !viewModel.insights.isEmpty {
@@ -141,7 +140,7 @@ struct ProgressTabView: View {
                 }
             }
             .navigationDestination(isPresented: $showMonthlyReport) {
-                MonthlyWrappedView(viewModel: socialViewModel)
+                MonthlyWrappedView()
             }
             .navigationDestination(for: UUID.self) { sessionId in
                 SessionDetailView(viewModel: viewModel, sessionId: sessionId)
@@ -177,7 +176,6 @@ struct ProgressTabView: View {
             }
             .task {
                 await viewModel.loadDashboard()
-                await socialViewModel.loadSocialData()
             }
             .refreshable {
                 UIImpactFeedbackGenerator(style: .soft).impactOccurred()
@@ -228,45 +226,16 @@ struct ProgressTabView: View {
         .animation(.easeInOut(duration: 0.2), value: viewModel.isReloadingWindowedSections)
     }
 
-    // MARK: - 2. Streak + Consistency (merged)
+    // MARK: - 2. Consistency
 
-    private var streakConsistencySection: some View {
+    private var consistencySection: some View {
         VStack(alignment: .leading, spacing: RQSpacing.md) {
             sectionHeaderWithInfo("CONSISTENCY", topic: ProgressExplainer.consistencyScore)
 
             RQCard {
                 VStack(alignment: .leading, spacing: RQSpacing.lg) {
-                    // Top row: flame + streak + consistency ring
+                    // Top row: consistency ring
                     HStack(spacing: RQSpacing.lg) {
-                        // Flame + streak
-                        HStack(spacing: RQSpacing.sm) {
-                            Image(systemName: "flame.fill")
-                                .font(.system(size: 22))
-                                .foregroundColor(streakColor)
-
-                            VStack(alignment: .leading, spacing: 0) {
-                                if let streak = viewModel.streakData, streak.currentStreak > 0 {
-                                    Text("\(streak.currentStreak)")
-                                        .font(RQTypography.numbers)
-                                        .foregroundColor(RQColors.textPrimary)
-                                    Text("WEEK STREAK")
-                                        .font(.system(size: 8, weight: .semibold))
-                                        .tracking(0.5)
-                                        .foregroundColor(RQColors.textTertiary)
-                                } else {
-                                    Text("—")
-                                        .font(RQTypography.numbers)
-                                        .foregroundColor(RQColors.textTertiary)
-                                    Text("NO STREAK")
-                                        .font(.system(size: 8, weight: .semibold))
-                                        .tracking(0.5)
-                                        .foregroundColor(RQColors.textTertiary)
-                                }
-                            }
-                        }
-
-                        Spacer()
-
                         // Consistency ring
                         if let score = viewModel.consistencyScore, score.overall > 0 {
                             HStack(spacing: RQSpacing.sm) {
@@ -336,15 +305,6 @@ struct ProgressTabView: View {
                 }
             }
         }
-    }
-
-    private var streakColor: Color {
-        guard let streak = viewModel.streakData else { return RQColors.textTertiary }
-        if streak.currentStreak >= 12 { return RQColors.warning }  // 3+ months
-        if streak.currentStreak >= 4 { return RQColors.accent }    // 1+ month
-        if streak.currentStreak >= 2 { return RQColors.success }   // 2+ weeks
-        if streak.currentStreak > 0 { return RQColors.textSecondary }
-        return RQColors.textTertiary
     }
 
     // MARK: - 4. Weekly Volume Chart

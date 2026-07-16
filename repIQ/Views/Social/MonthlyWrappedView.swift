@@ -1,12 +1,11 @@
 import SwiftUI
+import Supabase
 
 /// Entry point for the monthly wrapped flow. Generates (idempotently) the
 /// prior month's wrapped on appear, then hands off to `WrappedStoryView` for
 /// the Spotify-style story presentation. Past months are accessible via a
 /// sheet from the archetype (closing) slide.
 struct MonthlyWrappedView: View {
-    @Bindable var viewModel: SocialViewModel
-
     @State private var wrapped: MonthlyWrapped?
     @State private var pastWrapped: [MonthlyWrapped] = []
     @State private var isLoading = true
@@ -93,7 +92,7 @@ struct MonthlyWrappedView: View {
     // MARK: - Loading
 
     private func load() async {
-        guard let userId = viewModel.currentUserId else {
+        guard let userId = try? await supabase.auth.session.user.id else {
             errorMessage = "Not signed in."
             isLoading = false
             return

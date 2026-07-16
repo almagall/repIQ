@@ -330,12 +330,11 @@ enum ProgressExplainer {
     static let consistencyScore = Topic(
         title: "Consistency Score",
         icon: "gauge.with.needle.fill",
-        explanation: "Your consistency score is a 0–100 composite metric that measures how reliably you're training. It combines four factors: training frequency, volume stability, current streak, and recency.",
+        explanation: "Your consistency score is a 0–100 composite metric that measures how reliably you're training. It combines three factors: training frequency, volume stability, and recency.",
         keyPoints: [
-            "Frequency (40%): How often you train per week relative to your goal.",
-            "Volume Stability (25%): How consistent your weekly volume is (low variance is better).",
-            "Streak (20%): Your current training streak rewards sustained consistency.",
-            "Recency (15%): Training recently counts more than gaps followed by bursts.",
+            "Frequency (50%): How often you train per week relative to your goal.",
+            "Volume Stability (30%): How consistent your weekly volume is (low variance is better).",
+            "Recency (20%): Training recently counts more than gaps followed by bursts.",
         ],
         howToUse: "A score above 80 means you're highly consistent. 60–80 is good but could improve. Below 60, focus on establishing a regular training schedule before worrying about advanced programming."
     )

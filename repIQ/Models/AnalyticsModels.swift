@@ -38,14 +38,6 @@ struct ExerciseSessionSnapshot: Identifiable {
     let setCount: Int
 }
 
-// MARK: - Streak
-
-struct StreakData {
-    let currentStreak: Int
-    let bestStreak: Int
-    let lastWorkoutDate: Date?
-}
-
 // MARK: - Milestones
 
 enum MilestoneCategory: String, CaseIterable, Sendable {
@@ -450,7 +442,6 @@ struct ConsistencyScore {
     let overall: Int // 0–100
     let frequencyScore: Double // 0–1
     let volumeStabilityScore: Double // 0–1
-    let streakScore: Double // 0–1
     let recencyScore: Double // 0–1
 
     var grade: ConsistencyGrade {

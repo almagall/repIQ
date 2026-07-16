@@ -6,7 +6,6 @@ import MuscleMap
 final class ProgressDashboardViewModel {
     // MARK: - Dashboard Data
 
-    var streakData: StreakData?
     var weeklyVolume: Double = 0
     var weeklySessionCount: Int = 0
     var totalVolume: Double = 0
@@ -161,28 +160,24 @@ final class ProgressDashboardViewModel {
     }
 
     /// Prescriptive caption for the consistency card. Uses the user's current
-    /// frequency, streak status, and consistency grade to pick the message.
+    /// frequency and consistency grade to pick the message.
     var consistencyNarrative: String? {
         guard let score = consistencyScore else { return nil }
 
         // Use weeklySessionCount to detect drift from typical cadence
         let recentCadence = weeklySessionCount
-        let streak = streakData?.currentStreak ?? 0
 
         switch score.grade {
         case .elite:
-            return "Elite consistency — \(streak)-week streak, you're showing up like clockwork."
+            return "Elite consistency — you're showing up like clockwork."
         case .strong:
             if recentCadence == 0 {
-                return "Strong base but you haven't trained yet this week — keep the streak alive."
+                return "Strong base but you haven't trained yet this week — get one in to stay sharp."
             }
             return "Strong rhythm — \(recentCadence) session\(recentCadence == 1 ? "" : "s") this week, stay locked in."
         case .good:
             return "Decent groove — pick one extra session per week to push into Strong territory."
         case .developing:
-            if streak == 0 {
-                return "Inconsistent recently — start a new streak with a short session this week."
-            }
             return "Patchy stretches lately — aim for a steady 3-day cadence to lock in gains."
         case .beginning:
             return "Just getting started — one session a week beats none, build the habit first."
@@ -273,7 +268,6 @@ final class ProgressDashboardViewModel {
             }
 
             // Parallel fetch all analytics data
-            async let streakTask = analyticsService.fetchCurrentStreak(userId: userId)
             async let volumeTrendTask = analyticsService.fetchWeeklyVolumeTrend(userId: userId, weeks: 8)
             async let muscleTask = analyticsService.fetchMuscleGroupDistribution(userId: userId, days: 30)
             async let fractionalTask = analyticsService.fetchFractionalMuscleDistribution(userId: userId, days: 30)
@@ -305,8 +299,6 @@ final class ProgressDashboardViewModel {
             totalPRCount = fetchedMilestoneData.totalPRs
             totalSessions = fetchedMilestoneData.totalSessions
             milestones = MilestoneCatalog.evaluate(with: fetchedMilestoneData)
-
-            if let fetched = try? await streakTask { streakData = fetched }
 
             let fetchedProfile = try? await profileTask
             bodyDiagramGender = Self.genderForBodyDiagram(profileSex: fetchedProfile?.sex)
@@ -358,10 +350,9 @@ final class ProgressDashboardViewModel {
             insights = InsightEngine.generateInsights(
                 volumeTrend: fetchedTrend,
                 muscleDistribution: fetchedMuscle,
-                streakData: streakData,
                 recentPRs: recentPRs,
                 totalSessions: fetchedSessions.count,
-                lastWorkoutDate: streakData?.lastWorkoutDate,
+                lastWorkoutDate: fetchedSessions.compactMap(\.completedAt).max(),
                 averageRPE: fetchedRPE,
                 topLifts: fetchedTopLifts,
                 weeklySessionCount: weeklySessionCount

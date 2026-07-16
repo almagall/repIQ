@@ -5,7 +5,6 @@ struct MainTabView: View {
     let workoutCoordinator: WorkoutCoordinator
 
     @State private var selectedTab = 0
-    @State private var socialViewModel = SocialViewModel()
     @State private var showRecoveryAlert = false
     @State private var recoveredState: SavedWorkoutState?
     @State private var unviewedWrappedCount: Int = 0
@@ -59,18 +58,11 @@ struct MainTabView: View {
                 .badge(unviewedWrappedCount)
                 .tag(1)
 
-            withMiniBar { SocialTabView(viewModel: socialViewModel) }
-                .tabItem {
-                    Label("Social", systemImage: "person.2.fill")
-                }
-                .badge(socialViewModel.notificationCount)
-                .tag(2)
-
             withMiniBar { ProfileView() }
                 .tabItem {
                     Label("Profile", systemImage: "person.fill")
                 }
-                .tag(3)
+                .tag(2)
         }
         .tint(RQColors.accent)
         .environment(workoutCoordinator)

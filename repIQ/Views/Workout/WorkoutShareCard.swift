@@ -41,23 +41,6 @@ struct WorkoutShareCard: View {
                     shareStatCard(value: formattedVolume, label: "VOLUME", icon: "scalemass")
                 }
 
-                // Streak (if active)
-                if summary.currentStreak > 0 {
-                    HStack(spacing: RQSpacing.sm) {
-                        Image(systemName: "flame.fill")
-                            .font(.system(size: 12))
-                            .foregroundColor(RQColors.warning)
-                        Text("\(summary.currentStreak) day streak")
-                            .font(RQTypography.caption)
-                            .fontWeight(.semibold)
-                            .foregroundColor(RQColors.warning)
-                    }
-                    .padding(.horizontal, RQSpacing.md)
-                    .padding(.vertical, RQSpacing.sm)
-                    .background(RQColors.warning.opacity(0.1))
-                    .clipShape(Capsule())
-                }
-
                 // Exercise list with heaviest set + PR badges
                 VStack(spacing: RQSpacing.sm) {
                     HStack {

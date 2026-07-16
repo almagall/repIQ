@@ -39,7 +39,6 @@ final class DashboardViewModel {
             async let setCount = workoutService.fetchWeeklySetCount(userId: userId)
             async let allSessions = workoutService.fetchAllSessions(userId: userId)
             async let templates = templateService.fetchTemplates(userId: userId)
-            async let streak = fetchCurrentStreak(userId: userId)
             async let lastPR = fetchLastPRSummary(userId: userId)
 
             recentSession = try await sessions.first
@@ -68,11 +67,9 @@ final class DashboardViewModel {
             self.templates = loadedTemplates
             templateCount = loadedTemplates.count
 
-            let resolvedStreak = (try? await streak) ?? 0
             let resolvedLastPR = try? await lastPR
 
             WidgetService.sync(WidgetService.Snapshot(
-                currentStreak: resolvedStreak,
                 weeklyWorkingSetCount: weeklySetCount,
                 lastWorkoutDate: recentSession?.completedAt,
                 lastPRSummary: resolvedLastPR
@@ -114,19 +111,6 @@ final class DashboardViewModel {
     }
 
     // MARK: - Widget Sync Helpers
-
-    /// Lightweight streak fetch — single column on profiles, avoids the heavier
-    /// `fetchMilestoneProgressData` round-trip on every dashboard load.
-    private func fetchCurrentStreak(userId: UUID) async throws -> Int {
-        struct StreakRow: Decodable { let current_streak: Int }
-        let row: StreakRow = try await supabase.from("profiles")
-            .select("current_streak")
-            .eq("id", value: userId.uuidString)
-            .single()
-            .execute()
-            .value
-        return row.current_streak
-    }
 
     /// Fetches the most recent PR with the exercise name, formatted as a
     /// glanceable string for the home screen widget. Returns `nil` if the

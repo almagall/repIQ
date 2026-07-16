@@ -3,7 +3,6 @@ import SwiftUI
 struct NotificationSettingsView: View {
     @State private var notificationsEnabled = false
     @State private var workoutRemindersEnabled = false
-    @State private var streakRemindersEnabled = false
     @AppStorage("monthlyWrappedRemindersEnabled") private var monthlyWrappedRemindersEnabled = true
     @State private var reminderHour = 9
     @State private var reminderMinute = 0
@@ -42,7 +41,6 @@ struct NotificationSettingsView: View {
                             } else {
                                 notificationService.cancelAll()
                                 workoutRemindersEnabled = false
-                                streakRemindersEnabled = false
                             }
                         }
                     }
@@ -121,29 +119,6 @@ struct NotificationSettingsView: View {
                         }
                     }
 
-                    // Streak Reminders
-                    RQCard {
-                        Toggle(isOn: $streakRemindersEnabled) {
-                            VStack(alignment: .leading, spacing: RQSpacing.xxs) {
-                                Text("Streak Protection")
-                                    .font(RQTypography.headline)
-                                    .foregroundColor(RQColors.textPrimary)
-                                Text("Get a reminder at 7 PM if you haven't trained today")
-                                    .font(RQTypography.caption)
-                                    .foregroundColor(RQColors.textTertiary)
-                            }
-                        }
-                        .tint(RQColors.accent)
-                        .onChange(of: streakRemindersEnabled) { _, enabled in
-                            if enabled {
-                                notificationService.scheduleStreakReminder()
-                            } else {
-                                UNUserNotificationCenter.current().removePendingNotificationRequests(
-                                    withIdentifiers: ["streak-reminder"]
-                                )
-                            }
-                        }
-                    }
 
                     // Monthly Wrapped Reminders
                     RQCard {

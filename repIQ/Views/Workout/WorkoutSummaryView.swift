@@ -128,11 +128,6 @@ struct WorkoutSummaryView: View {
                     performanceGradeSection(grade)
                 }
 
-                // Streak
-                if summary.currentStreak > 0 {
-                    gamificationSection
-                }
-
                 // Baseline recorded — shows when there are any baseline exercises in this session
                 if summary.baselineHypertrophyCount + summary.baselineStrengthCount > 0 {
                     baselineRecordedCard
@@ -288,24 +283,6 @@ struct WorkoutSummaryView: View {
         }
     }
 
-    private var gamificationSection: some View {
-        RQCard {
-            VStack(spacing: RQSpacing.sm) {
-                Image(systemName: "flame.fill")
-                    .font(.system(size: 20))
-                    .foregroundColor(RQColors.warning)
-                Text("\(summary.currentStreak)")
-                    .font(RQTypography.numbers)
-                    .foregroundColor(RQColors.warning)
-                Text("Day Streak")
-                    .font(RQTypography.label)
-                    .textCase(.uppercase)
-                    .tracking(1.5)
-                    .foregroundColor(RQColors.textSecondary)
-            }
-            .frame(maxWidth: .infinity)
-        }
-    }
 
     // MARK: - Baseline Recorded
 

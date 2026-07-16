@@ -469,76 +469,6 @@ struct AnalyticsService: Sendable {
         return results
     }
 
-    // MARK: - Streak Calculation
-
-    /// Calculates current and best training streaks.
-    /// A streak day = any day with at least one completed session.
-    /// Allows a 1-day gap (rest day) within a streak.
-    func fetchCurrentStreak(userId: UUID) async throws -> StreakData {
-        let sessions = try await workoutService.fetchAllSessions(userId: userId)
-        guard !sessions.isEmpty else {
-            return StreakData(currentStreak: 0, bestStreak: 0, lastWorkoutDate: nil)
-        }
-
-        let calendar = Calendar.current
-
-        // Get unique workout dates (as start-of-day)
-        let workoutDates: Set<Date> = Set(sessions.compactMap { session in
-            let date = session.completedAt ?? session.startedAt
-            return calendar.startOfDay(for: date)
-        })
-
-        let lastWorkoutDate = workoutDates.max()
-
-        // Weekly streak: count consecutive weeks with at least 1 workout
-        // Group workout dates into week-of-year identifiers
-        let workoutWeeks: Set<String> = Set(workoutDates.map { date in
-            let year = calendar.component(.yearForWeekOfYear, from: date)
-            let week = calendar.component(.weekOfYear, from: date)
-            return "\(year)-\(week)"
-        })
-
-        // Walk backward from current week
-        let today = Date()
-        var currentStreak = 0
-        var checkWeekDate = today
-
-        // Check current week first
-        let currentWeekId = "\(calendar.component(.yearForWeekOfYear, from: today))-\(calendar.component(.weekOfYear, from: today))"
-
-        // If no workout this week, check if last week had one (grace: current week is still in progress)
-        if !workoutWeeks.contains(currentWeekId) {
-            if let lastWeekDate = calendar.date(byAdding: .weekOfYear, value: -1, to: today) {
-                let lastWeekId = "\(calendar.component(.yearForWeekOfYear, from: lastWeekDate))-\(calendar.component(.weekOfYear, from: lastWeekDate))"
-                if workoutWeeks.contains(lastWeekId) {
-                    checkWeekDate = lastWeekDate
-                } else {
-                    let bestStreak = calculateBestWeeklyStreak(workoutWeeks: workoutWeeks, calendar: calendar, latestDate: lastWorkoutDate ?? today)
-                    return StreakData(currentStreak: 0, bestStreak: bestStreak, lastWorkoutDate: lastWorkoutDate)
-                }
-            }
-        }
-
-        // Count consecutive weeks backward
-        while true {
-            let weekId = "\(calendar.component(.yearForWeekOfYear, from: checkWeekDate))-\(calendar.component(.weekOfYear, from: checkWeekDate))"
-            if workoutWeeks.contains(weekId) {
-                currentStreak += 1
-                guard let prevWeek = calendar.date(byAdding: .weekOfYear, value: -1, to: checkWeekDate) else { break }
-                checkWeekDate = prevWeek
-            } else {
-                break
-            }
-        }
-
-        let bestStreak = calculateBestWeeklyStreak(workoutWeeks: workoutWeeks, calendar: calendar, latestDate: lastWorkoutDate ?? today)
-
-        return StreakData(
-            currentStreak: currentStreak,
-            bestStreak: max(currentStreak, bestStreak),
-            lastWorkoutDate: lastWorkoutDate
-        )
-    }
 
     // MARK: - Milestone Progress
 
@@ -561,9 +491,6 @@ struct AnalyticsService: Sendable {
         // PR count
         let prCount = try await fetchTotalPRCount(userId: userId)
 
-        // Streak
-        let streak = try await fetchCurrentStreak(userId: userId)
-
         // Unique muscle groups
         var uniqueMuscleGroups = 0
         if !uniqueExerciseIds.isEmpty {
@@ -575,8 +502,8 @@ struct AnalyticsService: Sendable {
             totalSessions: sessions.count,
             totalVolume: totalVolume,
             totalPRs: prCount,
-            bestStreak: streak.bestStreak,
-            currentStreak: streak.currentStreak,
+            bestStreak: 0,
+            currentStreak: 0,
             uniqueExercises: uniqueExerciseIds.count,
             uniqueMuscleGroups: uniqueMuscleGroups
         )
@@ -796,7 +723,7 @@ struct AnalyticsService: Sendable {
     func fetchConsistencyScore(userId: UUID, weeks: Int = 8) async throws -> ConsistencyScore {
         let calendar = Calendar.current
         guard let startDate = calendar.date(byAdding: .weekOfYear, value: -weeks, to: Date()) else {
-            return ConsistencyScore(overall: 0, frequencyScore: 0, volumeStabilityScore: 0, streakScore: 0, recencyScore: 0)
+            return ConsistencyScore(overall: 0, frequencyScore: 0, volumeStabilityScore: 0, recencyScore: 0)
         }
 
         let formatter = ISO8601DateFormatter()
@@ -811,13 +738,13 @@ struct AnalyticsService: Sendable {
             .execute()
             .value
 
-        // 1. Frequency Score (40%) — sessions per week vs target of 4
+        // 1. Frequency Score (50%) — sessions per week vs target of 4
         let targetSessionsPerWeek = 4.0
         let totalWeeks = max(1.0, Double(weeks))
         let sessionsPerWeek = Double(sessions.count) / totalWeeks
         let frequencyScore = min(1.0, sessionsPerWeek / targetSessionsPerWeek)
 
-        // 2. Volume Stability (25%) — coefficient of variation of weekly volumes
+        // 2. Volume Stability (30%) — coefficient of variation of weekly volumes
         var volumeStabilityScore: Double = 0
         if sessions.count >= 2 {
             let allSets = try await fetchSetsForSessions(sessions.map(\.id))
@@ -841,13 +768,9 @@ struct AnalyticsService: Sendable {
             }
         }
 
-        // 3. Streak Score (20%) — current streak normalized
-        let streak = try await fetchCurrentStreak(userId: userId)
-        let streakScore = min(1.0, Double(streak.currentStreak) / 14.0) // 14-day streak = full score
-
-        // 4. Recency Score (15%) — days since last workout
+        // 3. Recency Score (20%) — days since last workout
         var recencyScore: Double = 0
-        if let lastWorkout = streak.lastWorkoutDate {
+        if let lastWorkout = sessions.last.map({ $0.completedAt ?? $0.startedAt }) {
             let daysSince = calendar.dateComponents([.day], from: lastWorkout, to: Date()).day ?? 30
             // 0 days = 1.0, 7+ days = 0.0
             recencyScore = max(0, 1.0 - (Double(daysSince) / 7.0))
@@ -855,17 +778,15 @@ struct AnalyticsService: Sendable {
 
         // Weighted composite
         let overall = Int(round(
-            (frequencyScore * 40.0) +
-            (volumeStabilityScore * 25.0) +
-            (streakScore * 20.0) +
-            (recencyScore * 15.0)
+            (frequencyScore * 50.0) +
+            (volumeStabilityScore * 30.0) +
+            (recencyScore * 20.0)
         ))
 
         return ConsistencyScore(
             overall: min(100, max(0, overall)),
             frequencyScore: frequencyScore,
             volumeStabilityScore: volumeStabilityScore,
-            streakScore: streakScore,
             recencyScore: recencyScore
         )
     }
@@ -1391,31 +1312,6 @@ struct AnalyticsService: Sendable {
             .execute()
             .value
         return records.count
-    }
-
-    /// Calculates the longest streak from a set of workout dates.
-    private func calculateBestWeeklyStreak(workoutWeeks: Set<String>, calendar: Calendar, latestDate: Date) -> Int {
-        guard !workoutWeeks.isEmpty else { return 0 }
-
-        // Walk backward from the latest workout date week by week
-        var bestStreak = 0
-        var currentStreak = 0
-        var checkDate = latestDate
-
-        // Go back far enough to cover all data (52 weeks * 5 years max)
-        for _ in 0..<260 {
-            let weekId = "\(calendar.component(.yearForWeekOfYear, from: checkDate))-\(calendar.component(.weekOfYear, from: checkDate))"
-            if workoutWeeks.contains(weekId) {
-                currentStreak += 1
-                bestStreak = max(bestStreak, currentStreak)
-            } else {
-                currentStreak = 0
-            }
-            guard let prevWeek = calendar.date(byAdding: .weekOfYear, value: -1, to: checkDate) else { break }
-            checkDate = prevWeek
-        }
-
-        return bestStreak
     }
 
     private func buildEmptyWeeks(from startDate: Date, count: Int) -> [WeeklyVolumeSummary] {

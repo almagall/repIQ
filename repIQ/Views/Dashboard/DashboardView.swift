@@ -10,7 +10,6 @@ struct DashboardView: View {
     @State private var showNewTemplateOptions = false
     @State private var showCalendarView = false
     @State private var calendarMonth = Date()
-    @State private var socialViewModel = SocialViewModel()
     @State private var showMonthlyWrapped = false
     @AppStorage("hasSeenWelcomeCard") private var hasSeenWelcomeCard = false
 
@@ -87,14 +86,6 @@ struct DashboardView: View {
 
                     // Activity (Week / Calendar toggle)
                     activityCard
-
-                    // Social Pulse — league snippet + a peek at the latest
-                    // friend activity. Renders nothing until the social VM has
-                    // at least one signal to show (league tier, friend item),
-                    // so users with no friends don't see an empty card.
-                    if shouldShowSocialPulse {
-                        socialPulseCard
-                    }
 
                     // Goals
                     NavigationLink {
@@ -181,13 +172,11 @@ struct DashboardView: View {
                 await viewModel.loadDashboard()
                 await goalViewModel.loadGoals()
                 await templateListViewModel.loadTemplates()
-                await socialViewModel.loadSocialData()
             }
             .refreshable {
                 await viewModel.loadDashboard()
                 await goalViewModel.loadGoals()
                 await templateListViewModel.loadTemplates()
-                await socialViewModel.loadSocialData()
             }
             .sheet(isPresented: $showTemplatePicker) {
                 templatePickerSheet
@@ -213,145 +202,13 @@ struct DashboardView: View {
                 })
             }
             .navigationDestination(isPresented: $showMonthlyWrapped) {
-                MonthlyWrappedView(viewModel: socialViewModel)
+                MonthlyWrappedView()
                     .onDisappear {
                         // Banner clears once viewed_at is persisted server-side; refresh
                         // the dashboard state so it disappears immediately on return.
                         Task { await viewModel.loadDashboard() }
                     }
             }
-            // Mirror SocialTabView's destination wiring so the Social Pulse
-            // card can push directly into the league/feed screens from Home.
-            .navigationDestination(for: SocialDestination.self) { destination in
-                switch destination {
-                case .league:
-                    LeagueView(viewModel: socialViewModel)
-                        .navigationTitle("Leagues")
-                        .navigationBarTitleDisplayMode(.inline)
-                case .challenges:
-                    ChallengesView(viewModel: socialViewModel)
-                        .navigationTitle("Challenges")
-                        .navigationBarTitleDisplayMode(.inline)
-                case .achievements:
-                    AchievementsView(viewModel: socialViewModel)
-                case .clubs:
-                    ClubsListView(viewModel: socialViewModel)
-                case .weeklyDigest:
-                    WeeklyDigestView(viewModel: socialViewModel)
-                case .matchmaking:
-                    MatchmakingView(viewModel: socialViewModel)
-                case .socialProfile:
-                    SocialProfileView(viewModel: socialViewModel)
-                case .friendProfile(let friendship):
-                    FriendProfileView(viewModel: socialViewModel, friendship: friendship)
-                case .progressionRace(let friendship):
-                    ProgressionRaceView(viewModel: socialViewModel, friend: friendship)
-                }
-            }
-        }
-    }
-
-    // MARK: - Social Pulse Card
-
-    private var shouldShowSocialPulse: Bool {
-        // Show once we have any signed-in social data (currentUserId is
-        // resolved during loadSocialData). `currentTier` always returns a
-        // value, so the league strip never renders an empty state.
-        socialViewModel.currentUserId != nil
-    }
-
-    private var friendFeedItems: [FeedItem] {
-        socialViewModel.feedItems.filter { $0.userId != socialViewModel.currentUserId }
-    }
-
-    private var socialPulseCard: some View {
-        VStack(spacing: RQSpacing.md) {
-            // League block — taps into LeagueView.
-            NavigationLink(value: SocialDestination.league) {
-                HStack(spacing: RQSpacing.md) {
-                    Image(systemName: socialViewModel.currentTier.icon)
-                        .font(.system(size: 22))
-                        .foregroundColor(RQColors.accent)
-                        .frame(width: 32)
-
-                    VStack(alignment: .leading, spacing: RQSpacing.xxs) {
-                        Text(socialViewModel.currentTier.displayName.uppercased() + " LEAGUE")
-                            .font(RQTypography.label)
-                            .tracking(1.5)
-                            .foregroundColor(RQColors.textSecondary)
-                        Text("\(socialViewModel.totalIQ) IQ points")
-                            .font(RQTypography.numbersSmall)
-                            .foregroundColor(RQColors.textPrimary)
-                    }
-
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(RQColors.textTertiary)
-                }
-            }
-            .buttonStyle(.plain)
-
-            // Latest friend activity — peek at the top item if any.
-            if let item = friendFeedItems.first {
-                Divider().overlay(RQColors.surfaceTertiary)
-
-                NavigationLink(value: SocialDestination.socialProfile) {
-                    HStack(spacing: RQSpacing.md) {
-                        Circle()
-                            .fill(RQColors.accent.opacity(0.2))
-                            .frame(width: 32, height: 32)
-                            .overlay(
-                                Text(String((item.userProfile?.username ?? "?").prefix(1)).uppercased())
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundColor(RQColors.accent)
-                            )
-
-                        VStack(alignment: .leading, spacing: RQSpacing.xxs) {
-                            Text(item.userProfile?.username ?? "A friend")
-                                .font(RQTypography.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(RQColors.textPrimary)
-                            Text(socialPulseSubtitle(for: item))
-                                .font(RQTypography.caption)
-                                .foregroundColor(RQColors.textTertiary)
-                                .lineLimit(1)
-                        }
-
-                        Spacer()
-
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(RQColors.textTertiary)
-                    }
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(RQSpacing.cardPadding)
-        .background(RQColors.surfacePrimary)
-        .cornerRadius(RQRadius.medium)
-    }
-
-    private func socialPulseSubtitle(for item: FeedItem) -> String {
-        switch item.itemType {
-        case .workoutCompleted:
-            return "Just completed a workout"
-        case .prAchieved:
-            let n = item.data.prCount ?? 1
-            return n > 1 ? "Hit \(n) new PRs" : "Hit a new PR"
-        case .streakMilestone:
-            if let d = item.data.streakDays { return "\(d)-day streak!" }
-            return "On a streak"
-        case .badgeEarned:
-            if let b = item.data.badgeName { return "Earned the \"\(b)\" badge" }
-            return "Earned a badge"
-        case .leaguePromoted:
-            if let t = item.data.leagueTier { return "Promoted to \(t.capitalized)" }
-            return "League promoted"
-        case .challengeWon:
-            return "Won a challenge"
         }
     }
 

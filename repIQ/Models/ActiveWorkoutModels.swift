@@ -170,8 +170,6 @@ struct WorkoutSummaryData: Identifiable {
 
     // Gamification
     var iqPointsEarned: Int = 0
-    var currentStreak: Int = 0
-    var longestStreak: Int = 0
     var newBadges: [Badge] = []
     /// Goals that just transitioned from active → completed because of this
     /// workout. Surfaced as a celebration card on the summary screen.
@@ -196,8 +194,6 @@ struct WorkoutSummaryData: Identifiable {
         newPRs: [PRSummary] = [],
         progressionDecisions: [ProgressionSummary] = [],
         iqPointsEarned: Int = 0,
-        currentStreak: Int = 0,
-        longestStreak: Int = 0,
         newBadges: [Badge] = []
     ) {
         self.duration = duration
@@ -207,8 +203,6 @@ struct WorkoutSummaryData: Identifiable {
         self.newPRs = newPRs
         self.progressionDecisions = progressionDecisions
         self.iqPointsEarned = iqPointsEarned
-        self.currentStreak = currentStreak
-        self.longestStreak = longestStreak
         self.newBadges = newBadges
     }
 

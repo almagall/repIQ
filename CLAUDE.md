@@ -1,6 +1,8 @@
 # repIQ
 
-A best-in-class iOS workout-logging app — SwiftUI, iOS 17+, Supabase backend. Goal: disrupt the workout-app category with intelligent autoregulation, friction-free logging (Lock Screen + Dynamic Island), and a social loop that rewards consistency.
+A best-in-class iOS workout-logging app — SwiftUI, iOS 17+, Supabase backend. Goal: disrupt the workout-app category with intelligent autoregulation and friction-free logging (Lock Screen + Dynamic Island).
+
+For the first App Store release the app is deliberately scoped to the **core tracking loop**: log workouts, get autoregulated progression targets, and review progress. The social and gamification layers (feed, friends, clubs, leagues, IQ points, badges, challenges, matchmaking, lift percentiles, training-now presence, and the training **streak**) were removed to keep v1 focused; they may return in a later release. See "Removed for v1" below.
 
 This file is auto-loaded into every Claude session in this repo. Keep it accurate; outdated entries are worse than no entries.
 
@@ -18,7 +20,7 @@ This file is auto-loaded into every Claude session in this repo. Keep it accurat
 | Archive for App Store | `xcodebuild ... -configuration Release -destination 'generic/platform=iOS' -archivePath build/repIQ.xcarchive archive` |
 | Supabase URL | `https://yuwtotiahdmnjplrumdu.supabase.co` (config in `repIQ/Config/Supabase.swift`) |
 | App Group | `group.com.repiq.shared` (used by Live Activity intent bridging) |
-| Current shipping version | `1.5 (build 11)` (May 2026) |
+| Current shipping version | `1.5 (build 11)` (May 2026) — the social/streak strip is unreleased post-11 work |
 
 ---
 
@@ -31,8 +33,7 @@ RootView (AppState)
  └─ MainTabView                     authenticated + onboarded
      ├─ Tab 0  DashboardView        (Home)
      ├─ Tab 1  ProgressTabView      (Progress)
-     ├─ Tab 2  SocialTabView        (Social)
-     └─ Tab 3  ProfileView          (Profile)
+     └─ Tab 2  ProfileView          (Profile)
 
 WorkoutCoordinator (hoisted to RootView, env-injected)
  ├─ owns ActiveWorkoutViewModel
@@ -41,6 +42,7 @@ WorkoutCoordinator (hoisted to RootView, env-injected)
  └─ drives the fullScreenCover binding in MainTabView for the workout overlay
 ```
 
+- **Three tabs.** Home, Progress, Profile. (There was a 4th "Social" tab; removed for v1.)
 - **Observation:** Swift's `@Observable` macro everywhere — *not* `ObservableObject`. Bindings via `@Bindable`.
 - **State of truth:** `WorkoutCoordinator` owns the in-flight `ActiveWorkoutViewModel`. SwiftUI `@State` is for view-only ephemeral UI state.
 - **Navigation:** Each tab is its own `NavigationStack`. The active workout is presented via `fullScreenCover` whose binding is custom — dismissing it minimizes (preserves VM) instead of tearing down. See `MainTabView.expandedBinding`.
@@ -54,7 +56,7 @@ repIQ/
  ├─ App/                  RootView, MainTabView, AppState, splash
  ├─ Auth/                 AuthView, sign-in/up flows, OAuth
  ├─ Onboarding/           7-step OnboardingView
- ├─ Config/               Supabase client config, AppConstants, AppStorage keys
+ ├─ Config/               Supabase client config, AppConstants (Constants.swift), AppStorage keys
  ├─ Design/               Theme.swift (RQColors, RQSpacing, RQRadius), Typography.swift
  ├─ Models/               Domain types (Codable structs, enums)
  ├─ Services/             Supabase calls + local services (one class per file)
@@ -64,10 +66,11 @@ repIQ/
  │   ├─ Auth/, Onboarding/
  │   ├─ Dashboard/        Home tab
  │   ├─ Progress/         Progress tab
- │   ├─ Social/           Social tab (Feed / Friends / Gym Hub)
+ │   ├─ Social/           Only the Monthly Wrapped recap survives here now
+ │   │   └─ Wrapped/      WrappedStoryView, MonthlyReportView, MonthlyComparisonView
  │   ├─ Profile/          Profile tab
  │   ├─ Templates/        Template + WorkoutDay editing
- │   ├─ Workout/          ActiveWorkout, SetRow, RestTimer, PR celebration, mini-bar
+ │   ├─ Workout/          ActiveWorkout, SetRow, RestTimer, PR celebration, mini-bar, summary
  │   ├─ History/          Past sessions
  │   ├─ Goals/            Goal setting
  │   └─ Components/       RQCard, RQButton, RQTextField, RPESelector, etc.
@@ -84,7 +87,13 @@ repIQActivity/             Live Activity widget extension target
  └─ repIQActivity.entitlements       Same App Group as main app
 ```
 
-Xcode 16's **filesystem-synchronized groups** are used for the main `repIQ` target — any file added under `repIQ/` is auto-included. The widget target uses traditional explicit references; new files for the widget target must be added to `project.pbxproj` manually (see how `WorkoutIntentBridge.swift` etc. are referenced from `../repIQ/Intents/`).
+Xcode 16's **filesystem-synchronized groups** are used for the main `repIQ` target — any file added under `repIQ/` is auto-included, and deleting a file removes it from the build with no `project.pbxproj` edit. The widget target uses traditional explicit references; new files for the widget target must be added to `project.pbxproj` manually (see how `WorkoutIntentBridge.swift` etc. are referenced from `../repIQ/Intents/`).
+
+### Current services
+
+`AnalyticsService` (Progress tab data — the big one), `AuthService`, `DigestService` (Monthly Wrapped), `ExerciseLibraryService`, `ExportService`, `GoalService`, `GymService` (Profile "set your gym" — vestigial without gym leaderboards, kept for now), `InsightEngine`, `LiveActivityService`, `NetworkMonitor`, `NotificationService`, `OfflineSetQueue`, `ProfileService`, `ProgramEngine`, `ProgressionService`, `SetFeedbackEngine`, `TemplateService`, `WidgetService`, `WorkoutAutoSave`, `WorkoutService`, `WrappedArchetype`.
+
+The social/gamification services (`SocialService`, `FeedService`, `ChallengeService`, `MatchmakingService`, `LiftPercentileService`, `PresenceService`, `TipsService`, `NudgeService`, `GamificationService`) were **deleted**.
 
 ---
 
@@ -109,6 +118,7 @@ Critical to read before touching workout logic.
 - **Superset** — two+ exercises performed back-to-back with no rest between, then rest after the round. Configured at session-level (not in template), via `ExerciseLogEntry.supersetGroup: Int?`.
 - **Pending set** — set logged offline, queued in `OfflineSetQueue` until network returns. Marked completed in UI immediately so workouts continue without interruption.
 - **Goal target** vs **pending value** — on `SetEntry`: `targetWeight/targetReps/targetRPE` are immutable snapshots from `perSetTarget` at workout start; `weight/reps/rpe` are the live values that get adjusted (in-app inputs or Live Activity steppers) and ultimately saved.
+- **Monthly Wrapped** — a per-month recap (Spotify-Wrapped style) generated by `DigestService` and rendered by `MonthlyWrappedView`. It's a self-contained retention feature — no friends required. It surfaces via a Dashboard banner and a Progress-tab CTA/badge.
 
 ---
 
@@ -118,8 +128,9 @@ Critical to keep in your head when touching anything that writes data.
 
 ### Layer 1: Supabase remote (primary source of truth)
 
-- All completed sets, sessions, profile, goals, feed, friendships, badges, IQ ledger.
-- Tables of note: `workout_sessions`, `workout_sets`, `exercises`, `templates`, `workout_days`, `workout_day_exercises`, `profiles`, `personal_records`, `iq_points_ledger`, `user_badges`, `feed_items`, `feed_reactions`, `feed_comments`, `friendships`, `goals`.
+- Completed sets, sessions, profile, goals, PRs, monthly wrapped.
+- Tables of note (still live): `workout_sessions`, `workout_sets`, `exercises`, `templates`, `workout_days`, `workout_day_exercises`, `profiles`, `personal_records`, `goals`, and the monthly-digest tables.
+- **Deferred/idle tables:** the social/gamification tables (`iq_points_ledger`, `user_badges`, `feed_items`, `feed_reactions`, `feed_comments`, `friendships`, `clubs`, `club_members`, `user_presence`, league columns, etc.) still exist in the database but the client no longer reads or writes them. Their migrations remain under `supabase/`. Leave them; re-wiring them is a future-release task.
 - Profile is auto-created by a DB trigger on auth signup. If email confirmation delays the trigger, `RootView.AppState.syncUsernameFromMetadata()` patches the username on next sign-in (`repIQ/Views/App/RootView.swift`).
 - Auth client config: `repIQ/Config/Supabase.swift`. Anon key in source (safe — public).
 
@@ -172,7 +183,7 @@ Stateless by design: the decision is recomputed from actual sets every completio
 
 ### Per-set target computation
 
-`ActiveWorkoutViewModel.perSetTarget(decision:previousSet:trainingMode:setPosition:totalSets:equipment:)` (~line 256) maps the prescribed `(targetWeight, repsLow..repsHigh, RPE)` to *each* set:
+`ActiveWorkoutViewModel.perSetTarget(decision:previousSet:trainingMode:setPosition:totalSets:equipment:)` maps the prescribed `(targetWeight, repsLow..repsHigh, RPE)` to *each* set:
 
 - **Hypertrophy:** every working set gets `(targetWeight, targetRepsLow, RPE = base + 0.5 × setIndex)`. RPE climbs as fatigue accumulates.
 - **Strength:** weight ramps from `targetWeight × startPct` (startPct depends on totalSets) up to full targetWeight on the top set; reps stay at `targetRepsLow`; RPE ramps linearly from 6.0 to `targetRPE + mesocycleOffset`.
@@ -191,7 +202,7 @@ Effective target RPE caps at 9.5 (`ProgressionTarget.effectiveTargetRPE`).
 
 ### PR detection
 
-- **Inline** (during the workout): runs in `ActiveWorkoutViewModel.completeSet` (~lines 1208–1319). Detects weight PRs (heaviest ever) and rep PRs (most reps at this exact weight). Triggers `prCelebration` modal + heavy haptic.
+- **Inline** (during the workout): runs in `ActiveWorkoutViewModel.completeSet`. Detects weight PRs (heaviest ever) and rep PRs (most reps at this exact weight). Triggers `prCelebration` modal + heavy haptic.
 - **Session-end**: `ProgressionService.detectPRs()` runs post-completion against DB. Inserts into `personal_records` table.
 
 ---
@@ -259,61 +270,44 @@ The state pushed to the activity. Fields:
 ### Home (`repIQ/Views/Dashboard/DashboardView.swift`)
 
 - **Welcome card** — first-time users only (`@AppStorage("hasSeenWelcomeCard")`).
-- **Wrapped banner** — appears 1st–14th of each month if prior month's wrapped is ready & unviewed (`WrappedBannerCard`).
+- **Wrapped banner** — appears 1st–14th of each month if prior month's wrapped is ready & unviewed (`WrappedBannerCard` → pushes `MonthlyWrappedView`).
 - **Quick Start** — hero CTA. Triggers template picker → `WorkoutDayPickerView` → `coordinator.startWorkout(template:day:date:)`.
 - **My Templates** — list of user templates. Tap → `WorkoutDayPickerView`.
 - **Workout History** — link to `WorkoutHistoryView`.
 - **Activity** — week strip (binary trained/didn't) or month calendar.
-- **Social Pulse** — league tier + IQ snippet and latest friend's activity. Tap to push into Leagues / social profile. Shown once `socialViewModel.currentUserId` resolves. Pushes via a `SocialDestination` enum + local `navigationDestination(for:)` that mirrors `SocialTabView`'s wiring.
 - **Goals** — up to 3 active goals with progress bars; link to `GoalSettingView`.
+
+(The old "Social Pulse" card was removed.)
 
 ### Progress (`repIQ/Views/Progress/ProgressTabView.swift`)
 
 - Monthly stats header
 - Last-workout recap
 - **Strength trajectory** chart (top lifts, scoped by workout day)
-- Streak + consistency heatmap (12-week daily binary)
+- **Consistency** section: consistency ring (0–100 score) + 12-week daily heatmap with PR-day dots. (The flame/"WEEK STREAK" chip was removed with the streak feature.)
 - Smart insights (prescriptive coaching)
 - Volume trend (4-week baseline)
 - Muscle balance body diagram (uses `MuscleMap` Swift package)
 - Recent PRs
-- Monthly Wrapped CTA (if ≥3 sessions this month)
+- Monthly Wrapped CTA (if ≥3 sessions this month) → `MonthlyWrappedView`
 
-Driven by `ProgressDashboardViewModel` (~13KB). Sub-views `MonthlyStatsHeader`, `LastWorkoutRecapCard`, `StrengthTrajectoryCard`, `ConsistencyHeatmap`, `MuscleBalanceBodyView`.
+Driven by `ProgressDashboardViewModel`. The exercise drill-in is `ExerciseProgressView` (via `ExerciseProgressLoaderView`) — trend chart, PRs, recent sessions. (Its lift-percentile card and community-tips section were removed with the social layer.)
 
-### Social (`repIQ/Views/Social/SocialTabView.swift`)
-
-3-section picker: **Feed** | **Friends** | **Gym Hub**.
-
-- **Feed** — workout completions, PRs, milestones from friends. Fist-bump reactions + comment threads. Workout cards render narrative titles ("Crushed Pull — 4 PRs", "Marathon Push — 25 sets") via `FeedView.workoutNarrative(_:)`. Zero-duration cards drop the duration pill. `FeedView.swift`.
-- **Friends** — list + pending requests. Friend rows are `NavigationLink`s into `FriendProfileView` (IQ / league / streak / bio + quick actions for Progression Race, Start a Challenge, Remove Friend). Training-partner status renders as a pill. `FriendsView.swift`.
-- **Gym Hub** — gym-scoped leaderboards, challenges, leagues, progression races, matchmaking. `GymHubView.swift`.
-
-Streak flame in toolbar; setup banner if username/profile incomplete.
-
-**Overflow menu** (top-right `•••`) is the single entry point for `LeagueView`, `ChallengesView`, `AchievementsView`, `ClubsListView`, `WeeklyDigestView`, `MatchmakingView`, and `SocialProfileView` — without it those seven views are orphaned. Push targets are typed via the `SocialDestination` enum (defined at the bottom of `SocialTabView.swift`) so the same destinations are reachable from `DashboardView` and `ProfileView` too.
-
-**Add Friends sheet** (`AddFriendsSheet.swift`) — leads with `MatchmakingService.findMatches` results ("Suggested for You") and an Invite Friends share entry (presents `UIActivityViewController` directly off the active scene with an App Store URL + the user's @username). Search-by-username is below the suggestions, not the only path.
-
-**Comebacks** — feed cards for friends returning after 14+ days off get a "Welcome back" pill. Detection is client-side in `FeedView.comebackItemIds`, derived from the spacing between a friend's consecutive `workout_completed` items in the loaded feed window. No new `FeedItemType` case — the decoration is layered on top of an existing item.
-
-**Clubs** (`ClubsListView` → `ClubDetailView`, `CreateClubView`) — 3–10 person training groups with public/private visibility. Backed by the `clubs` + `club_members` tables and the existing `ChallengeService` club methods.
-
-**Lift Percentiles** (`LiftPercentileService` + `ExerciseProgressView.liftPercentileCard`) — on the exercise drill-in screen, shows the user's e1RM percentile vs friends and vs everyone in their league tier. Friends scope is computed client-side over each friend's working sets in 90 days. Tier scope calls the `lift_percentile_in_tier` RPC (migration `20260518_lift_percentiles.sql`), which derives e1RM in SQL via Epley and returns NULL when the cohort is under 5 users. Hidden silently when no scope has enough data.
-
-**Promotion Race** (`LeagueView.promotionRaceCard`) — between the league header and the leaderboard. Shows IQ-to-next-tier, IQ delta to the rank above, IQ buffer over the rank below, and a "Top 5 promote" callout. Tier thresholds live on `LeagueTier.minIQ` (client-side only — automatic server-side promotion isn't wired yet).
-
-**Training Now presence** (`PresenceService` + `GymHubView.trainingNowBanner`) — friends who are actively logging a workout appear in a green "Training Now" banner above the gym members list. Backed by a `user_presence` row with a 2-hour TTL (migration `20260518_shared_templates_and_presence.sql`). `ActiveWorkoutViewModel.startWorkout` upserts the row; `completeWorkout` and `abandonWorkout` clear it (fire-and-forget so a network blip never blocks the workout).
+**Consistency score** (`AnalyticsService.fetchConsistencyScore`) is a 0–100 composite of three factors: **frequency (50%)**, **volume stability (30%)**, **recency (20%)**. The old streak factor (20%) was removed and its weight redistributed. `ConsistencyScore` no longer has a `streakScore` field.
 
 ### Profile (`repIQ/Views/Profile/ProfileView.swift`)
 
-Avatar / username / gym info, then a **My Stats** card (League / IQ / Streak triplet + quick links to `AchievementsView` and `SocialProfileView`), then Settings (weight unit, rest timer, body & health, notifications, privacy, gym, account) and Sign Out. Owns its own `SocialViewModel` and a local `navigationDestination(for: SocialDestination.self)` mirroring `SocialTabView`'s wiring.
+Avatar / username / gym info, then Settings (weight unit, rest timer, body & health, notifications, privacy, gym, account) and Sign Out. (The "My Stats" league/IQ/streak card was removed.) Notification settings offer workout reminders + monthly-wrapped reminders (the streak-protection reminder was removed).
 
 ### Templates (`repIQ/Views/Templates/`)
 
-`TemplateListView` → `TemplateDetailView` → `TemplateEditorView` (name + days + **Share with friends** toggle once saved) → `WorkoutDayEditorView` (exercises + training mode + targetSets + repCap + supersetGroup) → `ExercisePickerView`. Pre-built programs in `ProgramBrowserView` → `ProgramDetailView` (one-tap create-template).
+`TemplateListView` → `TemplateDetailView` → `TemplateEditorView` (name + days) → `WorkoutDayEditorView` (exercises + training mode + targetSets + repCap + supersetGroup) → `ExercisePickerView`. Pre-built programs in `ProgramBrowserView` → `ProgramDetailView` (one-tap create-template).
 
-**Shareable templates**: `templates.is_shared` (migration `20260518_shared_templates_and_presence.sql`) plus RLS that lets accepted friends read shared templates, their days, and their exercises. `FriendProfileView` shows a friend's shared templates with a "Try It" button that clones into the current user's templates via `TemplateService.duplicateTemplate`.
+(The template "Share with friends" toggle and shared-template cloning were removed with the social layer. The `templates.is_shared` column and its RLS remain in the DB, unused.)
+
+### Monthly Wrapped (`repIQ/Views/Social/MonthlyWrappedView.swift` + `Wrapped/`)
+
+Still present as a standalone recap. `MonthlyWrappedView` self-fetches the current user id (via `supabase.auth.session`) and drives `DigestService.generateMonthlyWrapped`, then hands off to `WrappedStoryView` (Spotify-style story), with `MonthlyReportView` / `MonthlyComparisonView` for the full breakdown and a share card. Lives under `Views/Social/` for historical reasons — it no longer depends on any social plumbing.
 
 ---
 
@@ -342,11 +336,11 @@ Avatar / username / gym info, then a **My Stats** card (League / IQ / Streak tri
    - Cancels auto-save + clears `WorkoutAutoSave`.
    - Ends Live Activity, unregisters intent handlers.
    - Updates session in Supabase.
-   - Awards IQ points (`GamificationService.awardWorkoutRewards`).
-   - Updates streak.
+   - Refreshes the home-widget last-workout date (`WidgetService.updateAfterWorkoutCompletion`).
    - Detects new PRs → DB.
-   - Creates feed item.
+   - Evaluates active goals (`GoalService.evaluateActiveGoals`) and surfaces any just-completed.
    - Builds `WorkoutSummaryData` → presents `WorkoutSummaryView`.
+   - (No IQ points, badges, feed items, streak update, or presence write — those were removed.)
 10. **Abandon:** alert confirm → `viewModel.abandonWorkout()` → marks session abandoned, ends Live Activity, no rewards.
 
 ### Mini-bar / minimize-expand pattern
@@ -405,11 +399,11 @@ The `expandedBinding` in `MainTabView` is custom: its `set` calls `coordinator.m
 ## Conventions
 
 - **Models** are `Codable, Sendable` structs/enums where they cross actor or process boundaries (Live Activity content, intent params, etc.).
-- **Services** are non-actor classes; methods are `async throws` for network calls.
+- **Services** are non-actor classes/structs; methods are `async throws` for network calls.
 - **ViewModels** are `@Observable final class`. They run on the main actor by default in iOS 17+ Swift 6 mode (project sets `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`).
 - **Persistence**: Supabase first; OfflineSetQueue is a fallback, not a primary write target.
 - **Time**: store as `Date` (UTC under the hood). Display via `relativeDisplay` extension or `formatted(...)`.
-- **No `print` in committed code.** Use the existing logging hooks if a logger gets added; for now, swallow errors at boundaries (Supabase services already do this).
+- **No `print` in committed code.** Swallow errors at boundaries (Supabase services already do this).
 - **Comments**: only for the "why" — hidden invariants, workarounds for specific bugs, surprising behavior. No restating what well-named code already says.
 - **Filesystem-synchronized groups**: drop new Swift files anywhere under `repIQ/` and they're auto-included in the main app target. The widget target needs manual `project.pbxproj` edits.
 
@@ -426,22 +420,28 @@ The `expandedBinding` in `MainTabView` is custom: its `set` calls `coordinator.m
 
 ---
 
-## Live Activity gotchas (learned the hard way)
+## Removed for v1 (deferred, not deleted from history)
 
-- `Text(timerInterval:)` in a header HStack starves siblings → entire body of the activity stops rendering. Symptom: a glitched fragment of the header at top-left of the card and empty space below.
-- iOS Lock Screen activity content max ~135pt. Designs that work in Xcode previews can clip on-device. Test by locking the simulator (`Cmd+L`).
-- iOS sometimes caches stale activity binaries; if a layout change doesn't appear after rebuild, do **delete app from simulator → clean build folder → build `repIQActivity` scheme separately → switch to `repIQ` and run**. The widget target doesn't always rebuild on a main-app `Cmd+R`.
-- Background tint (`activityBackgroundTint`) can be used as a quick "did the new code load" sentinel during debugging — change to `.red` and rebuild to confirm.
+The following were stripped to focus the first release on core tracking. The client code was deleted; the Supabase tables/migrations remain but are idle. Bringing any of these back is a future-release effort — check git history on branch `strip-social-v1` for the removal diffs.
+
+- **Social tab** and everything under it: feed, friends, friend profiles, gym hub, leagues, promotion race, challenges, achievements, badges, clubs, matchmaking, social profile, add-friends, weekly digest.
+- **Gamification:** IQ points, badges, league tiers, milestone/achievement catalogs (the `MilestoneCatalog`/`AchievementCatalog` data files still exist but are not rendered anywhere).
+- **Lift percentiles** (exercise drill-in) and **community tips**.
+- **Training-now presence** (`user_presence`).
+- **Shareable templates** (`is_shared` toggle + clone).
+- **Training streak — entirely.** Both the profile-based daily streak (workout-summary "Day Streak", share-card streak line, home-widget streak) and the analytics weekly streak (Progress-tab "WEEK STREAK" flame, consistency-score streak factor, streak-based smart insights, streak-protection notification). Monthly Wrapped still shows a "longest streak" recap stat — that's the one intentional exception, sourced from `DigestService`.
+
+**Kept:** the full logging loop, progression engine + deload prompts, Progress analytics (minus streak/percentiles), goals, history, templates + pre-built programs, Live Activity / Dynamic Island, Monthly Wrapped, offline queue, crash-recovery autosave, export, workout/wrapped reminders.
 
 ---
 
 ## Recent ships
 
-- **Unreleased (post-build 11)** — Jun 16 2026 — **Opt-in performance deloads.** Performance-based deloads (declining e1RM / consecutive bad sessions) are no longer applied silently at the next session. `calculateTarget` gained an `allowDeload` flag; `ActiveWorkoutViewModel` detects deload targets on `startWorkout` and surfaces a "Recovery Recommended" prompt (`ActiveWorkoutView.performanceDeloadBanner`) with **Take Deload** / **Keep Progressing**. Declining recomputes each flagged lift with `allowDeload: false` (declining → normal double-progression) and rebuilds the pre-filled sets. Stateless (re-prompts each session while declining); the time-based proactive banner is suppressed while a performance prompt is showing. No schema change.
-- **Unreleased (post-build 11)** — May 18 2026 — **Social expansion v1.** Three waves on `claude/objective-raman-7b8173`, merged to main. **Wave 1:** Clubs UI (`ClubsListView` / `ClubDetailView` / `CreateClubView`) on the existing `clubs`/`club_members` schema; `ExerciseTipsView` accepts an `initialExercise` parameter and is embedded as a compact 2-tip section on the exercise drill-in (Progress → exercise); "Welcome back" feed pill for friends returning after 14+ days off, derived client-side. **Wave 2:** Lift Percentiles (`LiftPercentileService` + `liftPercentileCard`) showing e1RM percentile vs friends (client-side) and vs league tier (new `lift_percentile_in_tier` RPC); Promotion Race card on `LeagueView` showing IQ-to-next-tier, IQ delta to the rank above/below, and a "Top 5 promote" callout, backed by client-side `LeagueTier.minIQ` thresholds. **Wave 3:** Shareable templates (`templates.is_shared` column + RLS that exposes shared templates and their days/exercises to accepted friends), share toggle in `TemplateEditorView`, and "Try It" clone button on `FriendProfileView`; silent training-now presence (`user_presence` table with 2h TTL, `PresenceService`, banner in `GymHubView`) written on workout start and cleared on complete/abandon. Two new Supabase migrations (`20260518_lift_percentiles.sql`, `20260518_shared_templates_and_presence.sql`) need to be applied before the new features have real backing data.
-- **1.5 (build 11)** — May 18 2026 — Social-feature surfacing pass. Six views (`LeagueView`, `ChallengesView`, `AchievementsView`, `WeeklyDigestView`, `MatchmakingView`, `SocialProfileView`) were defined in code but unreachable; now linked via a `SocialDestination` enum + a `••• ` overflow menu in the Social tab, the new Home Social Pulse card, and the new Profile My Stats card. Friend cards push into a new `FriendProfileView` with IQ / league / streak / bio + buttons for Progression Race, Start a Challenge, Remove Friend (none of these were reachable before). `CreateChallengeView` now accepts a `preselectedFriend`. `AddFriendsSheet` got matchmaking-driven "Suggested for You" results and an Invite Friends share with a deep-linked App Store URL. Fixed the "Share my Wrapped" black-screen crash (`ImageRenderer` was producing a ~75-megapixel image on the main thread + SwiftUI `.sheet` raced the hidden status bar — now scale 1.0 with direct UIKit presentation off the active scene). Wrapped story hides the tab bar for full-screen immersion. Feed workout titles read narratively. Zero-duration feed cards drop the duration pill.
-- **1.5 (build 10)** — May 2026 — Bumped to v1.5. Fixed Wrapped streak parse + bodyweight-exercise display. Fixed Wrapped month label off-by-one and archetype-slide buttons being blocked by tap zones. Progress tab overhaul: new sections, narrative copy, time-window picker. Replaced stacked target/last text with a per-set comparison rail. Progression-engine + UX fixes: bump weight at rep cap with flat e1RM (double-progression unstick), derive PRs from `workout_sets` not the `personal_records` cache, filter prior-session sets to working-only, fix inverted rep range when prior session exceeded rep cap, removed "Pick up where you left off" from the dashboard.
-- **1.4 (build 7)** — May 2026 — Interactive Lock Screen / Dynamic Island set logging via App Intents. Stepper buttons for weight/reps/RPE on the upcoming set + LOG SET commit button. GOAL (programmed target) and LAST (prior-session same-set-number) context lines. Skip-rest button during rest periods. Minimize-bug fix (VM ownership moved from `MainTabView` `@State` to `WorkoutCoordinator`). Live Activity orphan cleanup at app launch + before every new activity request.
+- **Unreleased (post-build 11)** — Jul 2026 — **v1 scope-down: removed social + gamification + streak.** Deleted the Social tab and its ~21 views, `SocialViewModel`, and 9 services (`SocialService`, `FeedService`, `ChallengeService`, `MatchmakingService`, `LiftPercentileService`, `PresenceService`, `TipsService`, `NudgeService`, `GamificationService`). Stripped all IQ/badge/feed/presence work from `completeWorkout`. Removed the **training streak** in its entirety (both the profile-daily and analytics-weekly systems), reweighted the consistency score to frequency 50% / volume-stability 30% / recency 20% (dropped `ConsistencyScore.streakScore`), and removed the streak-protection notification. `MonthlyWrappedView` was decoupled from `SocialViewModel` and kept as a standalone recap. Three tabs remain (Home / Progress / Profile). No schema changes — social/streak tables are left idle in the DB.
+- **Unreleased (post-build 11)** — Jun 16 2026 — **Opt-in performance deloads.** Performance-based deloads (declining e1RM / consecutive bad sessions) are no longer applied silently at the next session. `calculateTarget` gained an `allowDeload` flag; `ActiveWorkoutViewModel` detects deload targets on `startWorkout` and surfaces a "Recovery Recommended" prompt (`ActiveWorkoutView.performanceDeloadBanner`) with **Take Deload** / **Keep Progressing**. Declining recomputes each flagged lift with `allowDeload: false` and rebuilds the pre-filled sets. Stateless (re-prompts each session while declining); the time-based proactive banner is suppressed while a performance prompt is showing.
+- **1.5 (build 11)** — May 18 2026 — Social-feature surfacing pass (later removed in the v1 scope-down above). Also fixed the "Share my Wrapped" black-screen crash (`ImageRenderer` was producing a ~75-megapixel image on the main thread + SwiftUI `.sheet` raced the hidden status bar — now scale 1.0 with direct UIKit presentation off the active scene). Wrapped story hides the tab bar for full-screen immersion. Feed workout titles read narratively (feed since removed).
+- **1.5 (build 10)** — May 2026 — Bumped to v1.5. Fixed Wrapped streak parse + bodyweight-exercise display. Fixed Wrapped month label off-by-one and archetype-slide buttons being blocked by tap zones. Progress tab overhaul: new sections, narrative copy, time-window picker. Replaced stacked target/last text with a per-set comparison rail. Progression-engine + UX fixes: bump weight at rep cap with flat e1RM (double-progression unstick), derive PRs from `workout_sets` not the `personal_records` cache, filter prior-session sets to working-only, fix inverted rep range when prior session exceeded rep cap.
+- **1.4 (build 7)** — May 2026 — Interactive Lock Screen / Dynamic Island set logging via App Intents. Stepper buttons for weight/reps/RPE on the upcoming set + LOG SET commit button. GOAL and LAST context lines. Skip-rest button during rest periods. Minimize-bug fix (VM ownership moved from `MainTabView` `@State` to `WorkoutCoordinator`). Live Activity orphan cleanup at app launch + before every new activity request.
 - **1.0 (build 3)** — April 2026 — First TestFlight build (mini-bar, basic Live Activity for workouts, workout logging fixes, Progress tab revamp, insights revamp).
 
 ---
@@ -471,8 +471,6 @@ xcodebuild -project repIQ.xcodeproj -scheme repIQ \
   -archivePath build/repIQ.xcarchive archive
 
 # Then: open Xcode Organizer → Distribute App → App Store Connect → Upload.
-# Terminal upload (xcrun altool) requires API key + working Distribution profiles;
-# see Live Activity gotchas above for why first-time profile mints need Organizer.
 ```
 
 ---
@@ -484,9 +482,7 @@ xcodebuild -project repIQ.xcodeproj -scheme repIQ \
 - Critical alerts for rest-end (breakthrough DND)
 - Siri shortcuts donation ("Hey Siri, log 135 by 8") — App Intents already exist; just need shortcut donation + phrase polish
 - Lock-screen circular rest-ring redesign
-- Mentor/mentee pairing (Wave 4 of the social expansion — planned, not built)
-- Server-side automatic league tier promotions (currently `LeagueTier.minIQ` is the only threshold and only the client compares against it)
-- Realtime subscription for the Gym Hub "Training Now" banner (currently polled on view appear / refresh)
+- **Re-introducing the social/gamification layer** (feed, friends, leagues, IQ, badges, clubs, streaks) in a post-v1 release — the DB tables and migrations are still in place; the client code was removed on branch `strip-social-v1`.
 
 If you find yourself building one of these, check the existing intent infrastructure (`repIQ/Intents/`) and Live Activity setup before reinventing.
 
@@ -495,7 +491,7 @@ If you find yourself building one of these, check the existing intent infrastruc
 ## When in doubt
 
 - Read the actual code before assuming behavior — this file is a map, not the territory.
-- For workout logic: start at `ActiveWorkoutViewModel`. It's huge (~1800 lines) but it's the source.
+- For workout logic: start at `ActiveWorkoutViewModel`. It's huge but it's the source.
 - For progression decisions: `ProgressionService.calculateTarget`. Read the whole function — it's worth it.
 - For UI patterns: look at how an existing similar screen does it. The conventions are pretty consistent (RQCard wrappers, `@Observable` VMs, NavigationStack per tab).
 - Check git log for context — commit messages are descriptive: `git log --oneline -20`.

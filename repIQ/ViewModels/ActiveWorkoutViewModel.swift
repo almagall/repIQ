@@ -81,8 +81,6 @@ final class ActiveWorkoutViewModel {
     private let workoutService = WorkoutService()
     private let progressionService = ProgressionService()
     private let exerciseLibraryService = ExerciseLibraryService()
-    private let gamificationService = GamificationService()
-    private let feedService = FeedService()
     private let goalService = GoalService()
     private var timerTask: Task<Void, Never>?
     private var restTimerTask: Task<Void, Never>?
@@ -447,34 +445,6 @@ final class ActiveWorkoutViewModel {
     /// Starts the Live Activity once exercises are loaded. Called from
     /// `startWorkout()` and the recovery flow.
     ///
-    // MARK: - Training-now presence
-
-    private let presenceService = PresenceService()
-
-    /// Best-effort presence write. Failure is silent and intentionally
-    /// non-blocking — the workout itself must continue regardless. The
-    /// gym place id read happens on the auth user's profile row.
-    private func markPresenceTraining(userId: UUID) async {
-        struct PlaceRow: Decodable { let gym_place_id: String? }
-        let row: PlaceRow? = try? await supabase.from("profiles")
-            .select("gym_place_id")
-            .eq("id", value: userId.uuidString)
-            .single()
-            .execute()
-            .value
-        try? await presenceService.setTraining(
-            userId: userId,
-            gymPlaceId: row?.gym_place_id
-        )
-    }
-
-    /// Wipes the presence row. Triggered on complete or abandon. The
-    /// 2-hour TTL serves as a safety net if the call fails.
-    private func clearPresence() async {
-        guard let userId = try? await supabase.auth.session.user.id else { return }
-        try? await presenceService.clear(userId: userId)
-    }
-
     /// Async because `LiveActivityService.start` ends any orphaned
     /// activities before requesting a new one — without awaiting that, we
     /// could end up with two activities visible on the Lock Screen at
@@ -850,11 +820,6 @@ final class ActiveWorkoutViewModel {
             // 7. Start Live Activity (Lock Screen + Dynamic Island)
             await startLiveActivity()
 
-            // 7b. Set "training now" presence so friends at the same gym
-            // see the user is active. Best-effort — a failure here must
-            // not block the workout itself.
-            await markPresenceTraining(userId: userId)
-
             // 8. Detect performance-based deload targets and offer a choice.
             //    These were baked in at the previous session's completion; rather
             //    than apply the lighter weights silently, prompt the user.
@@ -1017,11 +982,6 @@ final class ActiveWorkoutViewModel {
         autoSaveTask = nil
         WorkoutAutoSave.clear()
 
-        // Clear "training now" presence so the Gym Hub doesn't keep
-        // showing this user as active. Fire-and-forget — failure here is
-        // benign (TTL kicks in within 2h).
-        Task { await clearPresence() }
-
         // End the Live Activity immediately so the Lock Screen / Dynamic Island
         // don't keep showing a stale workout while post-processing runs.
         LiveActivityService.shared.endNow()
@@ -1139,131 +1099,16 @@ final class ActiveWorkoutViewModel {
                 }
             }
 
-            // --- Gamification ---
-            // Update streak (no freezes — streak breaks if you don't train)
-            let streakResult = (try? await gamificationService.updateStreak(userId: userId))
-                ?? (currentStreak: 0, longestStreak: 0)
-
-            // Push the fresh streak to the home screen widget right away.
-            // The next dashboard load fills in weekly volume + last PR.
-            WidgetService.updateAfterWorkoutCompletion(
-                currentStreak: streakResult.currentStreak,
-                lastWorkoutDate: Date()
-            )
-
-            // Award IQ points for actual training actions
-            let iqEarned = (try? await gamificationService.awardWorkoutRewards(
-                userId: userId,
-                sessionId: sessionId,
-                completedSets: totalCompletedSets,
-                targetsHit: 0,
-                newPRCount: allNewPRs.count,
-                currentStreak: streakResult.currentStreak
-            )) ?? 0
-
-            // Evaluate badges
-            let newBadges = (try? await gamificationService.evaluateBadges(
-                userId: userId,
-                totalSessions: 0, // Let the service query if needed
-                totalSets: totalCompletedSets,
-                totalVolume: totalVolume,
-                currentStreak: streakResult.currentStreak,
-                longestStreak: streakResult.longestStreak,
-                totalPRs: allNewPRs.count,
-                friendsCount: 0,
-                fistBumpsGiven: 0
-            )) ?? []
-
-            // Create feed item for workout completion
-            let feedData = FeedItemData(
-                duration: duration,
-                totalSets: totalCompletedSets,
-                totalVolume: totalVolume,
-                exerciseCount: exerciseSummaries.count,
-                prCount: allNewPRs.isEmpty ? nil : allNewPRs.count,
-                exerciseNames: exerciseSummaries.map(\.name),
-                workoutDayName: dayName.isEmpty ? nil : dayName
-            )
-            try? await feedService.createFeedItem(
-                userId: userId,
-                sessionId: sessionId,
-                itemType: .workoutCompleted,
-                data: feedData
-            )
-
-            // Create PR feed items
-            if !allNewPRs.isEmpty {
-                let prFeedData = FeedItemData(
-                    prCount: allNewPRs.count,
-                    prDetails: allNewPRs.map { pr in
-                        FeedPRDetail(
-                            exerciseName: pr.exerciseName,
-                            recordType: pr.recordType.rawValue,
-                            value: pr.value
-                        )
-                    }
-                )
-                try? await feedService.createFeedItem(
-                    userId: userId,
-                    sessionId: sessionId,
-                    itemType: .prAchieved,
-                    data: prFeedData
-                )
-            }
-
-            // Create streak milestone feed items (at 7, 14, 30, 60, 90, 180, 365)
-            let streakMilestones = [7, 14, 30, 60, 90, 180, 365]
-            if streakMilestones.contains(streakResult.currentStreak) {
-                let streakData = FeedItemData(streakDays: streakResult.currentStreak)
-                try? await feedService.createFeedItem(
-                    userId: userId,
-                    sessionId: nil,
-                    itemType: .streakMilestone,
-                    data: streakData
-                )
-            }
-
-            // Create badge feed items
-            for badge in newBadges {
-                let badgeData = FeedItemData(badgeName: badge.name)
-                try? await feedService.createFeedItem(
-                    userId: userId,
-                    sessionId: nil,
-                    itemType: .badgeEarned,
-                    data: badgeData
-                )
-            }
-
-            // Evaluate milestones (Phase 4)
-            let matchmakingService = MatchmakingService()
-            let newMilestones = try? await matchmakingService.evaluateMilestones(
-                userId: userId,
-                totalSessions: 0, // Service queries actual count
-                totalVolume: totalVolume,
-                currentStreak: streakResult.currentStreak,
-                longestStreak: streakResult.longestStreak,
-                accountCreatedAt: nil
-            )
-
-            // Create feed items for new milestones (celebrations visible to friends)
-            if let milestones = newMilestones {
-                for milestone in milestones {
-                    let milestoneData = FeedItemData(badgeName: milestone.milestoneType.displayName)
-                    try? await feedService.createFeedItem(
-                        userId: userId,
-                        sessionId: nil,
-                        itemType: .badgeEarned,
-                        data: milestoneData
-                    )
-                }
-            }
+            // Refresh the home screen widget's last-workout date. The rest of
+            // the snapshot fills in on the next dashboard load.
+            WidgetService.updateAfterWorkoutCompletion(lastWorkoutDate: Date())
 
             // Auto-evaluate active goals against fresh training data and pull
             // back any that JUST hit their target. Best-effort: failure here
             // shouldn't break workout completion.
             let completedGoals = (try? await goalService.evaluateActiveGoals(userId: userId)) ?? []
 
-            // Build summary with PR, progression, and gamification data
+            // Build summary with PR and progression data
             var summary = WorkoutSummaryData(
                 duration: duration,
                 totalSets: totalCompletedSets,
@@ -1271,10 +1116,8 @@ final class ActiveWorkoutViewModel {
                 exerciseSummaries: exerciseSummaries,
                 newPRs: allNewPRs,
                 progressionDecisions: allDecisions,
-                iqPointsEarned: iqEarned,
-                currentStreak: streakResult.currentStreak,
-                longestStreak: streakResult.longestStreak,
-                newBadges: newBadges
+                iqPointsEarned: 0,
+                newBadges: []
             )
             summary.completedGoals = completedGoals
             summary.workoutName = dayName.isEmpty ? templateName : "\(templateName) — \(dayName)"
@@ -1315,8 +1158,6 @@ final class ActiveWorkoutViewModel {
                     newPRs: [],
                     progressionDecisions: [],
                     iqPointsEarned: 0,
-                    currentStreak: 0,
-                    longestStreak: 0,
                     newBadges: []
                 )
             }
@@ -1340,7 +1181,6 @@ final class ActiveWorkoutViewModel {
         // End the Live Activity so the Lock Screen / Dynamic Island clear
         LiveActivityService.shared.endNow()
         unregisterIntentHandlers()
-        Task { await clearPresence() }
 
         do {
             try await workoutService.abandonSession(sessionId: sessionId)
@@ -2102,6 +1942,8 @@ final class ActiveWorkoutViewModel {
         restTimerTarget = max(1, newTarget)
         if restTimerRemaining == 0 {
             cancelRestTimer()
+        } else {
+            NotificationService.shared.scheduleRestEndNotification(after: TimeInterval(restTimerRemaining))
         }
     }
 
@@ -2110,6 +1952,9 @@ final class ActiveWorkoutViewModel {
         restTimerTarget = seconds
         restTimerRemaining = seconds
         restTimerActive = true
+        // Local notification so the user is alerted when rest ends even if the
+        // app is backgrounded (the in-process tick is suspended off-screen).
+        NotificationService.shared.scheduleRestEndNotification(after: TimeInterval(seconds))
         // Push to Live Activity so the Lock Screen / Dynamic Island show the
         // countdown immediately. The activity layout uses Text(timerInterval:)
         // to tick down without further updates from us.
@@ -2123,6 +1968,9 @@ final class ActiveWorkoutViewModel {
                     self.restTimerRemaining -= 1
                 } else {
                     self.restTimerActive = false
+                    // Foreground tick reached zero — the scheduled alert is now
+                    // redundant; cancel it so it doesn't also fire as a banner.
+                    NotificationService.shared.cancelRestEndNotification()
                     // Haptic when timer completes
                     let generator = UINotificationFeedbackGenerator()
                     generator.notificationOccurred(.success)
@@ -2140,6 +1988,7 @@ final class ActiveWorkoutViewModel {
         restTimerActive = false
         restTimerRemaining = 0
         restTimerTarget = 0
+        NotificationService.shared.cancelRestEndNotification()
         if wasActive {
             pushActivityUpdate()
         }

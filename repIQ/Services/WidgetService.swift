@@ -14,13 +14,11 @@ struct WidgetService {
     /// Snapshot of the data the home screen widget renders. Pass `nil` for
     /// any field you don't have yet — the widget falls back gracefully.
     struct Snapshot {
-        var currentStreak: Int
         var weeklyWorkingSetCount: Int
         var lastWorkoutDate: Date?
         var lastPRSummary: String?
 
         static let empty = Snapshot(
-            currentStreak: 0,
             weeklyWorkingSetCount: 0,
             lastWorkoutDate: nil,
             lastPRSummary: nil
@@ -29,25 +27,21 @@ struct WidgetService {
 
     /// Pushes a fresh snapshot to the App Group and asks WidgetKit to refresh.
     static func sync(_ snapshot: Snapshot) {
-        defaults?.set(snapshot.currentStreak, forKey: Keys.currentStreak)
         defaults?.set(snapshot.weeklyWorkingSetCount, forKey: Keys.weeklyWorkingSetCount)
         defaults?.set(snapshot.lastWorkoutDate, forKey: Keys.lastWorkoutDate)
         defaults?.set(snapshot.lastPRSummary, forKey: Keys.lastPRSummary)
         WidgetCenter.shared.reloadAllTimelines()
     }
 
-    /// Targeted update for fields the workout completion path knows about
-    /// without re-fetching the full dashboard snapshot. The streak refreshes
-    /// instantly when a workout completes; the rest of the snapshot fills in
-    /// on the next dashboard load.
-    static func updateAfterWorkoutCompletion(currentStreak: Int, lastWorkoutDate: Date) {
-        defaults?.set(currentStreak, forKey: Keys.currentStreak)
+    /// Targeted update for the field the workout completion path knows about
+    /// without re-fetching the full dashboard snapshot. The rest of the
+    /// snapshot fills in on the next dashboard load.
+    static func updateAfterWorkoutCompletion(lastWorkoutDate: Date) {
         defaults?.set(lastWorkoutDate, forKey: Keys.lastWorkoutDate)
         WidgetCenter.shared.reloadAllTimelines()
     }
 
     enum Keys {
-        static let currentStreak = "widget_currentStreak"
         static let weeklyWorkingSetCount = "widget_weeklyWorkingSetCount"
         static let lastWorkoutDate = "widget_lastWorkoutDate"
         static let lastPRSummary = "widget_lastPRSummary"

@@ -65,31 +65,6 @@ final class NotificationService {
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: identifiers)
     }
 
-    // MARK: - Streak Reminders
-
-    func scheduleStreakReminder() {
-        let content = UNMutableNotificationContent()
-        content.title = "Don't Break Your Streak!"
-        content.body = "You haven't trained today. Keep your streak alive!"
-        content.sound = .default
-        content.categoryIdentifier = "STREAK_REMINDER"
-
-        // Fire at 7 PM if no workout logged today
-        var dateComponents = DateComponents()
-        dateComponents.hour = 19
-        dateComponents.minute = 0
-
-        let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
-
-        let request = UNNotificationRequest(
-            identifier: "streak-reminder",
-            content: content,
-            trigger: trigger
-        )
-
-        UNUserNotificationCenter.current().add(request)
-    }
-
     // MARK: - Rest Day Reminder
 
     func scheduleRestDayCheck() {
@@ -164,6 +139,38 @@ final class NotificationService {
         )
 
         UNUserNotificationCenter.current().add(request)
+    }
+
+    // MARK: - Rest Timer
+
+    /// Fixed identifier so a rest-end alert can be replaced/cancelled when the
+    /// timer is adjusted, skipped, or finishes while the app is foreground.
+    private static let restEndIdentifier = "rest_timer_end"
+
+    /// Schedules a one-shot alert for when the rest timer elapses. No-ops harmlessly
+    /// if notifications aren't authorized, so it rides the existing permission.
+    func scheduleRestEndNotification(after seconds: TimeInterval) {
+        cancelRestEndNotification()
+        guard seconds > 0 else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = "Rest complete"
+        content.body = "Time for your next set."
+        content.sound = .default
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: seconds, repeats: false)
+        let request = UNNotificationRequest(
+            identifier: Self.restEndIdentifier,
+            content: content,
+            trigger: trigger
+        )
+        UNUserNotificationCenter.current().add(request)
+    }
+
+    func cancelRestEndNotification() {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(
+            withIdentifiers: [Self.restEndIdentifier]
+        )
     }
 
     // MARK: - Cancel All
