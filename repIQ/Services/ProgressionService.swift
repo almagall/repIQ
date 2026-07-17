@@ -95,14 +95,18 @@ struct ProgressionService: Sendable {
         // Kept only for summary/log display continuity — not a decision input.
         let currentE1RM = bestE1RM(from: latestSession)
 
+        // The prescription is a SINGLE rep goal for the session (not a range). The
+        // rep band (10..top) still lives on TrainingMode; the target is the one
+        // number to hit this session, which increments week to week toward the top.
         func makeTarget(
             _ decision: ProgressionDecision,
-            weight: Double, low: Int, high: Int, reasoning: String
+            weight: Double, reps: Int, reasoning: String
         ) -> ProgressionTarget {
-            ProgressionTarget(
+            let r = min(max(reps, 1), top)
+            return ProgressionTarget(
                 exerciseId: exerciseId, trainingMode: mode,
                 targetWeight: roundToIncrement(weight, increment),
-                targetRepsLow: low, targetRepsHigh: max(low, high),
+                targetRepsLow: r, targetRepsHigh: r,
                 targetRPE: targetRPE, decision: decision, reasoning: reasoning,
                 previousWeight: workingWeight, previousReps: medReps, previousRPE: avgRPE,
                 estimatedOneRM: currentE1RM, mesocycleRPEOffset: mesocycleOffset,
@@ -112,20 +116,17 @@ struct ProgressionService: Sendable {
 
         // Deload safety nets (weight-based; e1RM not needed here).
         if let weeks = weeksSinceDeload, weeks >= 7, allowDeload {
-            return makeTarget(.deload, weight: workingWeight * 0.90,
-                low: bottom, high: min(bottom + 2, top),
+            return makeTarget(.deload, weight: workingWeight * 0.90, reps: bottom,
                 reasoning: "You've trained \(weeks) weeks without a deload. Scheduled recovery week to prevent overtraining.")
         }
         if allowDeload, countConsecutiveBadSessions(recentSessions: recentSessions) >= 2 {
-            return makeTarget(.deload, weight: workingWeight * 0.90,
-                low: bottom, high: min(bottom + 2, top),
+            return makeTarget(.deload, weight: workingWeight * 0.90, reps: bottom,
                 reasoning: "Performance has declined for multiple sessions. Deloading to allow recovery.")
         }
 
         // Baseline: need 2 sessions of history before prescribing progression.
         guard recentSessions.count >= 2 else {
-            let capped = min(medReps, top)
-            return makeTarget(.maintain, weight: workingWeight, low: capped, high: capped,
+            return makeTarget(.maintain, weight: workingWeight, reps: min(medReps, top),
                 reasoning: "First session tracked. Repeat to establish a baseline.")
         }
 
@@ -135,7 +136,7 @@ struct ProgressionService: Sendable {
             .flatMap { $0.filter { $0.setType == .working } }
             .map(\.weight).max() ?? workingWeight
         if workingWeight < bestRecentWeight * 0.90 {
-            return makeTarget(.maintain, weight: bestRecentWeight, low: bottom, high: top,
+            return makeTarget(.maintain, weight: bestRecentWeight, reps: bottom,
                 reasoning: "Last session was below your recent bests. Holding at your proven working weight.")
         }
 
@@ -144,13 +145,12 @@ struct ProgressionService: Sendable {
         // also satisfies it — beating the top just earns the bump sooner, never a
         // larger-than-one-increment jump.
         if minReps >= top {
-            return makeTarget(.increaseWeight, weight: workingWeight + increment,
-                low: bottom, high: top,
+            return makeTarget(.increaseWeight, weight: workingWeight + increment, reps: bottom,
                 reasoning: "You hit the top of the rep range on every set. Adding weight and resetting reps to the bottom of the range.")
         }
         // Missed the floor — hold weight and rebuild before progressing.
         if minReps < bottom {
-            return makeTarget(.maintain, weight: workingWeight, low: bottom, high: top,
+            return makeTarget(.maintain, weight: workingWeight, reps: bottom,
                 reasoning: "Last session fell below the rep range. Holding weight to rebuild.")
         }
         // RPE early-bump: the hardest set still left 3+ reps in reserve → add load
@@ -160,16 +160,13 @@ struct ProgressionService: Sendable {
         // skip ahead on load when there's a clear surplus. Only fires when RPE was
         // logged; absent RPE degrades cleanly to pure strict double progression.
         if let rpe = hardestRPE, rpe <= targetRPE - 3 {
-            return makeTarget(.increaseWeight, weight: workingWeight + increment,
-                low: bottom, high: top,
+            return makeTarget(.increaseWeight, weight: workingWeight + increment, reps: bottom,
                 reasoning: "You had 3+ reps in reserve on your hardest set. Adding weight early.")
         }
         // In range, not yet all at top — add a rep. The weakest set (minReps) gates
-        // the eventual weight bump; per-set prefill (see perSetTarget) asks each
-        // set to beat its own last performance.
-        return makeTarget(.increaseReps, weight: workingWeight,
-            low: min(minReps + 1, top), high: top,
-            reasoning: "Getting stronger. Aim to add a rep on every set until you reach the top of the range.")
+        // the eventual weight bump, so the single target is one above it.
+        return makeTarget(.increaseReps, weight: workingWeight, reps: min(minReps + 1, top),
+            reasoning: "Getting stronger. Aim for \(min(minReps + 1, top)) reps on every set on your way to \(top).")
     }
 
     // MARK: - Strength (Load-Biased Double Progression on the Top Set)
@@ -220,14 +217,17 @@ struct ProgressionService: Sendable {
         let e1rmConfidence = e1rmConfidenceFactor(medReps: medReps)
         let rpeFatigue = detectRPEFatigue(recentSessions: recentSessions, targetRPE: targetRPE)
 
+        // Single rep goal for the session (the top set's target); ramp sets derive
+        // their reps from it in perSetTarget.
         func makeTarget(
             _ decision: ProgressionDecision,
-            weight: Double, low: Int, high: Int, reasoning: String
+            weight: Double, reps: Int, reasoning: String
         ) -> ProgressionTarget {
-            ProgressionTarget(
+            let r = min(max(reps, 1), top)
+            return ProgressionTarget(
                 exerciseId: exerciseId, trainingMode: mode,
                 targetWeight: roundToIncrement(weight, increment),
-                targetRepsLow: low, targetRepsHigh: max(low, high),
+                targetRepsLow: r, targetRepsHigh: r,
                 targetRPE: targetRPE, decision: decision, reasoning: reasoning,
                 previousWeight: medWeight, previousReps: medReps, previousRPE: avgRPE,
                 estimatedOneRM: currentE1RM, mesocycleRPEOffset: mesocycleOffset,
@@ -237,26 +237,23 @@ struct ProgressionService: Sendable {
 
         // Deload safety nets.
         if let weeks = weeksSinceDeload, weeks >= 7, allowDeload {
-            return makeTarget(.deload, weight: currentE1RM * 0.90 * percentageOfE1RM(forReps: bottom),
-                low: bottom, high: min(bottom + 1, top),
+            return makeTarget(.deload, weight: currentE1RM * 0.90 * percentageOfE1RM(forReps: bottom), reps: bottom,
                 reasoning: "You've trained \(weeks) weeks without a deload. Scheduled recovery week to prevent overtraining.")
         }
         if allowDeload, countConsecutiveBadSessions(recentSessions: recentSessions) >= 2 {
-            return makeTarget(.deload, weight: currentE1RM * 0.90 * percentageOfE1RM(forReps: bottom),
-                low: bottom, high: min(bottom + 1, top),
+            return makeTarget(.deload, weight: currentE1RM * 0.90 * percentageOfE1RM(forReps: bottom), reps: bottom,
                 reasoning: "Performance has declined for multiple sessions. Deloading to allow recovery.")
         }
 
         // Baseline.
         guard recentSessions.count >= 2 else {
-            let capped = min(topSetReps, top)
-            return makeTarget(.maintain, weight: topSetWeight, low: capped, high: capped,
+            return makeTarget(.maintain, weight: topSetWeight, reps: min(topSetReps, top),
                 reasoning: "First session tracked. Repeat to establish a baseline.")
         }
 
         // Single off-day: hold at proven top-set weight.
         if offDay {
-            return makeTarget(.maintain, weight: bestRecentTopWeight, low: bottom, high: top,
+            return makeTarget(.maintain, weight: bestRecentTopWeight, reps: bottom,
                 reasoning: "Last session was below your recent bests. Holding at your proven top-set weight.")
         }
 
@@ -271,22 +268,19 @@ struct ProgressionService: Sendable {
 
         // Double progression on the top set.
         if topSetReps >= top {
-            return makeTarget(.increaseWeight, weight: bumpedWeight(),
-                low: bottom, high: top,
+            return makeTarget(.increaseWeight, weight: bumpedWeight(), reps: bottom,
                 reasoning: "You hit the top of the rep range on your top set. Adding weight and resetting reps.")
         }
         if topSetReps < bottom {
-            return makeTarget(.maintain, weight: topSetWeight, low: bottom, high: top,
+            return makeTarget(.maintain, weight: topSetWeight, reps: bottom,
                 reasoning: "Top set fell below the rep range. Holding weight to rebuild.")
         }
         if let rpe = topSetRPE, rpe <= targetRPE - 2 {
-            return makeTarget(.increaseWeight, weight: bumpedWeight(),
-                low: bottom, high: top,
+            return makeTarget(.increaseWeight, weight: bumpedWeight(), reps: bottom,
                 reasoning: "You had 2+ reps in reserve on your top set. Adding weight early.")
         }
-        return makeTarget(.increaseReps, weight: topSetWeight,
-            low: min(topSetReps + 1, top), high: top,
-            reasoning: "Strength is building. Add a rep on your top set before increasing weight.")
+        return makeTarget(.increaseReps, weight: topSetWeight, reps: min(topSetReps + 1, top),
+            reasoning: "Strength is building. Aim for \(min(topSetReps + 1, top)) on your top set before increasing weight.")
     }
 
     // MARK: - Bodyweight Progression
@@ -305,91 +299,58 @@ struct ProgressionService: Sendable {
         guard !latestWorkingSets.isEmpty else { return nil }
 
         let repRange = trainingMode.repRange
-        let effectiveUpperBound = min(repCap ?? repRange.upperBound, repRange.upperBound)
+        let bottom = repRange.lowerBound
+        let top = min(repCap ?? repRange.upperBound, repRange.upperBound)
         let targetRPE = trainingMode.targetRPE
 
         let medReps = medianInt(latestWorkingSets.map(\.reps))
+        let minReps = latestWorkingSets.map(\.reps).min() ?? medReps
         let avgRPE = averageRPE(latestWorkingSets, default: targetRPE)
         let medWeight = median(latestWorkingSets.map(\.weight))
 
         let mesocycleOffset = mesocycleRPEOffset(weeksSinceDeload: weeksSinceDeload)
 
-        let decision: ProgressionDecision
-        let tRepsLow: Int
-        let tRepsHigh: Int
-        let reasoning: String
-
-        // Proactive deload ceiling
-        if let weeks = weeksSinceDeload, weeks >= 7, allowDeload {
-            decision = .deloadVolume
-            tRepsLow = max(medReps - 2, repRange.lowerBound)
-            tRepsHigh = max(medReps - 1, repRange.lowerBound)
-            reasoning = "Scheduled recovery week after \(weeks) weeks of training."
-
-        } else if recentSessions.count < 2 {
-            // Maintain — but cap both bounds to avoid an inverted range when the
-            // prior session went above the rep cap.
-            decision = .maintain
-            let cappedReps = min(medReps, effectiveUpperBound)
-            tRepsLow = cappedReps
-            tRepsHigh = cappedReps
-            reasoning = "First session tracked. Repeat to establish a baseline."
-
-        } else {
-            let prevWorkingSets = recentSessions[1].filter { $0.setType == .working }
-            let prevMedReps = prevWorkingSets.isEmpty ? medReps : medianInt(prevWorkingSets.map(\.reps))
-
-            if medReps >= effectiveUpperBound {
-                decision = .increaseWeight
-                tRepsLow = repRange.lowerBound
-                tRepsHigh = min(repRange.lowerBound + 2, effectiveUpperBound)
-                reasoning = "You've reached \(effectiveUpperBound) reps. Consider adding external weight to keep progressing."
-
-            } else if medReps > prevMedReps {
-                decision = .increaseReps
-                tRepsLow = min(medReps + 1, effectiveUpperBound)
-                tRepsHigh = min(medReps + 2, effectiveUpperBound)
-                reasoning = "Reps are improving. Keep pushing for more reps each session."
-
-            } else if medReps == prevMedReps {
-                decision = .increaseReps
-                tRepsLow = min(medReps + 1, effectiveUpperBound)
-                tRepsHigh = min(medReps + 1, effectiveUpperBound)
-                reasoning = "Reps are holding steady. Aim for one more rep per set."
-
-            } else if allowDeload {
-                decision = .deloadVolume
-                tRepsLow = max(medReps - 1, repRange.lowerBound)
-                tRepsHigh = medReps
-                reasoning = "Rep count has dropped. Consider reducing sets or taking a lighter session."
-
-            } else {
-                // Reps dropped but the user chose to keep progressing — hold the
-                // line and aim to win the rep back rather than backing off.
-                decision = .increaseReps
-                tRepsLow = min(medReps + 1, effectiveUpperBound)
-                tRepsHigh = min(medReps + 1, effectiveUpperBound)
-                reasoning = "Aim to win back the rep you dropped last session."
-            }
+        // Rep-only double progression: a SINGLE rep goal per session (no range),
+        // mirroring the weighted path. Bodyweight can't shed load, so a decline
+        // holds/reduces reps instead of dropping weight.
+        func makeTarget(_ decision: ProgressionDecision, reps: Int, _ reasoning: String) -> ProgressionTarget {
+            ProgressionTarget(
+                exerciseId: exerciseId, trainingMode: trainingMode,
+                targetWeight: medWeight,
+                targetRepsLow: max(reps, 1), targetRepsHigh: max(reps, 1),
+                targetRPE: targetRPE, decision: decision, reasoning: reasoning,
+                previousWeight: medWeight, previousReps: medReps, previousRPE: avgRPE,
+                estimatedOneRM: 0, mesocycleRPEOffset: mesocycleOffset,
+                rpeFatigueDetected: false, e1rmConfidence: 1.0
+            )
         }
 
-        return ProgressionTarget(
-            exerciseId: exerciseId,
-            trainingMode: trainingMode,
-            targetWeight: medWeight,
-            targetRepsLow: tRepsLow,
-            targetRepsHigh: tRepsHigh,
-            targetRPE: targetRPE,
-            decision: decision,
-            reasoning: reasoning,
-            previousWeight: medWeight,
-            previousReps: medReps,
-            previousRPE: avgRPE,
-            estimatedOneRM: 0,
-            mesocycleRPEOffset: mesocycleOffset,
-            rpeFatigueDetected: false,
-            e1rmConfidence: 1.0
-        )
+        if let weeks = weeksSinceDeload, weeks >= 7, allowDeload {
+            return makeTarget(.deloadVolume, reps: max(medReps - 2, bottom),
+                "Scheduled recovery week after \(weeks) weeks of training.")
+        }
+        guard recentSessions.count >= 2 else {
+            return makeTarget(.maintain, reps: min(medReps, top),
+                "First session tracked. Repeat to establish a baseline.")
+        }
+        // Below the range floor — hold at current reps and rebuild (no load to shed).
+        if minReps < bottom {
+            return makeTarget(.maintain, reps: min(medReps, top),
+                "Last session fell below the rep range. Holding to rebuild.")
+        }
+        let prevWorkingSets = recentSessions[1].filter { $0.setType == .working }
+        let prevMedReps = prevWorkingSets.isEmpty ? medReps : medianInt(prevWorkingSets.map(\.reps))
+        if minReps >= top {
+            return makeTarget(.increaseWeight, reps: bottom,
+                "You reached \(top) reps on every set. Add external weight to keep progressing.")
+        }
+        if medReps < prevMedReps, allowDeload {
+            return makeTarget(.deloadVolume, reps: max(medReps - 1, bottom),
+                "Rep count has dropped. Reduce volume or take a lighter session.")
+        }
+        // Improving, holding, or keeping-progressing after a dip → aim for one more.
+        return makeTarget(.increaseReps, reps: min(minReps + 1, top),
+            "Reps are progressing. Aim for \(min(minReps + 1, top)) on every set.")
     }
 
     // MARK: - RPE Fatigue Detection (Gap 7)

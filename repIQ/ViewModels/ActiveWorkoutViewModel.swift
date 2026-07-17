@@ -296,7 +296,7 @@ final class ActiveWorkoutViewModel {
 
         switch trainingMode {
         case .hypertrophy:
-            // Straight sets: same weight × per-set rep target.
+            // Straight sets: same weight × the single session rep goal on every set.
             // RPE naturally drifts up with fatigue + mesocycle progression.
             let baseRPE = target.targetRPE + mesocycleOffset
             let rpe = expectedRPE(
@@ -305,20 +305,7 @@ final class ActiveWorkoutViewModel {
                 setPosition: setPosition,
                 totalSets: totalSets
             )
-            // Double progression: on an increase-reps decision, prefill each set to
-            // beat its OWN previous reps by one (capped at the top of the range), so
-            // within-range progress is visible every session instead of showing a
-            // static bottom-of-range number that reads as a repeat. Weight-bump,
-            // maintain, and deload decisions prefill targetRepsLow, which each branch
-            // already sets to the correct reset/hold value.
-            let reps: Int
-            if target.decision == .increaseReps {
-                let base = prev?.reps ?? target.targetRepsLow
-                reps = min(base + 1, target.targetRepsHigh)
-            } else {
-                reps = target.targetRepsLow
-            }
-            return (target.targetWeight, reps, rpe)
+            return (target.targetWeight, target.targetRepsLow, rpe)
 
         case .strength:
             // Ascending weight model with autoregulation (Gap 4):
