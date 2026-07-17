@@ -156,22 +156,35 @@ Critical to keep in your head when touching anything that writes data.
 
 ## Progression engine — the heart of the app
 
-`repIQ/Services/ProgressionService.swift::calculateTarget(...)` decides what to prescribe next session. Read this whole file before changing anything in it.
+`repIQ/Services/ProgressionService.swift::calculateTarget(...)` decides what to prescribe next session. Read this whole file before changing anything in it. `calculateTarget` dispatches by training mode to `hypertrophyTarget` / `strengthTarget` (bodyweight → `calculateBodyweightTarget`). **Both modes are double progression**; they differ in what drives the weight bump. e1RM is intentionally *not* a decision input for hypertrophy — the Epley/Brzycki estimate is unreliable in the 10–15 rep band, so hypertrophy follows actual reps against the range instead. (This replaced the old unified e1RM-trend + confidence-gate model, which stalled weight whenever the *median* rep count sat below the cap and never credited beating the prescription.)
 
-### Decision tree (in order)
+Both mode functions share the same preamble ordering: **deload safety nets → baseline (<2 sessions) → single off-day → progression state machine.**
 
-1. **<2 sessions of history** → `.maintain` (establish baseline).
-2. **`weeksSinceDeload >= 7`** → force `.deload` (90% e1RM). Proactive recovery ceiling.
-3. **2+ consecutive sessions with >10% weight drop** → `.deload`. Real fatigue, not a bad day.
-4. **e1RM stable but RPE rising** → `.maintain`. Hidden fatigue signal.
-5. **Single off-day** (this session's weight < 90% of recent best) → `.maintain` at proven capacity.
-6. **e1RM trending up** (≥+2%):
-   - High e1RM confidence (reps 1–5) → `.increaseWeight` (trust the extrapolation)
-   - Low confidence (reps >10) → `.increaseReps` if not at top of range, else `.increaseWeight`
-7. **e1RM flat** (>-2% to <+2%) → `.increaseReps` at same weight (drive adaptation via reps).
-8. **e1RM declining** (<-2%) → `.deload`.
+### Hypertrophy — strict double progression (in order)
 
-`calculateTarget` takes `allowDeload: Bool = true`. When `false`, every deload branch (2, 3, 8) is suppressed and routed into normal progression instead — declining e1RM falls through into the flat-e1RM double-progression logic. This backs the "Keep Progressing" choice on the deload prompt (see below).
+Reference = the whole set (uses `minReps`, the *minimum* reps across working sets, and `workingWeight` = median). Range 10–15 (narrowed by `repCap`).
+
+1. **`weeksSinceDeload >= 7`** (allowDeload) → `.deload` at 90% of working weight.
+2. **2+ consecutive sessions with >10% weight drop** (allowDeload) → `.deload` at 90%.
+3. **<2 sessions** → `.maintain` (baseline).
+4. **Single off-day** (`workingWeight < 90%` of recent best) → `.maintain` at proven working weight.
+5. **`minReps >= top`** (every set hit the top of the range, overshoot included) → **`.increaseWeight`** by one increment, reset reps to `bottom`.
+6. **`minReps < bottom`** (missed the floor) → `.maintain`, hold and rebuild.
+7. **RPE early-bump:** hardest set's RPE `<= targetRPE − 3` (**3+ RIR**) → **`.increaseWeight`** one increment. Deliberately stricter than strength's 2-RIR bar — hypertrophy banks reps at a load unless there's a clear surplus. Only fires when RPE is logged; absent RPE → pure strict double progression.
+8. **else** (in range, not all at top) → **`.increaseReps`**: `targetRepsLow = min(minReps + 1, top)`, `targetRepsHigh = top`.
+
+### Strength — top-set double progression (in order)
+
+Reference = the **top set** (heaviest working set), since ramped sets have different weights. e1RM *is* valid at 3–5 reps, so it sizes the weight jump. Range 3–5.
+
+1–3. Same deload/baseline nets as hypertrophy (deload weight is e1RM-derived: `currentE1RM × 0.90 × pctOfE1RM(bottom)`).
+4. **Single off-day** (`topSetWeight < 90%` of recent best) → `.maintain` at proven top-set weight.
+5. **`topSetReps >= top`** (top set hit 5) → **`.increaseWeight`** via `increaseWeightTarget` (e1RM-sized, floored one increment above the top set so a 5→3 reset jumps more than one increment), reset to `bottom`.
+6. **`topSetReps < bottom`** → `.maintain`, rebuild.
+7. **RPE early-bump:** top set's RPE `<= targetRPE − 2` (**2+ RIR**) → **`.increaseWeight`**.
+8. **else** → **`.increaseReps`** on the top set: `min(topSetReps + 1, top)`.
+
+`calculateTarget` takes `allowDeload: Bool = true`. When `false`, both deload nets are suppressed and flow into the normal state machine (a declining lifter gets `.maintain`/`.increaseReps` instead of a deload). This backs the "Keep Progressing" choice on the deload prompt (see below). Weight always advances by exactly one increment (hypertrophy) or an e1RM-sized-but-floored jump (strength) — never proportional to overshoot; beating the top of the range just earns the bump sooner.
 
 ### Deload is a choice, not silent (performance deloads)
 
@@ -185,7 +198,7 @@ Stateless by design: the decision is recomputed from actual sets every completio
 
 `ActiveWorkoutViewModel.perSetTarget(decision:previousSet:trainingMode:setPosition:totalSets:equipment:)` maps the prescribed `(targetWeight, repsLow..repsHigh, RPE)` to *each* set:
 
-- **Hypertrophy:** every working set gets `(targetWeight, targetRepsLow, RPE = base + 0.5 × setIndex)`. RPE climbs as fatigue accumulates.
+- **Hypertrophy:** every working set gets `targetWeight` at a per-set rep target. On an `.increaseReps` decision each set is prefilled to beat its *own* previous reps by one (`min(prevReps + 1, targetRepsHigh)`), so within-range progress is visible every session; every other decision (weight bump / maintain / deload) prefills `targetRepsLow`, which each branch already set to the correct reset/hold value. RPE = `base + 0.5 × setIndex` (climbs with fatigue).
 - **Strength:** weight ramps from `targetWeight × startPct` (startPct depends on totalSets) up to full targetWeight on the top set; reps stay at `targetRepsLow`; RPE ramps linearly from 6.0 to `targetRPE + mesocycleOffset`.
 - Weight is rounded down to the equipment increment via `ProgressionService.weightIncrement(for:)` and `roundToIncrement`.
 - Bodyweight exercises skip e1RM logic entirely; rep-only progression.
@@ -437,6 +450,7 @@ The following were stripped to focus the first release on core tracking. The cli
 
 ## Recent ships
 
+- **Unreleased (post-build 11)** — Jul 2026 — **Progression rewrite: mode-split double progression.** Replaced `calculateTarget`'s unified e1RM-trend + confidence-gate model (which stalled the prescribed weight whenever the median rep count sat below the cap, and never credited exceeding the prescription) with two mode-specific state machines. **Hypertrophy** = strict double progression driven by actual reps vs the range — weight advances one increment only when every working set reaches the top (`minReps >= top`) or the hardest set had 3+ RIR (RPE early-bump); e1RM is no longer a decision input (unreliable at 10–15 reps). **Strength** = top-set double progression — bump when the top set hits 5, e1RM sizes the (floored) jump since it's valid at 3–5 reps. `perSetTarget` hypertrophy prefill now beats each set's own prior reps by one on `.increaseReps`, so within-range progress shows every session. Deload nets + Keep-Progressing path preserved. No schema change (`progression_log` shape unchanged; `estimated_1rm` unused for hypertrophy).
 - **Unreleased (post-build 11)** — Jul 2026 — **v1 scope-down: removed social + gamification + streak.** Deleted the Social tab and its ~21 views, `SocialViewModel`, and 9 services (`SocialService`, `FeedService`, `ChallengeService`, `MatchmakingService`, `LiftPercentileService`, `PresenceService`, `TipsService`, `NudgeService`, `GamificationService`). Stripped all IQ/badge/feed/presence work from `completeWorkout`. Removed the **training streak** in its entirety (both the profile-daily and analytics-weekly systems), reweighted the consistency score to frequency 50% / volume-stability 30% / recency 20% (dropped `ConsistencyScore.streakScore`), and removed the streak-protection notification. `MonthlyWrappedView` was decoupled from `SocialViewModel` and kept as a standalone recap. Three tabs remain (Home / Progress / Profile). No schema changes — social/streak tables are left idle in the DB.
 - **Unreleased (post-build 11)** — Jun 16 2026 — **Opt-in performance deloads.** Performance-based deloads (declining e1RM / consecutive bad sessions) are no longer applied silently at the next session. `calculateTarget` gained an `allowDeload` flag; `ActiveWorkoutViewModel` detects deload targets on `startWorkout` and surfaces a "Recovery Recommended" prompt (`ActiveWorkoutView.performanceDeloadBanner`) with **Take Deload** / **Keep Progressing**. Declining recomputes each flagged lift with `allowDeload: false` and rebuilds the pre-filled sets. Stateless (re-prompts each session while declining); the time-based proactive banner is suppressed while a performance prompt is showing.
 - **1.5 (build 11)** — May 18 2026 — Social-feature surfacing pass (later removed in the v1 scope-down above). Also fixed the "Share my Wrapped" black-screen crash (`ImageRenderer` was producing a ~75-megapixel image on the main thread + SwiftUI `.sheet` raced the hidden status bar — now scale 1.0 with direct UIKit presentation off the active scene). Wrapped story hides the tab bar for full-screen immersion. Feed workout titles read narratively (feed since removed).

@@ -41,197 +41,252 @@ struct ProgressionService: Sendable {
             )
         }
 
-        let repRange = trainingMode.repRange
-        let effectiveUpperBound = min(repCap ?? repRange.upperBound, repRange.upperBound)
-        let targetRPE = trainingMode.targetRPE
+        switch trainingMode {
+        case .hypertrophy:
+            return hypertrophyTarget(
+                exerciseId: exerciseId, equipment: equipment,
+                recentSessions: recentSessions, repCap: repCap,
+                weeksSinceDeload: weeksSinceDeload, allowDeload: allowDeload
+            )
+        case .strength:
+            return strengthTarget(
+                exerciseId: exerciseId, equipment: equipment,
+                recentSessions: recentSessions, repCap: repCap,
+                weeksSinceDeload: weeksSinceDeload, allowDeload: allowDeload
+            )
+        }
+    }
+
+    // MARK: - Hypertrophy (Strict Double Progression)
+
+    /// Rep-driven double progression. Weight advances by exactly one increment,
+    /// and only when every working set reached the top of the rep range (strict
+    /// trigger) or the hardest set still had 2+ reps in reserve (RPE early-bump).
+    /// e1RM is deliberately NOT a decision input: the estimation formulas are
+    /// unreliable in the 10-15 rep band, so progression follows actual reps
+    /// against the range instead. (Replaced the prior e1RM-trend + confidence-gate
+    /// model, which stalled weight whenever the median rep count sat below the cap
+    /// and never credited beating the prescription — see branch strip-social-v1.)
+    private func hypertrophyTarget(
+        exerciseId: UUID,
+        equipment: String,
+        recentSessions: [[WorkoutSet]],
+        repCap: Int?,
+        weeksSinceDeload: Int?,
+        allowDeload: Bool
+    ) -> ProgressionTarget? {
+        let mode = TrainingMode.hypertrophy
+        let repRange = mode.repRange
+        let bottom = repRange.lowerBound
+        let top = min(repCap ?? repRange.upperBound, repRange.upperBound)
+        let targetRPE = mode.targetRPE
         let increment = weightIncrement(for: equipment)
 
-        let latestWorkingSets = latestSession.filter { $0.setType == .working }
-        guard !latestWorkingSets.isEmpty else { return nil }
+        guard let latestSession = recentSessions.first else { return nil }
+        let working = latestSession.filter { $0.setType == .working }
+        guard !working.isEmpty else { return nil }
 
-        // Previous session stats for display
-        let medWeight = median(latestWorkingSets.map(\.weight))
-        let medReps = medianInt(latestWorkingSets.map(\.reps))
-        let avgRPE = averageRPE(latestWorkingSets, default: targetRPE)
+        let workingWeight = median(working.map(\.weight))
+        let medReps = medianInt(working.map(\.reps))
+        let minReps = working.map(\.reps).min() ?? medReps
+        let avgRPE = averageRPE(working, default: targetRPE)
+        let hardestRPE = working.compactMap(\.rpe).max()
+        let mesocycleOffset = mesocycleRPEOffset(weeksSinceDeload: weeksSinceDeload)
+        // Kept only for summary/log display continuity — not a decision input.
+        let currentE1RM = bestE1RM(from: latestSession)
 
-        // Compute e1RM per session
-        let sessionE1RMs = recentSessions.compactMap { session -> Double? in
-            let e1rm = bestE1RM(from: session)
-            return e1rm > 0 ? e1rm : nil
+        func makeTarget(
+            _ decision: ProgressionDecision,
+            weight: Double, low: Int, high: Int, reasoning: String
+        ) -> ProgressionTarget {
+            ProgressionTarget(
+                exerciseId: exerciseId, trainingMode: mode,
+                targetWeight: roundToIncrement(weight, increment),
+                targetRepsLow: low, targetRepsHigh: max(low, high),
+                targetRPE: targetRPE, decision: decision, reasoning: reasoning,
+                previousWeight: workingWeight, previousReps: medReps, previousRPE: avgRPE,
+                estimatedOneRM: currentE1RM, mesocycleRPEOffset: mesocycleOffset,
+                rpeFatigueDetected: false, e1rmConfidence: 1.0
+            )
         }
 
-        guard let latestE1RM = sessionE1RMs.first else { return nil }
+        // Deload safety nets (weight-based; e1RM not needed here).
+        if let weeks = weeksSinceDeload, weeks >= 7, allowDeload {
+            return makeTarget(.deload, weight: workingWeight * 0.90,
+                low: bottom, high: min(bottom + 2, top),
+                reasoning: "You've trained \(weeks) weeks without a deload. Scheduled recovery week to prevent overtraining.")
+        }
+        if allowDeload, countConsecutiveBadSessions(recentSessions: recentSessions) >= 2 {
+            return makeTarget(.deload, weight: workingWeight * 0.90,
+                low: bottom, high: min(bottom + 2, top),
+                reasoning: "Performance has declined for multiple sessions. Deloading to allow recovery.")
+        }
 
-        // e1RM confidence based on rep range (Gap 5: e1RM weighting by rep range)
-        // Brzycki/Epley formulas are most accurate at 2-10 reps, error increases above 10
-        let e1rmConfidence = e1rmConfidenceFactor(medReps: medReps)
+        // Baseline: need 2 sessions of history before prescribing progression.
+        guard recentSessions.count >= 2 else {
+            let capped = min(medReps, top)
+            return makeTarget(.maintain, weight: workingWeight, low: capped, high: capped,
+                reasoning: "First session tracked. Repeat to establish a baseline.")
+        }
 
-        // RPE fatigue detection (Gap 7: RPE + e1RM combined signals)
-        // If e1RM is stable but RPE is rising, that signals hidden fatigue
-        let rpeFatigueDetected = detectRPEFatigue(recentSessions: recentSessions, targetRPE: targetRPE)
+        // Single off-day: last session's weight far below recent best → hold at
+        // proven capacity rather than progressing from a bad day.
+        let bestRecentWeight = recentSessions
+            .flatMap { $0.filter { $0.setType == .working } }
+            .map(\.weight).max() ?? workingWeight
+        if workingWeight < bestRecentWeight * 0.90 {
+            return makeTarget(.maintain, weight: bestRecentWeight, low: bottom, high: top,
+                reasoning: "Last session was below your recent bests. Holding at your proven working weight.")
+        }
 
-        // Mesocycle RPE offset (Gap 5: RPE progression across mesocycle)
+        // Strict trigger: every working set reached the top of the range. Because
+        // this tests the minimum, an over-cap session (e.g. 17 reps on a 15 cap)
+        // also satisfies it — beating the top just earns the bump sooner, never a
+        // larger-than-one-increment jump.
+        if minReps >= top {
+            return makeTarget(.increaseWeight, weight: workingWeight + increment,
+                low: bottom, high: top,
+                reasoning: "You hit the top of the rep range on every set. Adding weight and resetting reps to the bottom of the range.")
+        }
+        // Missed the floor — hold weight and rebuild before progressing.
+        if minReps < bottom {
+            return makeTarget(.maintain, weight: workingWeight, low: bottom, high: top,
+                reasoning: "Last session fell below the rep range. Holding weight to rebuild.")
+        }
+        // RPE early-bump: the hardest set still left 3+ reps in reserve → add load
+        // now rather than grinding up a wide range. The 3-RIR bar (vs the textbook
+        // 2-RIR "add weight" trigger used for strength) is deliberately conservative
+        // for hypertrophy: accumulating reps at a load is valuable stimulus, so only
+        // skip ahead on load when there's a clear surplus. Only fires when RPE was
+        // logged; absent RPE degrades cleanly to pure strict double progression.
+        if let rpe = hardestRPE, rpe <= targetRPE - 3 {
+            return makeTarget(.increaseWeight, weight: workingWeight + increment,
+                low: bottom, high: top,
+                reasoning: "You had 3+ reps in reserve on your hardest set. Adding weight early.")
+        }
+        // In range, not yet all at top — add a rep. The weakest set (minReps) gates
+        // the eventual weight bump; per-set prefill (see perSetTarget) asks each
+        // set to beat its own last performance.
+        return makeTarget(.increaseReps, weight: workingWeight,
+            low: min(minReps + 1, top), high: top,
+            reasoning: "Getting stronger. Aim to add a rep on every set until you reach the top of the range.")
+    }
+
+    // MARK: - Strength (Load-Biased Double Progression on the Top Set)
+
+    /// Load-driven progression using the heaviest working set (top of the ramp)
+    /// as the reference. Weight advances when the top set reaches the top of the
+    /// 3-5 rep range, or on an RPE early-bump. e1RM is a valid signal at 3-5 reps,
+    /// so it sizes the jump (e.g. a 5->3 rep reset warrants more than one
+    /// increment); a one-increment floor guarantees it never rounds backward.
+    private func strengthTarget(
+        exerciseId: UUID,
+        equipment: String,
+        recentSessions: [[WorkoutSet]],
+        repCap: Int?,
+        weeksSinceDeload: Int?,
+        allowDeload: Bool
+    ) -> ProgressionTarget? {
+        let mode = TrainingMode.strength
+        let repRange = mode.repRange
+        let bottom = repRange.lowerBound
+        let top = min(repCap ?? repRange.upperBound, repRange.upperBound)
+        let targetRPE = mode.targetRPE
+        let increment = weightIncrement(for: equipment)
+
+        guard let latestSession = recentSessions.first else { return nil }
+        let working = latestSession.filter { $0.setType == .working }
+        guard let topSet = working.max(by: { $0.weight < $1.weight }) else { return nil }
+
+        let topSetWeight = topSet.weight
+        let topSetReps = topSet.reps
+        let topSetRPE = topSet.rpe
+        let medWeight = median(working.map(\.weight))
+        let medReps = medianInt(working.map(\.reps))
+        let avgRPE = averageRPE(working, default: targetRPE)
         let mesocycleOffset = mesocycleRPEOffset(weeksSinceDeload: weeksSinceDeload)
 
-        // Off-day detection: if latest best weight is far below recent best, use best e1RM
-        let allRecentWorkingSets = recentSessions.flatMap { $0.filter { $0.setType == .working } }
-        let bestRecentWeight = allRecentWorkingSets.map(\.weight).max() ?? medWeight
-        let currentE1RM: Double
+        let sessionE1RMs = recentSessions.compactMap { session -> Double? in
+            let e = bestE1RM(from: session)
+            return e > 0 ? e : nil
+        }
+        let latestE1RM = sessionE1RMs.first ?? topSetWeight
+        let bestRecentTopWeight = recentSessions
+            .flatMap { $0.filter { $0.setType == .working } }
+            .map(\.weight).max() ?? topSetWeight
+        let offDay = topSetWeight < bestRecentTopWeight * 0.90
+        // On an off-day, size from the best recent e1RM, not the bad session.
+        let currentE1RM = offDay ? (sessionE1RMs.max() ?? latestE1RM) : latestE1RM
+        let e1rmConfidence = e1rmConfidenceFactor(medReps: medReps)
+        let rpeFatigue = detectRPEFatigue(recentSessions: recentSessions, targetRPE: targetRPE)
 
-        if medWeight < bestRecentWeight * 0.90 {
-            currentE1RM = sessionE1RMs.max() ?? latestE1RM
-        } else {
-            currentE1RM = latestE1RM
+        func makeTarget(
+            _ decision: ProgressionDecision,
+            weight: Double, low: Int, high: Int, reasoning: String
+        ) -> ProgressionTarget {
+            ProgressionTarget(
+                exerciseId: exerciseId, trainingMode: mode,
+                targetWeight: roundToIncrement(weight, increment),
+                targetRepsLow: low, targetRepsHigh: max(low, high),
+                targetRPE: targetRPE, decision: decision, reasoning: reasoning,
+                previousWeight: medWeight, previousReps: medReps, previousRPE: avgRPE,
+                estimatedOneRM: currentE1RM, mesocycleRPEOffset: mesocycleOffset,
+                rpeFatigueDetected: rpeFatigue, e1rmConfidence: e1rmConfidence
+            )
         }
 
-        // Target rep midpoint for percentage lookup
-        let targetMidRep = (repRange.lowerBound + effectiveUpperBound) / 2
-
-        // Determine trend and make decision
-        let decision: ProgressionDecision
-        let tWeight: Double
-        let tRepsLow: Int
-        let tRepsHigh: Int
-        let reasoning: String
-
-        // Proactive deload ceiling (Gap 3): force deload after 7+ weeks regardless of trend
+        // Deload safety nets.
         if let weeks = weeksSinceDeload, weeks >= 7, allowDeload {
-            let deloadedE1RM = currentE1RM * 0.90
-            decision = .deload
-            tWeight = roundToIncrement(deloadedE1RM * percentageOfE1RM(forReps: targetMidRep), increment)
-            tRepsLow = repRange.lowerBound
-            tRepsHigh = min(repRange.lowerBound + 2, effectiveUpperBound)
-            reasoning = "You've been training \(weeks) weeks without a deload. Scheduled recovery week to prevent overtraining and break through plateaus."
-
-        } else if sessionE1RMs.count < 2 {
-            // Only 1 session — maintain (repeat what they did, but never above the rep cap).
-            // Without clamping low+high to the cap, a prior over-cap rep count
-            // (e.g. logged 13 with a 12 cap) leaks through as an inverted "13-12" range.
-            decision = .maintain
-            tWeight = roundToIncrement(medWeight, increment)
-            let cappedReps = min(medReps, effectiveUpperBound)
-            tRepsLow = cappedReps
-            tRepsHigh = cappedReps
-            reasoning = "First session tracked. Repeat to establish a baseline."
-
-        } else {
-            let previousE1RM: Double
-            if sessionE1RMs.count >= 3 {
-                previousE1RM = (sessionE1RMs[1] + sessionE1RMs[2]) / 2.0
-            } else {
-                previousE1RM = sessionE1RMs[1]
-            }
-
-            let percentChange = (currentE1RM - previousE1RM) / previousE1RM
-
-            // Off-day escalation (Gap 6): consecutive bad sessions → deload
-            let consecutiveBadSessions = countConsecutiveBadSessions(recentSessions: recentSessions)
-
-            if consecutiveBadSessions >= 2 && allowDeload {
-                // Two or more consecutive >10% drops → real fatigue, not just off days
-                let deloadedE1RM = currentE1RM * 0.90
-                decision = .deload
-                tWeight = roundToIncrement(deloadedE1RM * percentageOfE1RM(forReps: targetMidRep), increment)
-                tRepsLow = repRange.lowerBound
-                tRepsHigh = min(repRange.lowerBound + 2, effectiveUpperBound)
-                reasoning = "Performance has declined for multiple sessions. Deloading to allow recovery."
-
-            } else if rpeFatigueDetected && percentChange >= -0.02 {
-                // RPE rising at same e1RM → approaching fatigue ceiling (Gap 7).
-                // Clamp both bounds to the cap so over-cap reps from the prior
-                // session don't produce an inverted "13-12" style range.
-                decision = .maintain
-                tWeight = roundToIncrement(medWeight, increment)
-                let cappedReps = min(medReps, effectiveUpperBound)
-                tRepsLow = cappedReps
-                tRepsHigh = cappedReps
-                reasoning = "Weight is stable but effort is increasing. Maintaining to manage fatigue before it impacts performance."
-
-            } else if medWeight < bestRecentWeight * 0.90 {
-                // Single off-day
-                decision = .maintain
-                tWeight = roundToIncrement(currentE1RM * percentageOfE1RM(forReps: targetMidRep), increment)
-                tRepsLow = repRange.lowerBound
-                tRepsHigh = min(repRange.lowerBound + 2, effectiveUpperBound)
-                reasoning = "Last session was below your recent bests. Keeping targets at your proven capacity."
-
-            } else if percentChange > 0.02 {
-                // e1RM trending up — decide based on rep range confidence
-                if e1rmConfidence >= 0.8 {
-                    // High confidence (low rep range) — trust e1RM, increase weight
-                    decision = .increaseWeight
-                    tWeight = roundToIncrement(currentE1RM * percentageOfE1RM(forReps: targetMidRep), increment)
-                    tRepsLow = repRange.lowerBound
-                    tRepsHigh = min(repRange.lowerBound + 2, effectiveUpperBound)
-                    reasoning = "Estimated 1RM is trending up. Prescribing weight for continued progress."
-                } else {
-                    // Lower confidence (high rep range) — favor rep progression first
-                    if medReps < effectiveUpperBound {
-                        decision = .increaseReps
-                        tWeight = roundToIncrement(medWeight, increment)
-                        tRepsLow = min(medReps + 1, effectiveUpperBound)
-                        tRepsHigh = min(medReps + 2, effectiveUpperBound)
-                        reasoning = "Getting stronger. Adding reps before increasing weight for this rep range."
-                    } else {
-                        decision = .increaseWeight
-                        tWeight = roundToIncrement(currentE1RM * percentageOfE1RM(forReps: targetMidRep), increment)
-                        tRepsLow = repRange.lowerBound
-                        tRepsHigh = min(repRange.lowerBound + 2, effectiveUpperBound)
-                        reasoning = "Hit top of rep range. Increasing weight and resetting reps."
-                    }
-                }
-
-            } else if percentChange >= -0.02 || !allowDeload {
-                // e1RM flat (or declining with deload suppressed — the user chose to
-                // keep progressing). Default move is double-progression — add reps at
-                // the same weight — but if you're already at the rep cap, the
-                // engine has nowhere to add reps and the prior code would
-                // re-prescribe the cap forever. When at cap, jump weight and
-                // reset reps to the bottom of the range. (Hitting cap with
-                // flat e1RM IS the trigger for a weight bump in
-                // double-progression.)
-                if medReps >= effectiveUpperBound {
-                    decision = .increaseWeight
-                    tWeight = roundToIncrement(currentE1RM * percentageOfE1RM(forReps: targetMidRep), increment)
-                    tRepsLow = repRange.lowerBound
-                    tRepsHigh = min(repRange.lowerBound + 2, effectiveUpperBound)
-                    reasoning = "You hit the rep cap. Increasing weight and resetting reps to the bottom of the range."
-                } else {
-                    decision = .increaseReps
-                    tWeight = roundToIncrement(medWeight, increment)
-                    tRepsLow = min(medReps + 1, effectiveUpperBound)
-                    tRepsHigh = min(medReps + 2, effectiveUpperBound)
-                    reasoning = "Strength is stable. Aim for more reps to drive adaptation."
-                }
-
-            } else {
-                // e1RM declining — deload
-                let deloadedE1RM = currentE1RM * 0.90
-                decision = .deload
-                tWeight = roundToIncrement(deloadedE1RM * percentageOfE1RM(forReps: targetMidRep), increment)
-                tRepsLow = repRange.lowerBound
-                tRepsHigh = min(repRange.lowerBound + 2, effectiveUpperBound)
-                reasoning = "Estimated 1RM has declined. Reducing load to rebuild."
-            }
+            return makeTarget(.deload, weight: currentE1RM * 0.90 * percentageOfE1RM(forReps: bottom),
+                low: bottom, high: min(bottom + 1, top),
+                reasoning: "You've trained \(weeks) weeks without a deload. Scheduled recovery week to prevent overtraining.")
+        }
+        if allowDeload, countConsecutiveBadSessions(recentSessions: recentSessions) >= 2 {
+            return makeTarget(.deload, weight: currentE1RM * 0.90 * percentageOfE1RM(forReps: bottom),
+                low: bottom, high: min(bottom + 1, top),
+                reasoning: "Performance has declined for multiple sessions. Deloading to allow recovery.")
         }
 
-        return ProgressionTarget(
-            exerciseId: exerciseId,
-            trainingMode: trainingMode,
-            targetWeight: tWeight,
-            targetRepsLow: tRepsLow,
-            targetRepsHigh: tRepsHigh,
-            targetRPE: targetRPE,
-            decision: decision,
-            reasoning: reasoning,
-            previousWeight: medWeight,
-            previousReps: medReps,
-            previousRPE: avgRPE,
-            estimatedOneRM: currentE1RM,
-            mesocycleRPEOffset: mesocycleOffset,
-            rpeFatigueDetected: rpeFatigueDetected,
-            e1rmConfidence: e1rmConfidence
-        )
+        // Baseline.
+        guard recentSessions.count >= 2 else {
+            let capped = min(topSetReps, top)
+            return makeTarget(.maintain, weight: topSetWeight, low: capped, high: capped,
+                reasoning: "First session tracked. Repeat to establish a baseline.")
+        }
+
+        // Single off-day: hold at proven top-set weight.
+        if offDay {
+            return makeTarget(.maintain, weight: bestRecentTopWeight, low: bottom, high: top,
+                reasoning: "Last session was below your recent bests. Holding at your proven top-set weight.")
+        }
+
+        // Weight jump sized from e1RM (valid at 3-5 reps), floored one increment
+        // above the top set so it can never round backward.
+        func bumpedWeight() -> Double {
+            increaseWeightTarget(
+                e1rmDerived: currentE1RM * percentageOfE1RM(forReps: bottom),
+                anchorWeight: topSetWeight, increment: increment, rpeBonusIncrements: 0
+            )
+        }
+
+        // Double progression on the top set.
+        if topSetReps >= top {
+            return makeTarget(.increaseWeight, weight: bumpedWeight(),
+                low: bottom, high: top,
+                reasoning: "You hit the top of the rep range on your top set. Adding weight and resetting reps.")
+        }
+        if topSetReps < bottom {
+            return makeTarget(.maintain, weight: topSetWeight, low: bottom, high: top,
+                reasoning: "Top set fell below the rep range. Holding weight to rebuild.")
+        }
+        if let rpe = topSetRPE, rpe <= targetRPE - 2 {
+            return makeTarget(.increaseWeight, weight: bumpedWeight(),
+                low: bottom, high: top,
+                reasoning: "You had 2+ reps in reserve on your top set. Adding weight early.")
+        }
+        return makeTarget(.increaseReps, weight: topSetWeight,
+            low: min(topSetReps + 1, top), high: top,
+            reasoning: "Strength is building. Add a rep on your top set before increasing weight.")
     }
 
     // MARK: - Bodyweight Progression
@@ -860,5 +915,29 @@ struct ProgressionService: Sendable {
     private func roundToIncrement(_ weight: Double, _ increment: Double) -> Double {
         guard increment > 0 else { return weight }
         return (weight / increment).rounded(.down) * increment
+    }
+
+    /// Computes a weight increase with a floor, an RPE bonus, and a clamp:
+    /// - Floor: an increase always moves the bar by at least one increment, so a
+    ///   deserved bump (e.g. hitting the rep cap) can't round back to the same
+    ///   weight (the old hypertrophy "sticky weight" bug).
+    /// - RPE bonus: `rpeBonusIncrements` extra increments when the set was easy.
+    /// - Clamp: caps the single-session jump (≥2 increments, or 5% of the anchor
+    ///   for heavier lifts) so a fluke high-rep set can't prescribe a huge jump.
+    private func increaseWeightTarget(
+        e1rmDerived: Double,
+        anchorWeight: Double,
+        increment: Double,
+        rpeBonusIncrements: Int
+    ) -> Double {
+        guard increment > 0, anchorWeight > 0 else {
+            return roundToIncrement(e1rmDerived, increment)
+        }
+        let base = roundToIncrement(e1rmDerived, increment)
+        let withBonus = base + Double(rpeBonusIncrements) * increment
+        let floor = anchorWeight + increment
+        let maxIncrease = max(2 * increment, roundToIncrement(anchorWeight * 0.05, increment))
+        let ceiling = anchorWeight + maxIncrease
+        return min(max(withBonus, floor), ceiling)
     }
 }
