@@ -169,7 +169,7 @@ Reference = the whole set (uses `minReps`, the *minimum* reps across working set
 1. **`weeksSinceDeload >= 7`** (allowDeload) → `.deload` at 90% of working weight.
 2. **2+ consecutive sessions with >10% weight drop** (allowDeload) → `.deload` at 90%.
 3. **<2 sessions** → `.maintain` (baseline).
-4. **Single off-day** (`workingWeight < 90%` of recent best) → `.maintain` at proven working weight.
+4. **Single off-day** — `workingWeight < 90%` of recent best **AND** sub-par (`minReps < bottom` OR hardest RPE `>= targetRPE + 1`) → `.maintain` at proven working weight. A lighter session with solid reps at reasonable effort is *not* an off-day; it falls through to normal progression from the actual weight (so a clean high-rep session at a lower load isn't yanked back up to an old best).
 5. **`minReps >= top`** (every set hit the top of the range, overshoot included) → **`.increaseWeight`** by one increment, target reps = `bottom` (reset).
 6. **`minReps < bottom`** (missed the floor) → `.maintain`, hold and rebuild, target reps = `bottom`.
 7. **RPE early-bump:** hardest set's RPE `<= targetRPE − 3` (**3+ RIR**) → **`.increaseWeight`** one increment, reset to `bottom`. Deliberately stricter than strength's 2-RIR bar — hypertrophy banks reps at a load unless there's a clear surplus. Only fires when RPE is logged; absent RPE → pure strict double progression.
@@ -180,7 +180,7 @@ Reference = the whole set (uses `minReps`, the *minimum* reps across working set
 Reference = the **top set** (heaviest working set), since ramped sets have different weights. e1RM *is* valid at 3–5 reps, so it sizes the weight jump. Range 3–5.
 
 1–3. Same deload/baseline nets as hypertrophy (deload weight is e1RM-derived: `currentE1RM × 0.90 × pctOfE1RM(bottom)`).
-4. **Single off-day** (`topSetWeight < 90%` of recent best) → `.maintain` at proven top-set weight.
+4. **Single off-day** — `topSetWeight < 90%` of recent best **AND** sub-par (`topSetReps < bottom` OR top-set RPE `>= targetRPE + 1`) → `.maintain` at proven top-set weight; otherwise falls through to normal progression from the actual weight.
 5. **`topSetReps >= top`** (top set hit 5) → **`.increaseWeight`** via `increaseWeightTarget` (e1RM-sized, floored one increment above the top set so a 5→3 reset jumps more than one increment), reset to `bottom`.
 6. **`topSetReps < bottom`** → `.maintain`, rebuild.
 7. **RPE early-bump:** top set's RPE `<= targetRPE − 2` (**2+ RIR**) → **`.increaseWeight`**.

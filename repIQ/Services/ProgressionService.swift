@@ -130,14 +130,18 @@ struct ProgressionService: Sendable {
                 reasoning: "First session tracked. Repeat to establish a baseline.")
         }
 
-        // Single off-day: last session's weight far below recent best → hold at
-        // proven capacity rather than progressing from a bad day.
+        // Single off-day: a lighter session that was ALSO genuinely sub-par — missed
+        // the range floor, or ground the hardest set to RPE >= target+1 — holds at
+        // proven capacity. A lighter session with solid reps at reasonable effort is
+        // NOT an off-day; it flows into normal progression from the actual weight, so
+        // a clean high-rep session at a lower load isn't yanked back up to an old best.
         let bestRecentWeight = recentSessions
             .flatMap { $0.filter { $0.setType == .working } }
             .map(\.weight).max() ?? workingWeight
-        if workingWeight < bestRecentWeight * 0.90 {
+        let subParSession = minReps < bottom || (hardestRPE ?? 0) >= targetRPE + 1
+        if workingWeight < bestRecentWeight * 0.90, subParSession {
             return makeTarget(.maintain, weight: bestRecentWeight, reps: bottom,
-                reasoning: "Last session was below your recent bests. Holding at your proven working weight.")
+                reasoning: "Last session was below your recent bests and effort was high. Holding at your proven working weight.")
         }
 
         // Strict trigger: every working set reached the top of the range. Because
@@ -251,10 +255,12 @@ struct ProgressionService: Sendable {
                 reasoning: "First session tracked. Repeat to establish a baseline.")
         }
 
-        // Single off-day: hold at proven top-set weight.
-        if offDay {
+        // Single off-day: only when the lighter session was ALSO sub-par (top set
+        // below the floor, or ground to RPE >= target+1). A lighter session with
+        // solid reps flows into normal progression from the actual top-set weight.
+        if offDay, topSetReps < bottom || (topSetRPE ?? 0) >= targetRPE + 1 {
             return makeTarget(.maintain, weight: bestRecentTopWeight, reps: bottom,
-                reasoning: "Last session was below your recent bests. Holding at your proven top-set weight.")
+                reasoning: "Last session was below your recent bests and effort was high. Holding at your proven top-set weight.")
         }
 
         // Weight jump sized from e1RM (valid at 3-5 reps), floored one increment
