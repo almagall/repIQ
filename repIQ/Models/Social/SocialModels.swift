@@ -806,6 +806,9 @@ struct MonthlyWrapped: Codable, Identifiable, Sendable, Hashable {
     var favoriteDay: String?
     var archetype: String?
     var viewedAt: Date?
+    /// Full display-ready Rep Sheet deck, stored in the `data` JSONB column.
+    /// Nil for legacy rows generated before the Rep Sheet redesign.
+    var content: RepSheetContent?
     let createdAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -828,6 +831,7 @@ struct MonthlyWrapped: Codable, Identifiable, Sendable, Hashable {
         case favoriteDay = "favorite_day"
         case archetype
         case viewedAt = "viewed_at"
+        case content = "data"
         case createdAt = "created_at"
     }
 }

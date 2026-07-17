@@ -145,12 +145,15 @@ struct DigestService: Sendable {
             .execute()
             .value
 
-        // 2) Sets — for volume, set count, top exercise, and per-session unique-exercise stats.
+        // 2) Sets — for volume, set count, top exercise, per-session unique
+        //    exercises, and (for Rep Sheet cards) per-lift e1RM, working
+        //    volume, and RPE/failure stats.
         struct SetRow: Decodable {
             let session_id: UUID
             let exercise_id: UUID
             let weight: Double
             let reps: Int
+            let rpe: Double?
             let set_type: String?
         }
         let sessionIds = sessions.map(\.id)
@@ -159,23 +162,32 @@ struct DigestService: Sendable {
         var exerciseVolumes: [UUID: Double] = [:]
         var workingSetsByExercise: [UUID: Int] = [:]
         var exercisesPerSession: [UUID: Set<UUID>] = [:]
+        var bestE1RMByExercise: [UUID: Double] = [:]
+        var workingVolumeByExercise: [UUID: Double] = [:]
+        var rpeValues: [Double] = []
+        var failureSets = 0
 
         if !sessionIds.isEmpty {
             let sets: [SetRow] = try await supabase.from("workout_sets")
-                .select("session_id, exercise_id, weight, reps, set_type")
+                .select("session_id, exercise_id, weight, reps, rpe, set_type")
                 .in("session_id", values: sessionIds.map(\.uuidString))
                 .execute()
                 .value
 
             for s in sets {
-                let isWorking = (s.set_type ?? "working") == "working"
+                let kind = s.set_type ?? "working"
                 let vol = s.weight * Double(s.reps)
                 totalVolume += vol
                 exerciseVolumes[s.exercise_id, default: 0] += vol
                 exercisesPerSession[s.session_id, default: []].insert(s.exercise_id)
-                if isWorking {
+                if kind == "failure" { failureSets += 1 }
+                if kind == "working" {
                     totalSets += 1
                     workingSetsByExercise[s.exercise_id, default: 0] += 1
+                    workingVolumeByExercise[s.exercise_id, default: 0] += vol
+                    let e = s.reps > 0 ? s.weight * (1 + Double(s.reps) / 30) : s.weight
+                    if e > (bestE1RMByExercise[s.exercise_id] ?? 0) { bestE1RMByExercise[s.exercise_id] = e }
+                    if let r = s.rpe { rpeValues.append(r) }
                 }
             }
         }
@@ -216,10 +228,12 @@ struct DigestService: Sendable {
             let value: Double
             let record_type: String
             let reps_at_weight: Int?
+            let exercise_id: UUID
+            let achieved_at: String?
             let exercises: ExName?
         }
         let prs: [PRJoinRow] = try await supabase.from("personal_records")
-            .select("value, record_type, reps_at_weight, exercises(name)")
+            .select("value, record_type, reps_at_weight, exercise_id, achieved_at, exercises(name)")
             .eq("user_id", value: userId.uuidString)
             .gte("achieved_at", value: monthStartStr)
             .lt("achieved_at", value: monthEndStr)
@@ -272,6 +286,240 @@ struct DigestService: Sendable {
             avgUniqueExercisesPerSession: avgUniqueExercises
         ))
 
+        // ===== Rep Sheet deck content (persisted to `monthly_wrapped.data`) =====
+        struct IDRow: Decodable { let id: UUID }
+        var content = RepSheetContent(order: [])
+        content.cover = .init(totalSessions: sessions.count, totalPRs: prs.count, totalVolume: totalVolume)
+
+        // Sessions each exercise appeared in, this month.
+        var sessionsPerExercise: [UUID: Int] = [:]
+        for (_, exs) in exercisesPerSession { for ex in exs { sessionsPerExercise[ex, default: 0] += 1 } }
+
+        // Prior-month baseline: best working-set e1RM per exercise.
+        let priorMonthAnchor = calendar.date(byAdding: .month, value: -1, to: monthStart)!
+        let priorRangeStart = calendar.date(from: calendar.dateComponents([.year, .month], from: priorMonthAnchor))!
+        var bestE1RMPrior: [UUID: Double] = [:]
+        if let priorSessions: [IDRow] = try? await supabase.from("workout_sessions")
+            .select("id")
+            .eq("user_id", value: userId.uuidString)
+            .eq("status", value: "completed")
+            .gte("completed_at", value: ISO8601DateFormatter().string(from: priorRangeStart))
+            .lt("completed_at", value: monthStartStr)
+            .execute().value,
+           !priorSessions.isEmpty {
+            struct PSet: Decodable { let exercise_id: UUID; let weight: Double; let reps: Int; let set_type: String? }
+            if let priorSets: [PSet] = try? await supabase.from("workout_sets")
+                .select("exercise_id, weight, reps, set_type")
+                .in("session_id", values: priorSessions.map(\.id.uuidString))
+                .execute().value {
+                for s in priorSets where (s.set_type ?? "working") == "working" {
+                    let e = s.reps > 0 ? s.weight * (1 + Double(s.reps) / 30) : s.weight
+                    if e > (bestE1RMPrior[s.exercise_id] ?? 0) { bestE1RMPrior[s.exercise_id] = e }
+                }
+            }
+        }
+
+        // Strength gained / biggest mover — lifts trained 2+ sessions with a baseline.
+        struct Mover { let name: String; let from: Double; let to: Double; var delta: Double { to - from }; var pct: Double { from > 0 ? (to - from) / from * 100 : 0 } }
+        var movers: [Mover] = []
+        for (ex, best) in bestE1RMByExercise {
+            guard (sessionsPerExercise[ex] ?? 0) >= 2, let prior = bestE1RMPrior[ex], prior > 0,
+                  let name = exerciseLookup[ex]?.name else { continue }
+            movers.append(Mover(name: name, from: prior, to: best))
+        }
+        let gainers = movers.filter { $0.delta > 0 }.sorted { $0.delta > $1.delta }
+        if movers.count >= 2, !gainers.isEmpty {
+            content.strengthGained = .init(
+                totalGainLbs: gainers.reduce(0) { $0 + $1.delta },
+                liftCount: gainers.count,
+                topLifts: gainers.prefix(3).map { .init(exerciseName: $0.name, deltaLbs: $0.delta) }
+            )
+            if let top = gainers.max(by: { $0.pct < $1.pct }) {
+                content.biggestMover = .init(exerciseName: top.name, percentGain: top.pct, fromE1RM: top.from, toE1RM: top.to)
+            }
+        }
+
+        // Breakthrough — biggest weight/e1RM PR + the prior best it beat.
+        if let big = weightPRs.max(by: { $0.value < $1.value }), let name = big.exercises?.name {
+            var priorBest: Double?
+            var stuckWeeks: Int?
+            struct PriorPR: Decodable { let value: Double; let achieved_at: String? }
+            if let rows: [PriorPR] = try? await supabase.from("personal_records")
+                .select("value, achieved_at")
+                .eq("user_id", value: userId.uuidString)
+                .eq("exercise_id", value: big.exercise_id.uuidString)
+                .lt("achieved_at", value: monthStartStr)
+                .order("value", ascending: false)
+                .limit(1)
+                .execute().value,
+               let p = rows.first {
+                priorBest = p.value
+                if let pd = p.achieved_at.flatMap(parseTimestamp), let cd = big.achieved_at.flatMap(parseTimestamp) {
+                    stuckWeeks = max(0, (calendar.dateComponents([.day], from: pd, to: cd).day ?? 0) / 7)
+                }
+            }
+            content.breakthrough = .init(
+                exerciseName: name, weight: big.value, reps: big.reps_at_weight ?? 0,
+                recordType: big.record_type,
+                achievedAtDisplay: big.achieved_at.flatMap(parseTimestamp).map(formatPRDate) ?? "",
+                priorBest: priorBest, stuckWeeks: stuckWeeks
+            )
+        }
+
+        // PR wall.
+        if prs.count >= 2 {
+            content.prWall = .init(
+                count: prs.count,
+                weightPRs: prs.filter { $0.record_type == "weight" || $0.record_type == "estimated_1rm" }.count,
+                repPRs: prs.filter { $0.record_type == "reps" }.count,
+                entries: prs.sorted { $0.value > $1.value }.prefix(5).compactMap { row -> RepSheetContent.PREntry? in
+                    guard let n = row.exercises?.name else { return nil }
+                    return RepSheetContent.PREntry(exerciseName: n, value: row.value, recordType: row.record_type, repsAtWeight: row.reps_at_weight)
+                }
+            )
+        }
+
+        // All-time rank + month-over-month (need prior wrapped rows).
+        let history = (try? await fetchWrappedHistory(userId: userId, limit: 12)) ?? []
+        let priorRows = history.filter { $0.monthStart < monthStart }
+        if !priorRows.isEmpty {
+            let chrono = priorRows.sorted { $0.monthStart < $1.monthStart }.map(\.totalVolume) + [totalVolume]
+            let priorVolumes = priorRows.map(\.totalVolume)
+            content.allTimeRank = .init(
+                rank: priorVolumes.filter { $0 > totalVolume }.count + 1,
+                totalMonths: priorRows.count + 1,
+                thisValue: totalVolume,
+                previousBest: priorVolumes.max() ?? 0,
+                monthlyValues: Array(chrono.suffix(7))
+            )
+        }
+        if let priorMonthRow = history.first(where: { calendar.isDate($0.monthStart, equalTo: priorRangeStart, toGranularity: .month) }) {
+            let volDelta = priorMonthRow.totalVolume > 0 ? (totalVolume - priorMonthRow.totalVolume) / priorMonthRow.totalVolume * 100 : nil
+            let e1rmDelta = movers.isEmpty ? nil : movers.map(\.pct).reduce(0, +) / Double(movers.count)
+            content.monthOverMonth = .init(
+                priorMonthLabel: monthName(priorRangeStart),
+                thisVolume: totalVolume, priorVolume: priorMonthRow.totalVolume,
+                volumeDeltaPct: volDelta, sessionsDelta: sessions.count - priorMonthRow.totalSessions,
+                e1rmDeltaPct: e1rmDelta
+            )
+        }
+
+        // Consistency heatmap.
+        if sessions.count >= 4 {
+            let daysInMonth = calendar.range(of: .day, in: .month, for: monthStart)?.count ?? 30
+            let trainedDayNums = Set(sessionDates.map { calendar.component(.day, from: $0) }).sorted()
+            let prDayNums = Set(prs.compactMap { $0.achieved_at.flatMap(parseTimestamp).map { calendar.component(.day, from: $0) } }).sorted()
+            var weekCounts: [Int: Int] = [:]
+            for d in sessionDates { weekCounts[calendar.component(.weekOfMonth, from: d), default: 0] += 1 }
+            content.consistency = .init(
+                trainedDays: trainedDayNums.count,
+                restDays: max(0, daysInMonth - trainedDayNums.count),
+                bestWeekSessions: weekCounts.values.max() ?? 0,
+                daysInMonth: daysInMonth,
+                trainedDayNumbers: trainedDayNums,
+                prDayNumbers: prDayNums
+            )
+        }
+
+        // Relative strength (needs a logged bodyweight).
+        if let kg = try? await fetchBodyWeightKg(userId: userId), kg > 0 {
+            let bwLbs = kg * 2.20462
+            let lifts = bestE1RMByExercise.sorted { $0.value > $1.value }.prefix(4).compactMap { pair -> RepSheetContent.LiftRatio? in
+                guard let n = exerciseLookup[pair.key]?.name else { return nil }
+                return RepSheetContent.LiftRatio(exerciseName: n, ratio: pair.value / bwLbs)
+            }
+            if !lifts.isEmpty {
+                content.relativeStrength = .init(bodyweightLbs: bwLbs, lifts: Array(lifts))
+            }
+        }
+
+        // Muscle balance (push vs pull working volume).
+        var workingVolumeByMuscle: [String: Double] = [:]
+        for (ex, vol) in workingVolumeByExercise {
+            guard let m = exerciseLookup[ex]?.muscle_group else { continue }
+            workingVolumeByMuscle[m, default: 0] += vol
+        }
+        let pushVol = workingVolumeByMuscle.filter { Self.pushMuscles.contains($0.key) }.values.reduce(0, +)
+        let pullVol = workingVolumeByMuscle.filter { Self.pullMuscles.contains($0.key) }.values.reduce(0, +)
+        if sessions.count >= 4, pushVol > 0, pullVol > 0 {
+            let hi = max(pushVol, pullVol), lo = min(pushVol, pullVol)
+            content.muscleBalance = .init(
+                pushVolume: pushVol, pullVolume: pullVol,
+                ratio: lo > 0 ? hi / lo : 1, pushDominant: pushVol >= pullVol,
+                topMuscle: workingSetsByMuscle.max(by: { $0.value < $1.value })?.key,
+                bottomMuscle: workingSetsByMuscle.min(by: { $0.value < $1.value })?.key
+            )
+        }
+
+        // When you train.
+        if sessions.count >= 4 {
+            let hours = sessionDates.map { calendar.component(.hour, from: $0) }
+            if !hours.isEmpty {
+                var windowCounts: [String: Int] = [:]
+                var hourCounts: [Int: Int] = [:]
+                for h in hours {
+                    windowCounts[trainingWindow(hour: h), default: 0] += 1
+                    hourCounts[h, default: 0] += 1
+                }
+                if let win = windowCounts.max(by: { $0.value < $1.value }) {
+                    content.whenYouTrain = .init(
+                        window: win.key,
+                        windowPct: Double(win.value) / Double(hours.count) * 100,
+                        mostCommonHour: hourCounts.max(by: { $0.value < $1.value })?.key ?? 0
+                    )
+                }
+            }
+        }
+
+        // Style.
+        if sessions.count >= 3 {
+            content.style = .init(
+                archetype: archetype.rawValue,
+                avgRPE: rpeValues.isEmpty ? nil : rpeValues.reduce(0, +) / Double(rpeValues.count),
+                hardestRPE: rpeValues.max(),
+                failureSets: failureSets
+            )
+        }
+
+        // Next month coaching (always present).
+        let sparse = sessions.count < 4
+        var tips: [String] = []
+        if sparse {
+            tips.append("Lock in a repeatable weekly schedule — pick your training days and protect them.")
+        }
+        if let mb = content.muscleBalance, mb.ratio >= 1.5 {
+            tips.append("Add \(mb.pushDominant ? "a pull" : "a push") day — one side is over \(String(format: "%.1f", mb.ratio))× the other.")
+        }
+        if let stalled = movers.filter({ $0.delta <= 0 }).min(by: { $0.pct < $1.pct }) {
+            tips.append("Push \(stalled.name) past its plateau — a small deload then rebuild often unsticks it.")
+        }
+        if totalSets > 0, Double(rpeValues.count) / Double(totalSets) < 0.5 {
+            tips.append("Log RPE on every working set — it sharpens next month's progression targets.")
+        }
+        if !sparse, sessions.count < 8 {
+            tips.append("Aim for one more session a week — consistency compounds faster than intensity.")
+        }
+        if tips.isEmpty {
+            tips.append("Keep the momentum — progress a lift you already train well and bank another PR.")
+        }
+        content.nextMonth = .init(tips: Array(tips.prefix(3)), tone: sparse ? "build" : "optimize")
+
+        // Notability-ranked selection: cover first, nextMonth last, top middle up to 8.
+        var scored: [(RepSheetCardID, Double)] = []
+        if let s = content.strengthGained { scored.append((.strengthGained, s.totalGainLbs)) }
+        if let m = content.biggestMover { scored.append((.biggestMover, m.percentGain)) }
+        if content.breakthrough != nil { scored.append((.breakthrough, 120)) }
+        if let w = content.prWall { scored.append((.prWall, Double(w.count) * 25)) }
+        if let r = content.allTimeRank { scored.append((.allTimeRank, r.rank == 1 ? 100 : Double(r.totalMonths - r.rank) / Double(max(r.totalMonths, 1)) * 60)) }
+        if let c = content.consistency { scored.append((.consistency, Double(c.trainedDays) * 4)) }
+        if let rs = content.relativeStrength { scored.append((.relativeStrength, (rs.lifts.first?.ratio ?? 0) * 25)) }
+        if let mb = content.muscleBalance { scored.append((.muscleBalance, (mb.ratio - 1) * 35)) }
+        if let mom = content.monthOverMonth { scored.append((.monthOverMonth, abs(mom.volumeDeltaPct ?? 0))) }
+        if content.whenYouTrain != nil { scored.append((.whenYouTrain, 12)) }
+        if content.style != nil { scored.append((.style, 18)) }
+        let middle = scored.sorted { $0.1 > $1.1 }.prefix(8).map { $0.0 }
+        content.order = [.cover] + middle + [.nextMonth]
+
         struct InsertPayload: Encodable {
             let user_id: String
             let month_start: String
@@ -289,6 +537,7 @@ struct DigestService: Sendable {
             let longest_streak: Int
             let favorite_day: String?
             let archetype: String
+            let data: RepSheetContent?
         }
 
         let result: MonthlyWrapped = try await supabase.from("monthly_wrapped")
@@ -308,7 +557,8 @@ struct DigestService: Sendable {
                 avg_session_duration: avgDuration,
                 longest_streak: longestStreak,
                 favorite_day: favoriteDay,
-                archetype: archetype.rawValue
+                archetype: archetype.rawValue,
+                data: content
             ))
             .select()
             .single()
@@ -626,5 +876,44 @@ struct DigestService: Sendable {
             }
         }
         return longest
+    }
+
+    // MARK: - Rep Sheet helpers
+
+    private static let pushMuscles: Set<String> = ["chest", "shoulders", "triceps"]
+    private static let pullMuscles: Set<String> = ["back", "biceps", "forearms"]
+
+    private func trainingWindow(hour: Int) -> String {
+        switch hour {
+        case 5..<11: return "early"
+        case 11..<15: return "midday"
+        case 15..<21: return "evening"
+        default: return "night"
+        }
+    }
+
+    private func monthName(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "MMMM"
+        return f.string(from: date)
+    }
+
+    private func formatPRDate(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "MMM d, h:mma"
+        return f.string(from: date)
+            .replacingOccurrences(of: "AM", with: "am")
+            .replacingOccurrences(of: "PM", with: "pm")
+    }
+
+    private func fetchBodyWeightKg(userId: UUID) async throws -> Double? {
+        struct Row: Decodable { let body_weight_kg: Double? }
+        let rows: [Row] = try await supabase.from("profiles")
+            .select("body_weight_kg")
+            .eq("id", value: userId.uuidString)
+            .limit(1)
+            .execute()
+            .value
+        return rows.first?.body_weight_kg
     }
 }
