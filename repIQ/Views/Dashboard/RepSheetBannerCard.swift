@@ -1,10 +1,10 @@
 import SwiftUI
 
 /// Dashboard banner that appears on the 1st–14th of a new month when the
-/// prior month's Wrapped is ready and unviewed. Tapping deep-links into the
+/// prior month's Rep Sheet is ready and unviewed. Tapping deep-links into the
 /// Spotify-style story flow.
-struct WrappedBannerCard: View {
-    let wrapped: MonthlyWrapped
+struct RepSheetBannerCard: View {
+    let wrapped: RepSheet
     var onTap: () -> Void
 
     var body: some View {
@@ -30,7 +30,7 @@ struct WrappedBannerCard: View {
                     }
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("YOUR \(monthLabel(wrapped.monthStart).uppercased()) WRAPPED")
+                        Text("YOUR \(monthLabel(wrapped.monthStart).uppercased()) REP SHEET")
                             .font(.system(size: 10, weight: .heavy, design: .rounded))
                             .tracking(1.5)
                             .foregroundStyle(RQColors.accent)

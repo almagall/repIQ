@@ -10,7 +10,7 @@ struct DashboardView: View {
     @State private var showNewTemplateOptions = false
     @State private var showCalendarView = false
     @State private var calendarMonth = Date()
-    @State private var showMonthlyWrapped = false
+    @State private var showRepSheet = false
     @AppStorage("hasSeenWelcomeCard") private var hasSeenWelcomeCard = false
 
     @Environment(WorkoutCoordinator.self) private var workoutCoordinator
@@ -26,8 +26,8 @@ struct DashboardView: View {
 
                     // Monthly Wrapped banner (1st–14th of month, prior month ready & unviewed)
                     if viewModel.shouldShowWrappedBanner, let wrapped = viewModel.priorMonthWrapped {
-                        WrappedBannerCard(wrapped: wrapped) {
-                            showMonthlyWrapped = true
+                        RepSheetBannerCard(wrapped: wrapped) {
+                            showRepSheet = true
                         }
                     }
 
@@ -201,8 +201,8 @@ struct DashboardView: View {
                     Task { await templateListViewModel.loadTemplates() }
                 })
             }
-            .navigationDestination(isPresented: $showMonthlyWrapped) {
-                MonthlyWrappedView()
+            .navigationDestination(isPresented: $showRepSheet) {
+                RepSheetView()
                     .onDisappear {
                         // Banner clears once viewed_at is persisted server-side; refresh
                         // the dashboard state so it disappears immediately on return.

@@ -94,9 +94,9 @@ final class NotificationService {
     /// Fires on the 1st of every month at 9 AM local, inviting the user to
     /// view the prior month's Wrapped. Repeats; safe to re-call (replaces
     /// the existing pending request with the same identifier).
-    func scheduleMonthlyWrappedReminder() {
+    func scheduleRepSheetReminder() {
         let content = UNMutableNotificationContent()
-        content.title = "Your Wrapped is ready"
+        content.title = "Your Rep Sheet is ready"
         content.body = "Last month's training, distilled. Tap to see your archetype."
         content.sound = .default
         content.categoryIdentifier = "MONTHLY_WRAPPED"
@@ -116,7 +116,7 @@ final class NotificationService {
         UNUserNotificationCenter.current().add(request)
     }
 
-    func cancelMonthlyWrappedReminder() {
+    func cancelRepSheetReminder() {
         UNUserNotificationCenter.current().removePendingNotificationRequests(
             withIdentifiers: ["monthly-wrapped"]
         )

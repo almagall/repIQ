@@ -15,7 +15,7 @@ final class DashboardViewModel {
     var templates: [Template] = []
     /// The prior month's wrapped, if it's been generated and not yet viewed.
     /// Drives the dashboard banner that appears on the 1st–14th of a new month.
-    var priorMonthWrapped: MonthlyWrapped?
+    var priorMonthWrapped: RepSheet?
 
     private let workoutService = WorkoutService()
     private let templateService = TemplateService()
@@ -101,11 +101,11 @@ final class DashboardViewModel {
             // into the wrapped flow themselves rather than running the heavy
             // aggregation on a cold dashboard load.
             if (1...7).contains(day) {
-                priorMonthWrapped = try await digestService.generateMonthlyWrapped(userId: userId)
+                priorMonthWrapped = try await digestService.generateRepSheet(userId: userId)
             }
         } catch {
             // Banner is non-critical; failing silently is fine here, the user
-            // can still navigate to MonthlyWrappedView directly which surfaces
+            // can still navigate to RepSheetView directly which surfaces
             // any error in its own UI.
         }
     }

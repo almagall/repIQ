@@ -116,7 +116,7 @@ struct DigestService: Sendable {
     /// Generates a Spotify-style monthly training report card for the *prior*
     /// calendar month. Idempotent via the unique (user_id, month_start)
     /// constraint — calling this multiple times returns the existing row.
-    func generateMonthlyWrapped(userId: UUID) async throws -> MonthlyWrapped {
+    func generateRepSheet(userId: UUID) async throws -> RepSheet {
         let calendar = Calendar.current
         let now = Date()
         // Prior month boundaries: monthStart = 1st of last month, monthEnd = 1st of current month.
@@ -540,7 +540,7 @@ struct DigestService: Sendable {
             let data: RepSheetContent?
         }
 
-        let result: MonthlyWrapped = try await supabase.from("monthly_wrapped")
+        let result: RepSheet = try await supabase.from("monthly_wrapped")
             .insert(InsertPayload(
                 user_id: userId.uuidString,
                 month_start: formatDate(monthStart),
@@ -575,8 +575,8 @@ struct DigestService: Sendable {
     /// are computed client-side from the two wrapped rows + the freshly
     /// queried per-month aggregations.
     struct ReportPayload: Sendable {
-        let current: MonthlyWrapped
-        let prior: MonthlyWrapped?
+        let current: RepSheet
+        let prior: RepSheet?
         let topLifts: [TopLift]
         let muscleGroupVolume: [(muscle: String, volume: Double)]
         let trainedDates: Set<Date>
@@ -599,7 +599,7 @@ struct DigestService: Sendable {
     /// Fetches the report payload for a wrapped row. Cheap-ish: 4 queries,
     /// all scoped to the month. Safe to call from a `.task` on the report
     /// view's `onAppear`.
-    func fetchReportPayload(for wrapped: MonthlyWrapped) async throws -> ReportPayload {
+    func fetchReportPayload(for wrapped: RepSheet) async throws -> ReportPayload {
         let calendar = Calendar.current
         let monthStart = wrapped.monthStart
         let monthEnd = calendar.date(from: calendar.dateComponents(
@@ -784,15 +784,15 @@ struct DigestService: Sendable {
     /// Returns the prior-month wrapped row if it already exists (without
     /// generating one). Used by the dashboard banner to know whether to show
     /// the "Your X Wrapped is ready" CTA.
-    func fetchPriorMonthWrapped(userId: UUID) async throws -> MonthlyWrapped? {
+    func fetchPriorMonthWrapped(userId: UUID) async throws -> RepSheet? {
         let calendar = Calendar.current
         let now = Date()
         let monthStart = calendar.date(from: calendar.dateComponents([.year, .month], from: calendar.date(byAdding: .month, value: -1, to: now)!))!
         return try await fetchExistingWrapped(userId: userId, monthStart: monthStart)
     }
 
-    private func fetchExistingWrapped(userId: UUID, monthStart: Date) async throws -> MonthlyWrapped? {
-        let existing: [MonthlyWrapped] = try await supabase.from("monthly_wrapped")
+    private func fetchExistingWrapped(userId: UUID, monthStart: Date) async throws -> RepSheet? {
+        let existing: [RepSheet] = try await supabase.from("monthly_wrapped")
             .select()
             .eq("user_id", value: userId.uuidString)
             .eq("month_start", value: formatDate(monthStart))
@@ -803,7 +803,7 @@ struct DigestService: Sendable {
     }
 
     /// Fetches past wrapped reports.
-    func fetchWrappedHistory(userId: UUID, limit: Int = 12) async throws -> [MonthlyWrapped] {
+    func fetchWrappedHistory(userId: UUID, limit: Int = 12) async throws -> [RepSheet] {
         try await supabase.from("monthly_wrapped")
             .select()
             .eq("user_id", value: userId.uuidString)

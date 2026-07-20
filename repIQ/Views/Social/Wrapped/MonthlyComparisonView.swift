@@ -15,8 +15,8 @@ import Charts
 /// - Archetype cards sit side by side at the top so the comparison
 ///   reveals the personality difference first
 struct MonthlyComparisonView: View {
-    let primary: MonthlyWrapped
-    let secondary: MonthlyWrapped
+    let primary: RepSheet
+    let secondary: RepSheet
 
     @State private var primaryPayload: DigestService.ReportPayload?
     @State private var secondaryPayload: DigestService.ReportPayload?
@@ -93,7 +93,7 @@ struct MonthlyComparisonView: View {
 
     // MARK: - Header
 
-    private func monthHeader(primary: MonthlyWrapped, secondary: MonthlyWrapped) -> some View {
+    private func monthHeader(primary: RepSheet, secondary: RepSheet) -> some View {
         HStack(spacing: RQSpacing.md) {
             monthHeaderCell(date: primary.monthStart, alignment: .leading)
             Image(systemName: "arrow.left.arrow.right")

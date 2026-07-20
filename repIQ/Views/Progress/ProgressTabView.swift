@@ -140,7 +140,7 @@ struct ProgressTabView: View {
                 }
             }
             .navigationDestination(isPresented: $showMonthlyReport) {
-                MonthlyWrappedView()
+                RepSheetView()
             }
             .navigationDestination(for: UUID.self) { sessionId in
                 SessionDetailView(viewModel: viewModel, sessionId: sessionId)

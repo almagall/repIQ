@@ -784,8 +784,8 @@ struct DigestHighlight: Codable, Sendable {
 
 // MARK: - Monthly Wrapped
 
-struct MonthlyWrapped: Codable, Identifiable, Sendable, Hashable {
-    static func == (lhs: MonthlyWrapped, rhs: MonthlyWrapped) -> Bool { lhs.id == rhs.id }
+struct RepSheet: Codable, Identifiable, Sendable, Hashable {
+    static func == (lhs: RepSheet, rhs: RepSheet) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
     let id: UUID
     let userId: UUID

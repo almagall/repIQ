@@ -18,13 +18,13 @@ import Supabase
 /// 6. Personal records — full list of PRs achieved in the month
 /// 7. Archetype rationale — short explanation of why this archetype was picked
 struct MonthlyReportView: View {
-    let wrapped: MonthlyWrapped
+    let wrapped: RepSheet
 
     @State private var payload: DigestService.ReportPayload?
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showComparePicker = false
-    @State private var compareTarget: MonthlyWrapped?
+    @State private var compareTarget: RepSheet?
 
     private let service = DigestService()
 
@@ -621,9 +621,9 @@ struct MonthlyReportView: View {
 /// month they're already viewing.
 private struct ComparePickerSheet: View {
     let currentWrappedId: UUID
-    var onSelect: (MonthlyWrapped) -> Void
+    var onSelect: (RepSheet) -> Void
 
-    @State private var options: [MonthlyWrapped] = []
+    @State private var options: [RepSheet] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
 
@@ -670,7 +670,7 @@ private struct ComparePickerSheet: View {
         .preferredColorScheme(.dark)
     }
 
-    private func rowFor(_ option: MonthlyWrapped) -> some View {
+    private func rowFor(_ option: RepSheet) -> some View {
         RQCard {
             HStack(spacing: RQSpacing.md) {
                 VStack(alignment: .leading, spacing: 4) {

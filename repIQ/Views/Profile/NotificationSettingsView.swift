@@ -35,7 +35,7 @@ struct NotificationSettingsView: View {
                                     // user hasn't explicitly turned it off — this is the
                                     // only way most users will discover the feature.
                                     if notificationsEnabled, monthlyWrappedRemindersEnabled {
-                                        notificationService.scheduleMonthlyWrappedReminder()
+                                        notificationService.scheduleRepSheetReminder()
                                     }
                                 }
                             } else {
@@ -120,14 +120,14 @@ struct NotificationSettingsView: View {
                     }
 
 
-                    // Monthly Wrapped Reminders
+                    // Monthly Rep Sheet Reminders
                     RQCard {
                         Toggle(isOn: $monthlyWrappedRemindersEnabled) {
                             VStack(alignment: .leading, spacing: RQSpacing.xxs) {
-                                Text("Monthly Wrapped")
+                                Text("Monthly Rep Sheet")
                                     .font(RQTypography.headline)
                                     .foregroundColor(RQColors.textPrimary)
-                                Text("Get notified on the 1st of each month when your Wrapped is ready")
+                                Text("Get notified on the 1st of each month when your Rep Sheet is ready")
                                     .font(RQTypography.caption)
                                     .foregroundColor(RQColors.textTertiary)
                             }
@@ -135,9 +135,9 @@ struct NotificationSettingsView: View {
                         .tint(RQColors.accent)
                         .onChange(of: monthlyWrappedRemindersEnabled) { _, enabled in
                             if enabled {
-                                notificationService.scheduleMonthlyWrappedReminder()
+                                notificationService.scheduleRepSheetReminder()
                             } else {
-                                notificationService.cancelMonthlyWrappedReminder()
+                                notificationService.cancelRepSheetReminder()
                             }
                         }
                     }

@@ -2,12 +2,12 @@ import SwiftUI
 import Supabase
 
 /// Entry point for the monthly wrapped flow. Generates (idempotently) the
-/// prior month's wrapped on appear, then hands off to `WrappedStoryView` for
+/// prior month's wrapped on appear, then hands off to `RepSheetDeckView` for
 /// the Spotify-style story presentation. Past months are accessible via a
 /// sheet from the archetype (closing) slide.
-struct MonthlyWrappedView: View {
-    @State private var wrapped: MonthlyWrapped?
-    @State private var pastWrapped: [MonthlyWrapped] = []
+struct RepSheetView: View {
+    @State private var wrapped: RepSheet?
+    @State private var pastWrapped: [RepSheet] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showHistorySheet = false
@@ -23,7 +23,7 @@ struct MonthlyWrappedView: View {
                 ProgressView()
                     .tint(RQColors.accent)
             } else if let wrapped {
-                WrappedStoryView(
+                RepSheetDeckView(
                     wrapped: wrapped,
                     onShare: { share(wrapped: wrapped) },
                     onViewHistory: { showHistorySheet = true },
@@ -41,7 +41,7 @@ struct MonthlyWrappedView: View {
         .preferredColorScheme(.dark)
         .task { await load() }
         .sheet(isPresented: $showHistorySheet) {
-            WrappedHistorySheet(
+            RepSheetHistorySheet(
                 pastWrapped: pastWrapped,
                 onSelect: { selected in
                     showHistorySheet = false
@@ -63,7 +63,7 @@ struct MonthlyWrappedView: View {
                 .font(.system(size: 40))
                 .foregroundStyle(.white.opacity(0.3))
             if let errorMessage {
-                Text("Couldn't load your Wrapped")
+                Text("Couldn't load your Rep Sheet")
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(.white)
                 Text(errorMessage)
@@ -77,10 +77,10 @@ struct MonthlyWrappedView: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(RQColors.accent)
             } else {
-                Text("No Wrapped yet")
+                Text("No Rep Sheet yet")
                     .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(.white)
-                Text("Train this month and your Wrapped will be ready on the 1st of next month.")
+                Text("Train this month and your Rep Sheet will be ready on the 1st of next month.")
                     .font(.system(size: 13))
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.white.opacity(0.55))
@@ -100,7 +100,7 @@ struct MonthlyWrappedView: View {
         isLoading = true
         errorMessage = nil
         do {
-            let current = try await service.generateMonthlyWrapped(userId: userId)
+            let current = try await service.generateRepSheet(userId: userId)
             let history = try await service.fetchWrappedHistory(userId: userId)
             wrapped = current
             pastWrapped = history.filter { $0.id != current.id }
@@ -117,12 +117,12 @@ struct MonthlyWrappedView: View {
     // MARK: - Sharing
 
     @MainActor
-    private func share(wrapped: MonthlyWrapped) {
+    private func share(wrapped: RepSheet) {
         // Render the share card to a 1080x1920 PNG (Instagram Story 9:16).
         // proposedSize already specifies the final pixel dimensions, so scale
         // is 1.0 — multiplying further produces a ~75MP image that hangs the
         // main thread and leaves the story flow in a black, unresponsive state.
-        let card = WrappedShareCard(wrapped: wrapped)
+        let card = RepSheetShareCard(wrapped: wrapped)
         let renderer = ImageRenderer(content: card)
         renderer.scale = 1.0
         renderer.proposedSize = .init(width: 1080, height: 1920)
@@ -158,9 +158,9 @@ struct MonthlyWrappedView: View {
 
 // MARK: - History sheet
 
-private struct WrappedHistorySheet: View {
-    let pastWrapped: [MonthlyWrapped]
-    var onSelect: (MonthlyWrapped) -> Void
+private struct RepSheetHistorySheet: View {
+    let pastWrapped: [RepSheet]
+    var onSelect: (RepSheet) -> Void
 
     var body: some View {
         NavigationStack {
@@ -216,8 +216,8 @@ private struct WrappedHistorySheet: View {
 
 // MARK: - Share card (rendered to a 9:16 PNG)
 
-private struct WrappedShareCard: View {
-    let wrapped: MonthlyWrapped
+private struct RepSheetShareCard: View {
+    let wrapped: RepSheet
 
     var body: some View {
         VStack(spacing: 24) {
@@ -228,7 +228,7 @@ private struct WrappedShareCard: View {
                     .font(.system(size: 22, weight: .heavy, design: .monospaced))
                     .tracking(6)
                     .foregroundStyle(RQColors.accent)
-                Text("YOUR WRAPPED")
+                Text("YOUR REP SHEET")
                     .font(.system(size: 56, weight: .heavy, design: .monospaced))
                     .tracking(2)
                     .foregroundStyle(RQColors.textPrimary)
