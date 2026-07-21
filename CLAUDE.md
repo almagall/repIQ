@@ -439,7 +439,7 @@ The `expandedBinding` in `MainTabView` is custom: its `set` calls `coordinator.m
 
 ## Removed for v1 (deferred, not deleted from history)
 
-The following were stripped to focus the first release on core tracking. The client code was deleted; the Supabase tables/migrations remain but are idle. Bringing any of these back is a future-release effort — check git history on branch `strip-social-v1` for the removal diffs.
+The following were stripped to focus the first release on core tracking. The client code was deleted; the Supabase tables/migrations remain but are idle. Bringing any of these back is a future-release effort — check `main`'s git history (the v1 scope-down commits) for the removal diffs.
 
 - **Social tab** and everything under it: feed, friends, friend profiles, gym hub, leagues, promotion race, challenges, achievements, badges, clubs, matchmaking, social profile, add-friends, weekly digest.
 - **Gamification:** IQ points, badges, league tiers, milestone/achievement catalogs (the `MilestoneCatalog`/`AchievementCatalog` data files still exist but are not rendered anywhere).
@@ -501,7 +501,7 @@ xcodebuild -project repIQ.xcodeproj -scheme repIQ \
 - Critical alerts for rest-end (breakthrough DND)
 - Siri shortcuts donation ("Hey Siri, log 135 by 8") — App Intents already exist; just need shortcut donation + phrase polish
 - Lock-screen circular rest-ring redesign
-- **Re-introducing the social/gamification layer** (feed, friends, leagues, IQ, badges, clubs, streaks) in a post-v1 release — the DB tables and migrations are still in place; the client code was removed on branch `strip-social-v1`.
+- **Re-introducing the social/gamification layer** (feed, friends, leagues, IQ, badges, clubs, streaks) in a post-v1 release — the DB tables and migrations are still in place; the client code was removed in the v1 scope-down commits (now on `main`).
 
 If you find yourself building one of these, check the existing intent infrastructure (`repIQ/Intents/`) and Live Activity setup before reinventing.
 
