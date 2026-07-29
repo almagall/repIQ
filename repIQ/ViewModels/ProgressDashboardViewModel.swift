@@ -20,17 +20,50 @@ final class ProgressDashboardViewModel {
     var prDates: Set<Date> = []
     var insights: [InsightCard] = []
     var milestones: [MilestoneDefinition] = []
-    var effectiveRepsSummary: [EffectiveRepsSummary] = []
     var averageRPE: Double?
 
     // Phase Then: new analytics
-    var pushPullBalance: PushPullBalance?
-    var volumeLandmarks: [VolumeLandmarkData] = []
-    var consistencyScore: ConsistencyScore?
     var topLifts: [TopLiftTrajectory] = []
     var monthlyStats: MonthlyStats?
     var lastWorkoutRecap: LastWorkoutRecap?
     var pastMeSnapshot: PastMeSnapshot?
+
+    /// Hero verdict — how many regularly-trained exercises the progression
+    /// engine moved up at their last session.
+    var progressionVerdict: ProgressionVerdict?
+
+    /// Forward-looking coaching line shown in the hero.
+    ///
+    /// Prefers an insight that names a specific exercise: "push Bench" is a
+    /// thing the user can do on their next session, whereas "volume is down
+    /// 28%" is a description they still have to translate into an action. Falls
+    /// back to the highest-priority insight when nothing names a lift.
+    var heroCoaching: InsightCard? {
+        let liftNames = Set(topLifts.map(\.exerciseName))
+        let liftSpecific = insights.first { insight in
+            liftNames.contains { insight.message.contains($0) }
+        }
+        return liftSpecific ?? insights.first
+    }
+
+    /// Insights excluding the one promoted into the hero, so the same card
+    /// never appears twice on the page.
+    var secondaryInsights: [InsightCard] {
+        guard let promoted = heroCoaching else { return insights }
+        return insights.filter { $0.id != promoted.id }
+    }
+
+    /// Prior month's Rep Sheet, used to decide whether the recap is news
+    /// (promoted under the hero) or already-seen (a footer link).
+    var priorMonthRepSheet: RepSheet?
+
+    /// True while last month's Rep Sheet is generated but unread. Unlike the
+    /// dashboard banner this isn't date-gated — the Progress tab is where a
+    /// user goes looking for a recap, so it stays promoted until opened.
+    var hasUnreadRepSheet: Bool {
+        guard let sheet = priorMonthRepSheet else { return false }
+        return sheet.viewedAt == nil
+    }
 
     /// Body-diagram sex from the user's profile. Defaults to `.male` when the
     /// profile field is missing or "prefer_not_to_say".
@@ -98,6 +131,7 @@ final class ProgressDashboardViewModel {
     private let workoutService = WorkoutService()
     private let exerciseService = ExerciseLibraryService()
     private let profileService = ProfileService()
+    private let digestService = DigestService()
 
     // MARK: - Computed
 
@@ -116,72 +150,35 @@ final class ProgressDashboardViewModel {
         return validWeeks.reduce(0) { $0 + $1.totalVolume } / Double(validWeeks.count)
     }
 
-    /// One-sentence prescriptive caption for the muscle balance section.
-    /// Identifies the most over-represented and most neglected groups and
-    /// translates the imbalance into an actionable suggestion.
+    /// One-sentence prescriptive caption for the muscle balance section, keyed
+    /// off weekly sets rather than volume share so small muscles aren't flagged
+    /// simply for being small.
     var muscleBalanceNarrative: String? {
         let totals = activeMuscleDistribution
         guard !totals.isEmpty else { return nil }
-        let totalVolume = totals.reduce(0.0) { $0 + $1.volume }
-        guard totalVolume > 0 else { return nil }
+        let totalSets = totals.reduce(0.0) { $0 + $1.setCount }
+        guard totalSets > 0 else { return nil }
 
-        let nonZero = totals.filter { $0.volume > 0 }
-        guard let top = nonZero.max(by: { $0.volume < $1.volume }) else { return nil }
-        let topShare = top.volume / totalVolume
+        let trained = totals.filter { $0.setCount > 0 }
+        guard let top = trained.max(by: { $0.setCount < $1.setCount }) else { return nil }
 
-        // Push/pull imbalance takes priority — strongest visible signal.
-        if let balance = pushPullBalance {
-            if balance.status == .pushDominant {
-                return "Push volume is dominating — add a pull day or extra back work this week."
-            }
-            if balance.status == .pullDominant {
-                return "Pull-heavy week — work in some pressing if chest/shoulders are a goal."
-            }
+        // A fully untrained group is the strongest signal available.
+        if let neglected = totals.first(where: { $0.setCount == 0 }) {
+            return "No \(neglected.displayName.lowercased()) work in this window — a couple of direct sets a week holds ground."
         }
 
-        // One group taking >35% is usually a sign of an unbalanced split
+        // One group taking more than a third of all sets suggests the split is
+        // lopsided rather than that the muscle is well trained.
+        let topShare = top.setCount / totalSets
         if topShare > 0.35 {
-            return "\(top.displayName) is \(Int(topShare * 100))% of your volume — make sure the rest aren't sliding."
+            return "\(top.displayName) is \(Int(topShare * 100))% of your sets — check the rest aren't sliding."
         }
 
-        // Find the lowest non-zero share and a fully neglected group
-        let zeroed = totals.filter { $0.setCount == 0 }
-        if let neglected = zeroed.first {
-            return "No \(neglected.displayName.lowercased()) work in the window — add 2-3 direct sets per week."
+        if let lowest = trained.min(by: { $0.weeklySets < $1.weeklySets }), lowest.weeklySets < 4 {
+            return "\(lowest.displayName) is your lightest at \(lowest.weeklySetsDisplay) sets a week — add a couple if it's a goal."
         }
 
-        let lowest = nonZero.min(by: { $0.volume < $1.volume })!
-        let lowestShare = lowest.volume / totalVolume
-        if lowestShare < 0.04 {
-            return "\(lowest.displayName) is under-trained at \(String(format: "%.0f%%", lowestShare * 100)) — bump it by a few sets."
-        }
-
-        return "Balanced distribution — keep stacking weeks like this."
-    }
-
-    /// Prescriptive caption for the consistency card. Uses the user's current
-    /// frequency and consistency grade to pick the message.
-    var consistencyNarrative: String? {
-        guard let score = consistencyScore else { return nil }
-
-        // Use weeklySessionCount to detect drift from typical cadence
-        let recentCadence = weeklySessionCount
-
-        switch score.grade {
-        case .elite:
-            return "Elite consistency — you're showing up like clockwork."
-        case .strong:
-            if recentCadence == 0 {
-                return "Strong base but you haven't trained yet this week — get one in to stay sharp."
-            }
-            return "Strong rhythm — \(recentCadence) session\(recentCadence == 1 ? "" : "s") this week, stay locked in."
-        case .good:
-            return "Decent groove — pick one extra session per week to push into Strong territory."
-        case .developing:
-            return "Patchy stretches lately — aim for a steady 3-day cadence to lock in gains."
-        case .beginning:
-            return "Just getting started — one session a week beats none, build the habit first."
-        }
+        return "Balanced spread — keep stacking weeks like this."
     }
 
     /// An interpreted narrative for the volume trend (replaces the raw percent delta).
@@ -268,18 +265,19 @@ final class ProgressDashboardViewModel {
             }
 
             // Parallel fetch all analytics data
-            async let volumeTrendTask = analyticsService.fetchWeeklyVolumeTrend(userId: userId, weeks: 8)
+            async let volumeTrendTask = analyticsService.fetchWeeklyVolumeTrend(
+                userId: userId,
+                weeks: selectedTimeWindow.weeks
+            )
+            async let progressionRateTask = analyticsService.fetchProgressionRate(userId: userId)
+            async let repSheetTask = digestService.fetchPriorMonthWrapped(userId: userId)
             async let muscleTask = analyticsService.fetchMuscleGroupDistribution(userId: userId, days: 30)
             async let fractionalTask = analyticsService.fetchFractionalMuscleDistribution(userId: userId, days: 30)
             async let prTask = analyticsService.fetchRecentPRs(userId: userId, limit: 10)
             async let frequencyTask = analyticsService.fetchTrainingFrequency(userId: userId, weeks: 12)
             async let milestoneTask = analyticsService.fetchMilestoneProgress(userId: userId)
             async let sessionsTask = workoutService.fetchAllSessions(userId: userId)
-            async let effectiveRepsTask = analyticsService.fetchEffectiveRepsSummary(userId: userId, days: 30)
             async let rpeTask = analyticsService.fetchAverageRPE(userId: userId, days: 14)
-            async let pushPullTask = analyticsService.fetchPushPullBalance(userId: userId, days: 30)
-            async let consistencyTask = analyticsService.fetchConsistencyScore(userId: userId, weeks: 8)
-            async let landmarkTask = analyticsService.fetchVolumeLandmarkData(userId: userId)
             async let topLiftsTask = analyticsService.fetchTopLiftsTrajectory(userId: userId, limit: 5)
             async let monthlyStatsTask = analyticsService.fetchMonthlyStats(userId: userId)
             async let lastRecapTask = analyticsService.fetchLastWorkoutRecap(userId: userId)
@@ -294,6 +292,8 @@ final class ProgressDashboardViewModel {
 
             if let fetched = try? await monthlyStatsTask { monthlyStats = fetched }
             if let fetched = try? await lastRecapTask { lastWorkoutRecap = fetched }
+            if let fetched = try? await progressionRateTask { progressionVerdict = fetched }
+            priorMonthRepSheet = (try? await repSheetTask) ?? nil
             let fetchedMilestoneData = try await milestoneTask
             totalVolume = fetchedMilestoneData.totalVolume
             totalPRCount = fetchedMilestoneData.totalPRs
@@ -320,26 +320,22 @@ final class ProgressDashboardViewModel {
             if let fetched = try? await fractionalTask { fractionalDistribution = fetched }
             if let fetched = try? await prTask { recentPRs = fetched }
             if let fetched = try? await frequencyTask { frequencyData = fetched }
-            if let fetched = try? await effectiveRepsTask { effectiveRepsSummary = fetched }
             let fetchedRPE = try? await rpeTask
             averageRPE = fetchedRPE
-            if let fetched = try? await pushPullTask { pushPullBalance = fetched }
-            if let fetched = try? await consistencyTask { consistencyScore = fetched }
-            if let fetched = try? await landmarkTask { volumeLandmarks = fetched }
             prDates = (try? await prDatesTask) ?? []
 
-            // Past-me snapshot: compare the user's top tracked lift to where
-            // they were ~3 months ago. Skipped silently if there's not enough
-            // history.
-            if let topLift = fetchedTopLifts.first {
-                pastMeSnapshot = (try? await analyticsService.fetchPastMeSnapshot(
-                    userId: userId,
-                    exerciseId: topLift.exerciseId,
-                    exerciseName: topLift.exerciseName
-                )) ?? nil
-            } else {
-                pastMeSnapshot = nil
-            }
+            // Past-me snapshot on the *most improved* lift rather than simply
+            // the most-trained one. With a large exercise library the top lift
+            // is an arbitrary pick; the biggest gainer is an actual finding.
+            //
+            // Candidates are ranked on the three-month snapshot the card
+            // actually renders, not on the four-week delta — those windows
+            // disagree often enough that ranking by one and displaying the
+            // other can label a lift "most improved" while showing a decline.
+            pastMeSnapshot = await mostImprovedSnapshot(
+                userId: userId,
+                candidates: Array(fetchedTopLifts.prefix(4))
+            )
 
             if let currentWeek = fetchedTrend.last {
                 weeklyVolume = currentWeek.totalVolume
@@ -373,6 +369,36 @@ final class ProgressDashboardViewModel {
         isLoading = false
     }
 
+    /// Fetches past-me snapshots for the top candidates in parallel and returns
+    /// whichever gained the most over the three-month window. Bounded to a
+    /// handful of lifts so this stays a few concurrent reads rather than one
+    /// per tracked exercise.
+    private func mostImprovedSnapshot(
+        userId: UUID,
+        candidates: [TopLiftTrajectory]
+    ) async -> PastMeSnapshot? {
+        guard !candidates.isEmpty else { return nil }
+
+        let snapshots = await withTaskGroup(of: PastMeSnapshot?.self) { group in
+            for lift in candidates {
+                group.addTask { [analyticsService] in
+                    try? await analyticsService.fetchPastMeSnapshot(
+                        userId: userId,
+                        exerciseId: lift.exerciseId,
+                        exerciseName: lift.exerciseName
+                    )
+                }
+            }
+            var collected: [PastMeSnapshot] = []
+            for await snapshot in group {
+                if let snapshot { collected.append(snapshot) }
+            }
+            return collected
+        }
+
+        return snapshots.max(by: { $0.delta < $1.delta })
+    }
+
     /// Maps the profile.sex string to MuscleMap's BodyGender. Anything other than
     /// "female" falls back to `.male` so the diagram still renders for users
     /// who chose "prefer_not_to_say" or never set the field.
@@ -398,19 +424,16 @@ final class ProgressDashboardViewModel {
         )
         async let muscleTask = analyticsService.fetchMuscleGroupDistribution(userId: userId, days: window.days)
         async let fractionalTask = analyticsService.fetchFractionalMuscleDistribution(userId: userId, days: window.days)
-        async let effectiveTask = analyticsService.fetchEffectiveRepsSummary(userId: userId, days: window.days)
         async let prDatesTask = analyticsService.fetchPRDates(userId: userId, days: window.days)
 
         let fetchedTrend = (try? await trendTask) ?? []
         let fetchedMuscle = (try? await muscleTask) ?? []
         let fetchedFractional = (try? await fractionalTask) ?? []
-        let fetchedEffective = (try? await effectiveTask) ?? []
         let fetchedPRDates = (try? await prDatesTask) ?? []
 
         volumeTrend = fetchedTrend
         muscleDistribution = fetchedMuscle
         fractionalDistribution = fetchedFractional
-        effectiveRepsSummary = fetchedEffective
         prDates = fetchedPRDates
     }
 
@@ -423,7 +446,7 @@ final class ProgressDashboardViewModel {
         guard let userId = try? await supabase.auth.session.user.id else { return }
         let fetched = (try? await analyticsService.fetchWeeklyVolumeTrend(
             userId: userId,
-            weeks: 8,
+            weeks: selectedTimeWindow.weeks,
             muscleGroup: muscle
         )) ?? []
         volumeTrend = fetched

@@ -23,7 +23,7 @@ struct StrengthTrajectoryCard: View {
             )
 
             if lifts.isEmpty {
-                RQCard {
+                RQCard(bordered: false) {
                     HStack(spacing: RQSpacing.md) {
                         Image(systemName: "chart.xyaxis.line")
                             .font(.system(size: 22))
@@ -35,7 +35,7 @@ struct StrengthTrajectoryCard: View {
                     }
                 }
             } else {
-                RQCard {
+                RQCard(bordered: false) {
                     VStack(spacing: RQSpacing.md) {
                         ForEach(Array(lifts.enumerated()), id: \.element.id) { index, lift in
                             liftRow(lift)
@@ -110,14 +110,18 @@ struct StrengthTrajectoryCard: View {
                         }
                     }
 
+                    // Three-colour vocabulary, shared with the hero: rising /
+                    // holding / slipping. The five velocity states stay
+                    // available on the exercise drill-in.
                     HStack(spacing: RQSpacing.xs) {
-                        Image(systemName: lift.velocityStatus.icon)
+                        Image(systemName: lift.velocityStatus.trend.icon)
                             .font(.system(size: 9, weight: .bold))
-                            .foregroundColor(lift.velocityStatus.color)
+                            .foregroundColor(lift.velocityStatus.trend.color)
                         Text(lift.narrative)
                             .font(.system(size: 11))
                             .foregroundColor(RQColors.textTertiary)
                             .lineLimit(1)
+                            .minimumScaleFactor(0.85)
                     }
 
                     // 4-week projection (only when reliable + meaningful gain)
@@ -151,7 +155,7 @@ struct StrengthTrajectoryCard: View {
 
                 // Middle: sparkline
                 if lift.sparkline.count >= 2 {
-                    sparkline(lift.sparkline, color: lift.velocityStatus.color)
+                    sparkline(lift.sparkline, color: lift.velocityStatus.trend.color)
                         .frame(width: 48, height: 24)
                 }
 

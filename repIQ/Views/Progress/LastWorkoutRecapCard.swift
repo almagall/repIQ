@@ -53,7 +53,7 @@ struct LastWorkoutRecapCard: View {
             RQSectionHeader(title: "LAST WORKOUT")
 
             NavigationLink(value: recap.sessionId) {
-                RQCard {
+                RQCard(bordered: false) {
                     VStack(alignment: .leading, spacing: RQSpacing.md) {
                         // Title row
                         HStack(alignment: .top) {

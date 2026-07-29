@@ -12,7 +12,7 @@ struct LifetimeTotalsStrip: View {
         VStack(alignment: .leading, spacing: RQSpacing.sm) {
             RQSectionHeader(title: "LIFETIME")
 
-            RQCard {
+            RQCard(bordered: false) {
                 HStack(spacing: 0) {
                     statTile(value: "\(totalSessions)", label: "WORKOUTS")
                     Divider().frame(height: 36).background(RQColors.surfaceTertiary)

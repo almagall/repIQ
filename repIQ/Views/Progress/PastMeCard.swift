@@ -47,7 +47,7 @@ struct PastMeCard: View {
         VStack(alignment: .leading, spacing: RQSpacing.md) {
             RQSectionHeader(title: "VS PAST YOU")
 
-            RQCard {
+            RQCard(bordered: false) {
                 VStack(alignment: .leading, spacing: RQSpacing.md) {
                     HStack(alignment: .top) {
                         VStack(alignment: .leading, spacing: 2) {

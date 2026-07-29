@@ -14,30 +14,30 @@ struct MuscleBalanceBodyView: View {
 
     // MARK: - Data derivations
 
-    /// Total volume across all muscle groups.
-    private var totalVolume: Double {
-        distribution.reduce(0) { $0 + $1.volume }
+    /// Total sets across all muscle groups. Balance is measured in sets, not
+    /// tonnage — see `MuscleGroupVolume`.
+    private var totalSets: Double {
+        distribution.reduce(0) { $0 + $1.setCount }
     }
 
-    /// Active groups sorted by volume descending.
+    /// Active groups sorted by set count descending.
     private var sortedGroups: [MuscleGroupVolume] {
-        distribution.filter { $0.volume > 0 }.sorted { $0.volume > $1.volume }
+        distribution.filter { $0.setCount > 0 }.sorted { $0.setCount > $1.setCount }
     }
 
-    /// Groups flagged as under-trained (less than 2% of total volume OR zero).
-    /// We include zero-volume groups here because "you didn't train this at all"
-    /// is the most important signal the dashboard can surface.
+    /// Groups genuinely light on volume, so the user can see what's sliding.
+    ///
+    /// Thresholded on absolute weekly sets rather than simply taking the bottom
+    /// two: a plain bottom-N always finds something to flag, which is how a
+    /// well-trained muscle ends up listed as "lowest" while the diagram paints
+    /// it hot. Below roughly four sets a week is where the number is actually
+    /// worth acting on.
     private var watchList: [MuscleGroupVolume] {
-        let activeWithLowShare = distribution.filter { group in
-            guard totalVolume > 0 else { return false }
-            let share = group.volume / totalVolume
-            return share > 0 && share < 0.02
-        }
-        let zeroVolume = distribution.filter { $0.setCount == 0 && $0.volume == 0 }
-        return (activeWithLowShare + zeroVolume)
-            .sorted { $0.volume < $1.volume }
-            .prefix(3)
-            .map { $0 }
+        let untrained = distribution.filter { $0.setCount == 0 }
+        let light = distribution
+            .filter { $0.setCount > 0 && $0.weeklySets < 4 }
+            .sorted { $0.weeklySets < $1.weeklySets }
+        return (untrained + light).prefix(3).map { $0 }
     }
 
     // MARK: - Body
@@ -52,7 +52,7 @@ struct MuscleBalanceBodyView: View {
             }
         }
         .sheet(item: $selectedGroup) { group in
-            MuscleDetailSheet(group: group, totalVolume: totalVolume)
+            MuscleDetailSheet(group: group, totalSets: totalSets)
         }
     }
 
@@ -96,7 +96,7 @@ struct MuscleBalanceBodyView: View {
 
     private var watchListSection: some View {
         VStack(alignment: .leading, spacing: RQSpacing.sm) {
-            Text("NEEDS ATTENTION")
+            Text("LOWEST")
                 .font(.system(size: 9, weight: .bold))
                 .tracking(1)
                 .foregroundColor(RQColors.textTertiary)
@@ -121,7 +121,7 @@ struct MuscleBalanceBodyView: View {
 
                         Spacer()
 
-                        Text("\(group.setCount) set\(group.setCount == 1 ? "" : "s") · \(String(format: "%.0f%%", group.percentage))")
+                        Text("\(group.weeklySetsDisplay) sets/wk")
                             .font(.system(size: 10, weight: .medium))
                             .foregroundColor(RQColors.textTertiary)
 
@@ -152,19 +152,19 @@ struct MuscleBalanceBodyView: View {
 
     /// Converts the distribution into per-muscle intensities for MuscleMap.
     /// Each repIQ group maps to one or more MuscleMap muscles, all painted at
-    /// the same intensity proportional to the group's share of total volume.
+    /// the same intensity proportional to the group's share of total sets.
     private var heatmapData: [MuscleIntensity] {
-        guard totalVolume > 0 else { return [] }
+        guard totalSets > 0 else { return [] }
 
         // Find the highest-share group so the heatmap scales to the user's
         // own distribution — not an absolute floor. The biggest muscle always
         // reads as full intensity and the rest scale down from there.
-        let maxShare = distribution.map { $0.volume / totalVolume }.max() ?? 1.0
+        let maxShare = distribution.map { $0.setCount / totalSets }.max() ?? 1.0
         let effectiveMax = max(maxShare, 0.05)
 
         var result: [MuscleIntensity] = []
-        for group in distribution where group.volume > 0 {
-            let share = group.volume / totalVolume
+        for group in distribution where group.setCount > 0 {
+            let share = group.setCount / totalSets
             let intensity = min(share / effectiveMax, 1.0)
             for muscle in Self.muscleMapping[group.muscleGroup] ?? [] {
                 result.append(MuscleIntensity(muscle: muscle, intensity: intensity))
@@ -207,12 +207,12 @@ struct MuscleBalanceBodyView: View {
 /// or in the watch list. Shows volume context and actionable info.
 private struct MuscleDetailSheet: View {
     let group: MuscleGroupVolume
-    let totalVolume: Double
+    let totalSets: Double
     @Environment(\.dismiss) private var dismiss
 
     private var shareLabel: String {
-        guard totalVolume > 0 else { return "—" }
-        return String(format: "%.1f%%", (group.volume / totalVolume) * 100)
+        guard totalSets > 0 else { return "—" }
+        return String(format: "%.0f%%", (group.setCount / totalSets) * 100)
     }
 
     private var volumeLabel: String {
@@ -243,7 +243,7 @@ private struct MuscleDetailSheet: View {
 
                     // Stats
                     HStack(spacing: 0) {
-                        statTile(value: "\(group.setCount)", label: "WORKING SETS")
+                        statTile(value: group.weeklySetsDisplay, label: "SETS / WEEK")
                         Divider().frame(height: 40).background(RQColors.surfaceTertiary)
                         statTile(value: shareLabel, label: "OF TOTAL")
                         Divider().frame(height: 40).background(RQColors.surfaceTertiary)
@@ -297,23 +297,28 @@ private struct MuscleDetailSheet: View {
         .frame(maxWidth: .infinity)
     }
 
+    /// Guidance is keyed off absolute weekly sets rather than share of total.
+    /// Share punishes small muscles by construction — biceps take fewer sets
+    /// than back at equal quality — whereas weekly set count is the number the
+    /// user can actually act on.
     private var guidanceMessage: String {
-        guard totalVolume > 0 else {
+        guard totalSets > 0 else {
             return "No training data yet for this muscle group."
         }
-        let share = (group.volume / totalVolume) * 100
+        let name = group.displayName
         if group.setCount == 0 {
-            return "You haven't trained \(group.displayName.lowercased()) in the past 30 days. Consider adding 2–3 direct sets per week to maintain balance and avoid weak points."
+            return "You haven't trained \(name.lowercased()) in this window. A couple of direct sets a week is enough to hold ground."
         }
-        if share < 2 {
-            return "\(group.displayName) is getting very little training volume (\(String(format: "%.1f%%", share)) of your total). Add 2–3 more direct sets per week to bring this group up."
+        let weekly = group.weeklySets
+        if weekly < 4 {
+            return "\(name) is getting \(group.weeklySetsDisplay) sets a week. If it's a priority, adding two or three more is the simplest lever."
         }
-        if share < 7 {
-            return "\(group.displayName) is slightly under-represented. If this is a priority muscle, consider bumping your weekly sets by 2–4."
+        if weekly < 8 {
+            return "\(name) sits at \(group.weeklySetsDisplay) sets a week — enough to maintain. Push higher if you want it growing."
         }
-        if share > 25 {
-            return "\(group.displayName) is taking up a large share of your volume. That's fine if it's a weak point you're bringing up — just make sure you're not neglecting other groups."
+        if weekly > 22 {
+            return "\(name) is taking \(group.weeklySetsDisplay) sets a week. That's a lot to recover from; make sure the quality is still there late in the week."
         }
-        return "\(group.displayName) is getting a healthy share of your training volume. Keep it up."
+        return "\(name) is getting \(group.weeklySetsDisplay) sets a week — a solid working range."
     }
 }

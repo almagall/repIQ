@@ -16,7 +16,7 @@ struct MonthlyStatsHeader: View {
         VStack(alignment: .leading, spacing: RQSpacing.sm) {
             RQSectionHeader(title: "THIS MONTH · \(monthLabel)")
 
-            RQCard {
+            RQCard(bordered: false) {
                 HStack(spacing: 0) {
                     statTile(
                         value: "\(stats?.workouts ?? 0)",

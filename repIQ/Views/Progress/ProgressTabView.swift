@@ -43,33 +43,25 @@ struct ProgressTabView: View {
                         message: "Complete your first workout to start tracking your progress and PRs."
                     )
                 } else {
+                    // Flow layout: sections are separated by whitespace and
+                    // hairline rules rather than by borders. The hero is the
+                    // only bordered element on the page, which is what makes it
+                    // read as the headline.
                     VStack(spacing: RQSpacing.xl) {
                         timeWindowPicker
 
-                        // 1. Monthly Stats Header — at-a-glance snapshot of this month
-                        MonthlyStatsHeader(stats: viewModel.monthlyStats)
+                        // 1. The verdict — the one number the tab exists to answer.
+                        ProgressionHeroCard(
+                            verdict: viewModel.progressionVerdict ?? .empty,
+                            coaching: viewModel.heroCoaching
+                        )
 
-                        // 1b. Lifetime totals — accumulated weight of all sessions
-                        if viewModel.totalSessions > 0 {
-                            LifetimeTotalsStrip(
-                                totalSessions: viewModel.totalSessions,
-                                totalVolume: viewModel.totalVolume,
-                                totalPRCount: viewModel.totalPRCount
-                            )
+                        // 1b. Last month's recap, promoted while it's still news.
+                        if viewModel.hasUnreadRepSheet {
+                            unreadRepSheetBanner
                         }
 
-                        // 2. Last Workout recap — answers "how did I do last time?"
-                        if let recap = viewModel.lastWorkoutRecap {
-                            LastWorkoutRecapCard(recap: recap)
-                        }
-
-                        // 2b. "You vs past you" card on the user's top lift.
-                        // Quietly absent when there's not enough history.
-                        if let snapshot = viewModel.pastMeSnapshot {
-                            PastMeCard(snapshot: snapshot)
-                        }
-
-                        // 3. Hero: Strength Trajectory — top lifts scoped by workout day
+                        // 2. Per-lift detail behind the verdict.
                         StrengthTrajectoryCard(
                             lifts: viewModel.topLifts,
                             bodyweightLbs: viewModel.bodyweightLbs,
@@ -85,40 +77,56 @@ struct ProgressTabView: View {
                             }
                         )
 
-                        // 3. Consistency
-                        consistencySection
-
-                        // 3. Smart Insights — prescriptive coaching (promoted from #6)
-                        if !viewModel.insights.isEmpty {
+                        // 3. Anything else worth acting on.
+                        if !viewModel.secondaryInsights.isEmpty {
                             insightsSection
                         }
 
-                        // 4. Volume Trend with 4-week baseline overlay
+                        flowDivider
+
+                        // 4. Recency, then habit, then rewards.
+                        if let recap = viewModel.lastWorkoutRecap {
+                            LastWorkoutRecapCard(recap: recap)
+                            flowDivider
+                        }
+
+                        consistencySection
+
+                        flowDivider
+
+                        if !viewModel.recentPRs.isEmpty {
+                            recentPRsSection
+                            flowDivider
+                        }
+
+                        MonthlyStatsHeader(stats: viewModel.monthlyStats)
+
+                        if viewModel.totalSessions > 0 {
+                            LifetimeTotalsStrip(
+                                totalSessions: viewModel.totalSessions,
+                                totalVolume: viewModel.totalVolume,
+                                totalPRCount: viewModel.totalPRCount
+                            )
+                        }
+
+                        if let snapshot = viewModel.pastMeSnapshot {
+                            PastMeCard(snapshot: snapshot)
+                        }
+
+                        flowDivider
+
+                        // 5. Supporting analytics.
                         volumeChartSection
 
-                        // 5. Muscle Balance + Push/Pull (merged)
                         if !viewModel.activeMuscleDistribution.isEmpty {
+                            flowDivider
                             muscleBalanceSection
                         }
 
-                        // 5b. Weekly volume zones — MEV/MAV/MRV bands per muscle group
-                        if !viewModel.volumeLandmarks.isEmpty {
-                            VolumeLandmarksCard(landmarks: viewModel.volumeLandmarks)
+                        // 6. Footer link, only once the recap is no longer news.
+                        if !viewModel.hasUnreadRepSheet {
+                            monthlyReportCTA
                         }
-
-                        // 5c. Effective reps — stimulus vs junk volume
-                        if !viewModel.effectiveRepsSummary.isEmpty {
-                            EffectiveRepsCard(summaries: viewModel.effectiveRepsSummary)
-                        }
-
-                        // 6. Recent PRs — celebration
-                        if !viewModel.recentPRs.isEmpty {
-                            recentPRsSection
-                        }
-
-                        // 7. Monthly Report Card CTA — visible whenever the user has any history.
-                        // Current month may be empty; the report falls back to last month with data.
-                        monthlyReportCTA
                     }
                     .padding(.horizontal, RQSpacing.screenHorizontal)
                     .padding(.top, RQSpacing.lg)
@@ -128,17 +136,6 @@ struct ProgressTabView: View {
             .background(RQColors.background)
             .navigationTitle("Progress")
             .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showMonthlyReport = true
-                    } label: {
-                        Image(systemName: "doc.text.magnifyingglass")
-                            .font(.system(size: 14))
-                            .foregroundColor(RQColors.accent)
-                    }
-                }
-            }
             .navigationDestination(isPresented: $showMonthlyReport) {
                 RepSheetView()
             }
@@ -188,6 +185,59 @@ struct ProgressTabView: View {
 
     // Share text removed — replaced with Monthly Report Card button
 
+    // MARK: - Flow Layout Helpers
+
+    /// Hairline rule used in place of card borders to separate sections.
+    private var flowDivider: some View {
+        Rectangle()
+            .fill(RQColors.surfaceTertiary)
+            .frame(height: 0.5)
+    }
+
+    /// Shown while last month's Rep Sheet is unread. Bounded by hairlines
+    /// rather than filled or bordered, so it sits in the flow without becoming
+    /// another box competing with the hero.
+    private var unreadRepSheetBanner: some View {
+        Button {
+            showMonthlyReport = true
+        } label: {
+            HStack(spacing: RQSpacing.sm) {
+                Text(priorMonthName)
+                    .font(RQTypography.headline)
+                    .foregroundColor(RQColors.textPrimary)
+                Text("REP SHEET")
+                    .font(RQTypography.label)
+                    .tracking(1)
+                    .foregroundColor(RQColors.textSecondary)
+                Text("NEW")
+                    .font(RQTypography.label)
+                    .tracking(1)
+                    .foregroundColor(RQColors.accent)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(RQColors.textTertiary)
+            }
+            .padding(.vertical, RQSpacing.md)
+            .contentShape(Rectangle())
+            .overlay(alignment: .top) {
+                Rectangle().fill(RQColors.surfaceTertiary).frame(height: 0.5)
+            }
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(RQColors.surfaceTertiary).frame(height: 0.5)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var priorMonthName: String {
+        let calendar = Calendar.current
+        let priorMonth = calendar.date(byAdding: .month, value: -1, to: Date()) ?? Date()
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM"
+        return formatter.string(from: priorMonth)
+    }
+
     // MARK: - Time Window Picker
 
     /// Segmented row of TimeWindow chips. Affects: volume trend, muscle
@@ -228,83 +278,49 @@ struct ProgressTabView: View {
 
     // MARK: - 2. Consistency
 
+    /// Training days heatmap. The old 0–100 consistency score and its letter
+    /// grade were removed: the composite weighted a hardcoded 4-sessions-a-week
+    /// target at 50%, penalised volume variation (which punished deliberate
+    /// periodisation and deload weeks), and zeroed out recency after 7 days —
+    /// so a well-programmed lifter could be told they were inconsistent. The
+    /// heatmap and a plain session count report the same thing without
+    /// editorialising.
     private var consistencySection: some View {
         VStack(alignment: .leading, spacing: RQSpacing.md) {
-            sectionHeaderWithInfo("CONSISTENCY", topic: ProgressExplainer.consistencyScore)
+            HStack {
+                Text("TRAINING DAYS")
+                    .font(RQTypography.label)
+                    .tracking(1.5)
+                    .foregroundColor(RQColors.textTertiary)
+                Spacer()
+                Text("\(totalSessionsInWindow) sessions")
+                    .font(RQTypography.caption)
+                    .foregroundColor(RQColors.textSecondary)
+            }
 
-            RQCard {
-                VStack(alignment: .leading, spacing: RQSpacing.lg) {
-                    // Top row: consistency ring
-                    HStack(spacing: RQSpacing.lg) {
-                        // Consistency ring
-                        if let score = viewModel.consistencyScore, score.overall > 0 {
-                            HStack(spacing: RQSpacing.sm) {
-                                ZStack {
-                                    Circle()
-                                        .stroke(RQColors.surfaceTertiary, lineWidth: 4)
-                                        .frame(width: 48, height: 48)
-                                    Circle()
-                                        .trim(from: 0, to: Double(score.overall) / 100.0)
-                                        .stroke(
-                                            score.grade.color,
-                                            style: StrokeStyle(lineWidth: 4, lineCap: .round)
-                                        )
-                                        .frame(width: 48, height: 48)
-                                        .rotationEffect(.degrees(-90))
-                                    Text("\(score.overall)")
-                                        .font(.system(size: 14, weight: .bold, design: .monospaced))
-                                        .foregroundColor(RQColors.textPrimary)
-                                }
+            ConsistencyHeatmap(
+                dailyData: viewModel.frequencyData,
+                prDates: viewModel.prDates
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-                                VStack(alignment: .leading, spacing: 0) {
-                                    Text(score.grade.displayName.uppercased())
-                                        .font(.system(size: 10, weight: .bold))
-                                        .tracking(0.5)
-                                        .foregroundColor(score.grade.color)
-                                    Text("8-week score")
-                                        .font(.system(size: 9))
-                                        .foregroundColor(RQColors.textTertiary)
-                                }
-                            }
-                        }
-                    }
-
-                    // Heatmap with PR-day gold dots
-                    ConsistencyHeatmap(
-                        dailyData: viewModel.frequencyData,
-                        prDates: viewModel.prDates
-                    )
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    HStack(spacing: RQSpacing.md) {
-                        if !viewModel.prDates.isEmpty {
-                            HStack(spacing: RQSpacing.xs) {
-                                Circle()
-                                    .fill(RQColors.supersetGold)
-                                    .frame(width: 5, height: 5)
-                                Text("PR DAY")
-                                    .font(.system(size: 9, weight: .semibold))
-                                    .tracking(0.5)
-                                    .foregroundColor(RQColors.textTertiary)
-                            }
-                        }
-                        Spacer()
-                    }
-
-                    if let narrative = viewModel.consistencyNarrative {
-                        HStack(spacing: RQSpacing.xs) {
-                            Image(systemName: "sparkles")
-                                .font(.system(size: 9))
-                                .foregroundColor(RQColors.accent)
-                            Text(narrative)
-                                .font(RQTypography.caption)
-                                .foregroundColor(RQColors.textSecondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
+            if !viewModel.prDates.isEmpty {
+                HStack(spacing: RQSpacing.xs) {
+                    Circle()
+                        .fill(RQColors.supersetGold)
+                        .frame(width: 5, height: 5)
+                    Text("PR DAY")
+                        .font(.system(size: 9, weight: .semibold))
+                        .tracking(0.5)
+                        .foregroundColor(RQColors.textTertiary)
                 }
             }
         }
+    }
+
+    /// Sessions represented in the heatmap window.
+    private var totalSessionsInWindow: Int {
+        viewModel.frequencyData.reduce(0) { $0 + $1.count }
     }
 
     // MARK: - 4. Weekly Volume Chart
@@ -331,7 +347,7 @@ struct ProgressTabView: View {
 
             volumeMuscleFilterChips
 
-            RQCard {
+            Group {
                 VStack(alignment: .leading, spacing: RQSpacing.md) {
                     if viewModel.volumeTrend.contains(where: { $0.totalVolume > 0 }) {
                         Chart {
@@ -468,46 +484,35 @@ struct ProgressTabView: View {
     // MARK: - 5. Smart Insights
 
     private var insightsSection: some View {
-        VStack(alignment: .leading, spacing: RQSpacing.md) {
-            sectionHeader("INSIGHTS")
-
-            ForEach(viewModel.insights) { insight in
+        VStack(alignment: .leading, spacing: RQSpacing.lg) {
+            ForEach(viewModel.secondaryInsights) { insight in
                 insightCard(insight)
             }
         }
     }
 
+    /// Insight rows carry their state in a hairline rule and an uppercase
+    /// label, not in a coloured left bar. Colour marks the status word — which
+    /// is information — rather than decorating the container.
     private func insightCard(_ insight: InsightCard) -> some View {
-        HStack(spacing: RQSpacing.md) {
-            // Colored left bar
-            RoundedRectangle(cornerRadius: 1)
-                .fill(insight.accentColor)
-                .frame(width: 3)
-
-            Image(systemName: insight.icon)
-                .font(.system(size: 16))
+        VStack(alignment: .leading, spacing: RQSpacing.xs) {
+            Text(insight.title.uppercased())
+                .font(RQTypography.label)
+                .tracking(1.5)
                 .foregroundColor(insight.accentColor)
-                .frame(width: 24)
 
-            VStack(alignment: .leading, spacing: RQSpacing.xxs) {
-                Text(insight.title)
-                    .font(RQTypography.headline)
-                    .foregroundColor(RQColors.textPrimary)
-                Text(insight.message)
-                    .font(RQTypography.caption)
-                    .foregroundColor(RQColors.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Spacer()
+            Text(insight.message)
+                .font(RQTypography.caption)
+                .foregroundColor(RQColors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(RQSpacing.cardPadding)
-        .background(Color.clear)
-        .cornerRadius(RQSpacing.cardCornerRadius)
-        .overlay(
-            RoundedRectangle(cornerRadius: RQSpacing.cardCornerRadius)
-                .stroke(RQColors.textTertiary, lineWidth: 1)
-        )
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, RQSpacing.md)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(insight.accentColor)
+                .frame(height: 1)
+        }
     }
 
     // MARK: - Monthly Report CTA
@@ -623,7 +628,7 @@ struct ProgressTabView: View {
     }
 
     private func prCard(_ record: PersonalRecord, exerciseName: String, delta: Double?) -> some View {
-        RQCard(padding: RQSpacing.md) {
+        RQCard(padding: RQSpacing.md, bordered: false) {
             VStack(alignment: .leading, spacing: RQSpacing.sm) {
                 HStack(spacing: RQSpacing.xs) {
                     Image(systemName: prIcon(record.recordType))
@@ -688,122 +693,41 @@ struct ProgressTabView: View {
     private var muscleBalanceSection: some View {
         VStack(alignment: .leading, spacing: RQSpacing.md) {
             HStack {
-                sectionHeaderWithInfo("MUSCLE BALANCE", topic: ProgressExplainer.muscleBalance)
+                sectionHeaderWithInfo("WEEKLY SETS PER MUSCLE", topic: ProgressExplainer.muscleBalance)
                 Spacer()
-                // Info button explaining the DIRECT/ADJUSTED toggle
                 InfoButton(topic: ProgressExplainer.fractionalVolume)
-                // Fractional volume toggle
+                // Plain-language toggle: "synergist" is jargon most lifters
+                // won't parse, and the control is only useful if its label
+                // explains what changes.
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         viewModel.showFractionalVolume.toggle()
                     }
                 } label: {
-                    HStack(spacing: RQSpacing.xs) {
-                        Image(systemName: viewModel.showFractionalVolume ? "arrow.triangle.branch" : "scope")
-                            .font(.system(size: 10))
-                        Text(viewModel.showFractionalVolume ? "+ SYNERGISTS" : "DIRECT ONLY")
-                            .font(RQTypography.label)
-                            .tracking(0.5)
-                    }
-                    .foregroundColor(viewModel.showFractionalVolume ? RQColors.accent : RQColors.textTertiary)
-                    .padding(.horizontal, RQSpacing.sm)
-                    .padding(.vertical, RQSpacing.xxs)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: RQRadius.small)
-                            .stroke(
-                                viewModel.showFractionalVolume ? RQColors.accent.opacity(0.5) : RQColors.textTertiary,
-                                lineWidth: 0.5
-                            )
-                    )
+                    Text(viewModel.showFractionalVolume ? "Incl. assisting" : "Direct only")
+                        .font(RQTypography.caption)
+                        .foregroundColor(viewModel.showFractionalVolume ? RQColors.accent : RQColors.textTertiary)
                 }
                 .buttonStyle(.plain)
             }
 
-            RQCard {
-                VStack(spacing: RQSpacing.lg) {
-                    // Body diagram hero + watch list
-                    MuscleBalanceBodyView(
-                        distribution: viewModel.activeMuscleDistribution,
-                        gender: viewModel.bodyDiagramGender
-                    )
-
-                    if viewModel.showFractionalVolume {
-                        HStack(spacing: RQSpacing.xs) {
-                            Image(systemName: "info.circle")
-                                .font(.system(size: 10))
-                            Text("Includes 0.5x synergist credit for compound lifts")
-                                .font(RQTypography.caption)
-                        }
+            VStack(alignment: .leading, spacing: RQSpacing.lg) {
+                if viewModel.showFractionalVolume {
+                    Text("Assisting muscles count as half a set")
+                        .font(RQTypography.caption)
                         .foregroundColor(RQColors.textTertiary)
-                    }
-
-                    // Push / Pull ratio (merged in)
-                    if let balance = viewModel.pushPullBalance,
-                       balance.pushVolume + balance.pullVolume > 0 {
-                        Divider().background(RQColors.surfaceTertiary)
-                        pushPullStrip(balance)
-                    }
-
-                    if let narrative = viewModel.muscleBalanceNarrative {
-                        Divider().background(RQColors.surfaceTertiary)
-                        HStack(spacing: RQSpacing.xs) {
-                            Image(systemName: "sparkles")
-                                .font(.system(size: 9))
-                                .foregroundColor(RQColors.accent)
-                            Text(narrative)
-                                .font(RQTypography.caption)
-                                .foregroundColor(RQColors.textSecondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
                 }
-            }
-        }
-    }
 
-    private func pushPullStrip(_ balance: PushPullBalance) -> some View {
-        VStack(alignment: .leading, spacing: RQSpacing.xs) {
-            HStack(spacing: RQSpacing.sm) {
-                Image(systemName: balance.status.icon)
-                    .font(.system(size: 12))
-                    .foregroundColor(balance.status.color)
-                Text("PUSH : PULL")
-                    .font(.system(size: 9, weight: .bold))
-                    .tracking(0.5)
-                    .foregroundColor(RQColors.textTertiary)
-                Text(balance.ratioString)
-                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
-                    .foregroundColor(RQColors.textPrimary)
-                Spacer()
-                Text(balance.status.displayName.uppercased())
-                    .font(.system(size: 9, weight: .bold))
-                    .tracking(0.5)
-                    .foregroundColor(balance.status.color)
-            }
+                MuscleBalanceBodyView(
+                    distribution: viewModel.activeMuscleDistribution,
+                    gender: viewModel.bodyDiagramGender
+                )
 
-            // Visual bar
-            let total = balance.pushVolume + balance.pullVolume
-            if total > 0 {
-                GeometryReader { geo in
-                    HStack(spacing: 2) {
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(RQColors.strength)
-                            .frame(width: max(4, geo.size.width * (balance.pushVolume / total)))
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(RQColors.accent)
-                            .frame(width: max(4, geo.size.width * (balance.pullVolume / total)))
-                    }
-                }
-                .frame(height: 6)
-
-                HStack {
-                    Text("Push \(balance.pushSets)")
-                        .font(.system(size: 9))
-                        .foregroundColor(RQColors.textTertiary)
-                    Spacer()
-                    Text("Pull \(balance.pullSets)")
-                        .font(.system(size: 9))
-                        .foregroundColor(RQColors.textTertiary)
+                if let narrative = viewModel.muscleBalanceNarrative {
+                    Text(narrative)
+                        .font(RQTypography.caption)
+                        .foregroundColor(RQColors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }

@@ -12,16 +12,39 @@ struct WeeklyVolumeSummary: Identifiable {
 
 // MARK: - Muscle Group Distribution
 
+/// Training distribution for one muscle group over a window.
+///
+/// Balance is expressed in **sets**, not volume. Absolute load differs between
+/// muscle groups for physiological reasons — four sets of squats move several
+/// times the poundage of four sets of curls at identical training stimulus — so
+/// a volume share makes legs and back look dominant and arms look neglected for
+/// every user regardless of how they programmed the week. Sets per week is the
+/// standard the hypertrophy literature uses. `volume` is retained because the
+/// Rep Sheet still reports tonnage.
 struct MuscleGroupVolume: Identifiable {
     var id: String { muscleGroup }
     let muscleGroup: String
     let displayName: String
     let volume: Double
+    /// Share of total *sets* across all groups (0–100).
     let percentage: Double
-    let setCount: Int
+    /// Fractional because synergists earn half credit on compound lifts.
+    let setCount: Double
+    /// `setCount` normalised to a weekly rate, so the number stays comparable
+    /// as the user changes the time window.
+    let weeklySets: Double
 
     var color: Color {
         RQColors.muscleGroupColors[muscleGroup] ?? RQColors.textTertiary
+    }
+
+    /// Weekly sets rounded for display; halves are preserved ("13.5") because
+    /// synergist credit routinely lands on one.
+    var weeklySetsDisplay: String {
+        let rounded = (weeklySets * 2).rounded() / 2
+        return rounded == rounded.rounded()
+            ? String(format: "%.0f", rounded)
+            : String(format: "%.1f", rounded)
     }
 }
 
@@ -138,6 +161,112 @@ enum VelocityStatus: String, Sendable {
         if weeklyPercent > -0.5 { return .maintaining }
         if weeklyPercent > -2.0 { return .stalling }
         return .regressing
+    }
+
+    /// Collapses the five velocity states into the three-colour language used
+    /// across the Progress tab. Five distinct colours in a summary view reads
+    /// as noise; the full granularity stays on the exercise drill-in.
+    var trend: StrengthTrend {
+        switch self {
+        case .accelerating, .progressing: return .rising
+        case .maintaining, .stalling: return .holding
+        case .regressing: return .slipping
+        }
+    }
+}
+
+// MARK: - Progression Verdict (Progress tab hero)
+
+/// The three-colour vocabulary shared by the hero, the trajectory rows and the
+/// insight labels. Learned once, reused everywhere.
+enum StrengthTrend: String, Sendable {
+    case rising
+    case holding
+    case slipping
+
+    var color: Color {
+        switch self {
+        case .rising: return RQColors.success
+        case .holding: return RQColors.warning
+        case .slipping: return RQColors.error
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .rising: return "arrow.up.right"
+        case .holding: return "arrow.right"
+        case .slipping: return "arrow.down.right"
+        }
+    }
+}
+
+/// Aggregate answer to "am I progressing?", derived from the progression
+/// engine's own decisions rather than from e1RM. Works for every exercise the
+/// app can log — bodyweight, machine and barbell alike — because every
+/// exercise gets a decision regardless of whether an e1RM is meaningful.
+struct ProgressionVerdict: Sendable {
+    /// Exercises whose latest decision was to add weight.
+    let addedWeight: Int
+    /// Exercises whose latest decision was to add reps.
+    let addedReps: Int
+    /// Exercises holding at their current prescription.
+    let holding: Int
+    /// Exercises the engine pulled back (deload or volume deload).
+    let deloading: Int
+    /// Regularly-trained exercises that don't yet have enough history to judge.
+    /// Non-zero only in the baseline state.
+    let buildingBaseline: Int
+
+    /// Exercises moving up: added weight or added reps.
+    var movingUp: Int { addedWeight + addedReps }
+
+    /// Regularly-trained exercises with a usable decision.
+    var total: Int { addedWeight + addedReps + holding + deloading }
+
+    /// True when there isn't enough history to render a verdict yet.
+    var isBaseline: Bool { total == 0 }
+
+    /// Share of tracked exercises moving up (0–1). Zero when nothing qualifies.
+    var progressingShare: Double {
+        guard total > 0 else { return 0 }
+        return Double(movingUp) / Double(total)
+    }
+
+    var trend: StrengthTrend {
+        // Any deloading at all with little forward movement means the engine is
+        // actively pulling the user back — that's a slipping month regardless
+        // of how the remaining lifts look.
+        if deloading > 0 && progressingShare < 0.34 { return .slipping }
+        if progressingShare >= 0.6 { return .rising }
+        if progressingShare >= 0.34 { return .holding }
+        return .slipping
+    }
+
+    var headline: String {
+        switch trend {
+        case .rising: return "PROGRESSING"
+        case .holding: return "HOLDING"
+        case .slipping: return "SLIPPING"
+        }
+    }
+
+    /// Placeholder used before the first fetch resolves, so the hero can render
+    /// its baseline state rather than being conditionally absent.
+    static let empty = ProgressionVerdict(
+        addedWeight: 0, addedReps: 0, holding: 0,
+        deloading: 0, buildingBaseline: 0
+    )
+
+    /// Muted supporting line, e.g. "7 added weight · 2 added reps · 3 holding".
+    /// Omits zero-valued components so sparse months don't read as failures.
+    var breakdown: String {
+        var parts: [String] = []
+        if addedWeight > 0 { parts.append("\(addedWeight) added weight") }
+        if addedReps > 0 { parts.append("\(addedReps) added reps") }
+        if holding > 0 { parts.append("\(holding) holding") }
+        if deloading > 0 { parts.append("\(deloading) deloading") }
+        return parts.joined(separator: "  ·  ")
     }
 }
 
@@ -270,221 +399,6 @@ struct RecentPREntry: Identifiable, Sendable {
     }
 }
 
-// MARK: - Effective Reps
-
-struct EffectiveRepsSummary: Identifiable {
-    var id: String { muscleGroup }
-    let muscleGroup: String
-    let displayName: String
-    let effectiveReps: Int
-    let totalReps: Int
-    let totalSets: Int
-
-    var effectiveRatio: Double {
-        guard totalReps > 0 else { return 0 }
-        return Double(effectiveReps) / Double(totalReps)
-    }
-
-    var color: Color {
-        RQColors.muscleGroupColors[muscleGroup] ?? RQColors.textTertiary
-    }
-}
-
-// MARK: - Push/Pull Balance
-
-struct PushPullBalance {
-    let pushVolume: Double
-    let pullVolume: Double
-    let pushSets: Int
-    let pullSets: Int
-
-    /// Push:Pull ratio (e.g., 1.3 means 30% more push than pull).
-    var ratio: Double {
-        guard pullVolume > 0 else { return pushVolume > 0 ? .infinity : 1.0 }
-        return pushVolume / pullVolume
-    }
-
-    /// Formatted ratio string like "1.3 : 1".
-    var ratioString: String {
-        guard pullVolume > 0 else { return pushVolume > 0 ? "All Push" : "N/A" }
-        return String(format: "%.1f : 1", ratio)
-    }
-
-    var status: PushPullStatus {
-        PushPullStatus.from(ratio: ratio)
-    }
-
-    /// Push muscle groups: chest, shoulders, triceps.
-    static let pushGroups: Set<String> = ["chest", "shoulders", "triceps"]
-    /// Pull muscle groups: back, biceps.
-    static let pullGroups: Set<String> = ["back", "biceps"]
-}
-
-enum PushPullStatus: String, Sendable {
-    case balanced       // 0.8 – 1.3
-    case pushDominant   // > 1.3
-    case pullDominant   // < 0.8
-
-    var displayName: String {
-        switch self {
-        case .balanced: return "Balanced"
-        case .pushDominant: return "Push Heavy"
-        case .pullDominant: return "Pull Heavy"
-        }
-    }
-
-    var color: Color {
-        switch self {
-        case .balanced: return RQColors.success
-        case .pushDominant: return RQColors.warning
-        case .pullDominant: return RQColors.info
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .balanced: return "checkmark.circle"
-        case .pushDominant: return "arrow.right.circle"
-        case .pullDominant: return "arrow.left.circle"
-        }
-    }
-
-    static func from(ratio: Double) -> PushPullStatus {
-        if ratio > 1.3 { return .pushDominant }
-        if ratio < 0.8 { return .pullDominant }
-        return .balanced
-    }
-}
-
-// MARK: - Volume Landmarks
-
-struct VolumeLandmarkData: Identifiable {
-    var id: String { muscleGroup }
-    let muscleGroup: String
-    let displayName: String
-    let currentWeeklySets: Int
-    let mev: Int // Minimum Effective Volume
-    let mav: ClosedRange<Int> // Maximum Adaptive Volume range
-    let mrv: Int // Maximum Recoverable Volume
-
-    var status: VolumeLandmarkStatus {
-        if currentWeeklySets < mev { return .belowMEV }
-        if currentWeeklySets <= mav.upperBound { return .withinMAV }
-        if currentWeeklySets <= mrv { return .approachingMRV }
-        return .aboveMRV
-    }
-
-    /// Progress within the MEV → MRV range (0.0 – 1.0+).
-    var progressInRange: Double {
-        guard mrv > mev else { return 0 }
-        return Double(currentWeeklySets - mev) / Double(mrv - mev)
-    }
-
-    var color: Color {
-        RQColors.muscleGroupColors[muscleGroup] ?? RQColors.textTertiary
-    }
-
-    /// Actionable prescription based on the current status vs landmarks.
-    /// Returns nil when the muscle is in the sweet spot (no action needed).
-    var prescription: String? {
-        switch status {
-        case .belowMEV:
-            let deficit = max(1, mev - currentWeeklySets)
-            return "Add \(deficit)-\(deficit + 2) sets/wk"
-        case .withinMAV:
-            return nil
-        case .approachingMRV:
-            return "Monitor fatigue"
-        case .aboveMRV:
-            let excess = max(1, currentWeeklySets - mrv)
-            return "Reduce \(excess)-\(excess + 2) sets/wk"
-        }
-    }
-}
-
-enum VolumeLandmarkStatus: String, Sendable {
-    case belowMEV       // Under-training
-    case withinMAV      // Sweet spot
-    case approachingMRV // High but recoverable
-    case aboveMRV       // Over-training risk
-
-    var displayName: String {
-        switch self {
-        case .belowMEV: return "Below MEV"
-        case .withinMAV: return "Sweet Spot"
-        case .approachingMRV: return "High Volume"
-        case .aboveMRV: return "Over MRV"
-        }
-    }
-
-    var color: Color {
-        switch self {
-        case .belowMEV: return RQColors.warning
-        case .withinMAV: return RQColors.success
-        case .approachingMRV: return RQColors.info
-        case .aboveMRV: return RQColors.error
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .belowMEV: return "arrow.down.circle"
-        case .withinMAV: return "checkmark.circle"
-        case .approachingMRV: return "exclamationmark.circle"
-        case .aboveMRV: return "xmark.circle"
-        }
-    }
-}
-
-// MARK: - Consistency Score
-
-struct ConsistencyScore {
-    let overall: Int // 0–100
-    let frequencyScore: Double // 0–1
-    let volumeStabilityScore: Double // 0–1
-    let recencyScore: Double // 0–1
-
-    var grade: ConsistencyGrade {
-        ConsistencyGrade.from(score: overall)
-    }
-}
-
-enum ConsistencyGrade: String, Sendable {
-    case elite      // 90–100
-    case strong     // 75–89
-    case good       // 60–74
-    case developing // 40–59
-    case beginning  // 0–39
-
-    var displayName: String {
-        switch self {
-        case .elite: return "Elite"
-        case .strong: return "Strong"
-        case .good: return "Good"
-        case .developing: return "Developing"
-        case .beginning: return "Beginning"
-        }
-    }
-
-    var color: Color {
-        switch self {
-        case .elite: return RQColors.accent
-        case .strong: return RQColors.success
-        case .good: return RQColors.chartPositive
-        case .developing: return RQColors.warning
-        case .beginning: return RQColors.textTertiary
-        }
-    }
-
-    static func from(score: Int) -> ConsistencyGrade {
-        if score >= 90 { return .elite }
-        if score >= 75 { return .strong }
-        if score >= 60 { return .good }
-        if score >= 40 { return .developing }
-        return .beginning
-    }
-}
-
 // MARK: - Strength Prediction
 
 struct StrengthPrediction: Sendable {
@@ -502,8 +416,11 @@ struct StrengthPrediction: Sendable {
         return (projectedGain / currentE1RM) * 100
     }
 
-    /// True if we have enough data and a reasonable fit.
-    var isReliable: Bool { confidence >= 0.3 }
+    /// True if we have enough data and a reasonable fit. An R² below 0.5 leaves
+    /// most of the variance unexplained, and extrapolating strength linearly is
+    /// already optimistic because gains decelerate — so the bar matches the one
+    /// the trajectory card applies rather than the looser 0.3 used previously.
+    var isReliable: Bool { confidence >= 0.5 }
 }
 
 // MARK: - Monthly Stats (Progress tab header)
@@ -571,25 +488,19 @@ struct TopLiftTrajectory: Identifiable, Sendable {
         "\(exerciseId.uuidString)-\(workoutDayId?.uuidString ?? "global")"
     }
 
-    /// Builds a one-sentence coaching narrative based on velocity and delta.
+    /// Short status phrase for the trajectory row. Kept terse because the row
+    /// already shows the weight and the delta — anything longer truncates at
+    /// this width, and the percentage would just restate the number beside it.
     static func buildNarrative(status: VelocityStatus, weeklyPercent: Double, deltaPercent: Double, sessionCount: Int) -> String {
         if sessionCount < 3 {
-            return "Building baseline — keep logging"
+            return "Building baseline"
         }
         switch status {
-        case .accelerating:
-            return String(format: "Trending up +%.1f%%/wk — strong gains", weeklyPercent)
-        case .progressing:
-            return String(format: "Progressing +%.1f%%/wk — on track", weeklyPercent)
-        case .maintaining:
-            if abs(deltaPercent) < 1.0 {
-                return "Maintaining — consider a progression push"
-            }
-            return "Holding steady"
-        case .stalling:
-            return "Plateau — try variety or deload"
-        case .regressing:
-            return String(format: "Regressing %.1f%%/wk — check recovery", weeklyPercent)
+        case .accelerating: return "Strong gains"
+        case .progressing: return "On track"
+        case .maintaining: return "Holding — ready for a push"
+        case .stalling: return "Plateau — try a change"
+        case .regressing: return "Declining — check recovery"
         }
     }
 }

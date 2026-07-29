@@ -108,15 +108,16 @@ struct AnalyticsService: Sendable {
         let exerciseMap = Dictionary(uniqueKeysWithValues: exercises.map { ($0.id, $0) })
 
         // Aggregate by muscle group
-        var groupVolume: [String: (volume: Double, sets: Int)] = [:]
+        var groupVolume: [String: (volume: Double, sets: Double)] = [:]
         for set in workingSets {
             let group = exerciseMap[set.exerciseId]?.muscleGroup ?? "other"
             groupVolume[group, default: (0, 0)].volume += set.volume
             groupVolume[group, default: (0, 0)].sets += 1
         }
 
-        let totalVolume = groupVolume.values.reduce(0.0) { $0 + $1.volume }
-        guard totalVolume > 0 else { return [] }
+        let totalSets = groupVolume.values.reduce(0.0) { $0 + $1.sets }
+        guard totalSets > 0 else { return [] }
+        let weeks = max(1.0, Double(days) / 7.0)
 
         return groupVolume.map { group, data in
             let muscleGroup = MuscleGroup(rawValue: group)
@@ -124,11 +125,12 @@ struct AnalyticsService: Sendable {
                 muscleGroup: group,
                 displayName: muscleGroup?.displayName ?? group.capitalized,
                 volume: data.volume,
-                percentage: (data.volume / totalVolume) * 100,
-                setCount: data.sets
+                percentage: (data.sets / totalSets) * 100,
+                setCount: data.sets,
+                weeklySets: data.sets / weeks
             )
         }
-        .sorted { $0.volume > $1.volume }
+        .sorted { $0.setCount > $1.setCount }
     }
 
     // MARK: - Exercise History
@@ -509,61 +511,6 @@ struct AnalyticsService: Sendable {
         )
     }
 
-    // MARK: - Effective Reps Summary
-
-    /// Returns effective (stimulating) reps per muscle group for the past N days.
-    /// Uses RPE data to estimate how many reps per set were near failure.
-    func fetchEffectiveRepsSummary(userId: UUID, days: Int = 30) async throws -> [EffectiveRepsSummary] {
-        let calendar = Calendar.current
-        guard let startDate = calendar.date(byAdding: .day, value: -days, to: Date()) else {
-            return []
-        }
-
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-
-        let sessions: [WorkoutSession] = try await supabase.from("workout_sessions")
-            .select()
-            .eq("user_id", value: userId.uuidString)
-            .eq("status", value: "completed")
-            .gte("completed_at", value: formatter.string(from: startDate))
-            .execute()
-            .value
-
-        guard !sessions.isEmpty else { return [] }
-
-        let sessionIds = sessions.map(\.id)
-        let allSets = try await fetchSetsForSessions(sessionIds)
-        let workingSets = allSets.filter { $0.setType == .working }
-        guard !workingSets.isEmpty else { return [] }
-
-        let exerciseIds = Array(Set(workingSets.map(\.exerciseId)))
-        let exercises = try await fetchExercisesFull(ids: exerciseIds)
-        let exerciseMap = Dictionary(uniqueKeysWithValues: exercises.map { ($0.id, $0) })
-
-        // Aggregate effective reps by muscle group
-        var groupData: [String: (effectiveReps: Int, totalReps: Int, sets: Int)] = [:]
-        for set in workingSets {
-            let group = exerciseMap[set.exerciseId]?.muscleGroup ?? "other"
-            let effective = CompoundSynergistMap.effectiveReps(reps: set.reps, rpe: set.rpe)
-            groupData[group, default: (0, 0, 0)].effectiveReps += effective
-            groupData[group, default: (0, 0, 0)].totalReps += set.reps
-            groupData[group, default: (0, 0, 0)].sets += 1
-        }
-
-        return groupData.map { group, data in
-            let muscleGroup = MuscleGroup(rawValue: group)
-            return EffectiveRepsSummary(
-                muscleGroup: group,
-                displayName: muscleGroup?.displayName ?? group.capitalized,
-                effectiveReps: data.effectiveReps,
-                totalReps: data.totalReps,
-                totalSets: data.sets
-            )
-        }
-        .sorted { $0.totalSets > $1.totalSets }
-    }
-
     // MARK: - Fractional Muscle Distribution
 
     /// Like fetchMuscleGroupDistribution but adds 0.5x synergist credit for compound exercises.
@@ -595,8 +542,10 @@ struct AnalyticsService: Sendable {
         let exercises = try await fetchExercisesFull(ids: exerciseIds)
         let exerciseMap = Dictionary(uniqueKeysWithValues: exercises.map { ($0.id, $0) })
 
-        // Aggregate with synergist credit
-        var groupVolume: [String: (volume: Double, sets: Int)] = [:]
+        // Aggregate with synergist credit. Sets are fractional here: a compound
+        // lift gives its synergists half a set each, matching the multiplier
+        // already applied to volume.
+        var groupVolume: [String: (volume: Double, sets: Double)] = [:]
         for set in workingSets {
             guard let exercise = exerciseMap[set.exerciseId] else { continue }
             let primary = exercise.muscleGroup
@@ -610,11 +559,13 @@ struct AnalyticsService: Sendable {
             let synergistList = CompoundSynergistMap.synergistGroups(primary: primary, isCompound: exercise.isCompound)
             for synergist in synergistList {
                 groupVolume[synergist, default: (0, 0)].volume += setVolume * CompoundSynergistMap.synergistMultiplier
+                groupVolume[synergist, default: (0, 0)].sets += CompoundSynergistMap.synergistMultiplier
             }
         }
 
-        let totalVolume = groupVolume.values.reduce(0.0) { $0 + $1.volume }
-        guard totalVolume > 0 else { return [] }
+        let totalSets = groupVolume.values.reduce(0.0) { $0 + $1.sets }
+        guard totalSets > 0 else { return [] }
+        let weeks = max(1.0, Double(days) / 7.0)
 
         return groupVolume.map { group, data in
             let muscleGroup = MuscleGroup(rawValue: group)
@@ -622,11 +573,12 @@ struct AnalyticsService: Sendable {
                 muscleGroup: group,
                 displayName: muscleGroup?.displayName ?? group.capitalized,
                 volume: data.volume,
-                percentage: (data.volume / totalVolume) * 100,
-                setCount: data.sets
+                percentage: (data.sets / totalSets) * 100,
+                setCount: data.sets,
+                weeklySets: data.sets / weeks
             )
         }
-        .sorted { $0.volume > $1.volume }
+        .sorted { $0.setCount > $1.setCount }
     }
 
     // MARK: - Average RPE
@@ -659,190 +611,6 @@ struct AnalyticsService: Sendable {
 
         guard !rpeValues.isEmpty else { return nil }
         return rpeValues.reduce(0, +) / Double(rpeValues.count)
-    }
-
-    // MARK: - Push/Pull Balance
-
-    /// Returns push vs pull volume balance for the past N days.
-    func fetchPushPullBalance(userId: UUID, days: Int = 30) async throws -> PushPullBalance {
-        let calendar = Calendar.current
-        guard let startDate = calendar.date(byAdding: .day, value: -days, to: Date()) else {
-            return PushPullBalance(pushVolume: 0, pullVolume: 0, pushSets: 0, pullSets: 0)
-        }
-
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-
-        let sessions: [WorkoutSession] = try await supabase.from("workout_sessions")
-            .select()
-            .eq("user_id", value: userId.uuidString)
-            .eq("status", value: "completed")
-            .gte("completed_at", value: formatter.string(from: startDate))
-            .execute()
-            .value
-
-        guard !sessions.isEmpty else {
-            return PushPullBalance(pushVolume: 0, pullVolume: 0, pushSets: 0, pullSets: 0)
-        }
-
-        let sessionIds = sessions.map(\.id)
-        let allSets = try await fetchSetsForSessions(sessionIds)
-        let workingSets = allSets.filter { $0.setType == .working }
-
-        let exerciseIds = Array(Set(workingSets.map(\.exerciseId)))
-        let exercises = try await fetchExercisesFull(ids: exerciseIds)
-        let exerciseMap = Dictionary(uniqueKeysWithValues: exercises.map { ($0.id, $0) })
-
-        var pushVolume: Double = 0
-        var pullVolume: Double = 0
-        var pushSets = 0
-        var pullSets = 0
-
-        for set in workingSets {
-            let group = exerciseMap[set.exerciseId]?.muscleGroup ?? ""
-            if PushPullBalance.pushGroups.contains(group) {
-                pushVolume += set.volume
-                pushSets += 1
-            } else if PushPullBalance.pullGroups.contains(group) {
-                pullVolume += set.volume
-                pullSets += 1
-            }
-        }
-
-        return PushPullBalance(
-            pushVolume: pushVolume,
-            pullVolume: pullVolume,
-            pushSets: pushSets,
-            pullSets: pullSets
-        )
-    }
-
-    // MARK: - Consistency Score
-
-    /// Computes a 0–100 consistency score from multiple training factors.
-    func fetchConsistencyScore(userId: UUID, weeks: Int = 8) async throws -> ConsistencyScore {
-        let calendar = Calendar.current
-        guard let startDate = calendar.date(byAdding: .weekOfYear, value: -weeks, to: Date()) else {
-            return ConsistencyScore(overall: 0, frequencyScore: 0, volumeStabilityScore: 0, recencyScore: 0)
-        }
-
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-
-        let sessions: [WorkoutSession] = try await supabase.from("workout_sessions")
-            .select()
-            .eq("user_id", value: userId.uuidString)
-            .eq("status", value: "completed")
-            .gte("completed_at", value: formatter.string(from: startDate))
-            .order("completed_at", ascending: true)
-            .execute()
-            .value
-
-        // 1. Frequency Score (50%) — sessions per week vs target of 4
-        let targetSessionsPerWeek = 4.0
-        let totalWeeks = max(1.0, Double(weeks))
-        let sessionsPerWeek = Double(sessions.count) / totalWeeks
-        let frequencyScore = min(1.0, sessionsPerWeek / targetSessionsPerWeek)
-
-        // 2. Volume Stability (30%) — coefficient of variation of weekly volumes
-        var volumeStabilityScore: Double = 0
-        if sessions.count >= 2 {
-            let allSets = try await fetchSetsForSessions(sessions.map(\.id))
-            var weeklyVolumes: [Date: Double] = [:]
-            for session in sessions {
-                let date = session.completedAt ?? session.startedAt
-                guard let weekStart = calendar.dateInterval(of: .weekOfYear, for: date)?.start else { continue }
-                let sessionVolume = allSets
-                    .filter { $0.sessionId == session.id && $0.setType == .working }
-                    .reduce(0.0) { $0 + $1.volume }
-                weeklyVolumes[weekStart, default: 0] += sessionVolume
-            }
-
-            let volumes = Array(weeklyVolumes.values).filter { $0 > 0 }
-            if volumes.count >= 2 {
-                let mean = volumes.reduce(0, +) / Double(volumes.count)
-                let variance = volumes.reduce(0) { $0 + pow($1 - mean, 2) } / Double(volumes.count)
-                let cv = mean > 0 ? sqrt(variance) / mean : 1.0
-                // Lower CV = more stable. CV of 0 = perfect, CV > 0.5 = very unstable
-                volumeStabilityScore = max(0, 1.0 - (cv * 2.0))
-            }
-        }
-
-        // 3. Recency Score (20%) — days since last workout
-        var recencyScore: Double = 0
-        if let lastWorkout = sessions.last.map({ $0.completedAt ?? $0.startedAt }) {
-            let daysSince = calendar.dateComponents([.day], from: lastWorkout, to: Date()).day ?? 30
-            // 0 days = 1.0, 7+ days = 0.0
-            recencyScore = max(0, 1.0 - (Double(daysSince) / 7.0))
-        }
-
-        // Weighted composite
-        let overall = Int(round(
-            (frequencyScore * 50.0) +
-            (volumeStabilityScore * 30.0) +
-            (recencyScore * 20.0)
-        ))
-
-        return ConsistencyScore(
-            overall: min(100, max(0, overall)),
-            frequencyScore: frequencyScore,
-            volumeStabilityScore: volumeStabilityScore,
-            recencyScore: recencyScore
-        )
-    }
-
-    // MARK: - Volume Landmark Data
-
-    /// Returns volume landmark comparison for each muscle group over the past 7 days (1 week).
-    func fetchVolumeLandmarkData(userId: UUID) async throws -> [VolumeLandmarkData] {
-        let calendar = Calendar.current
-        guard let startDate = calendar.date(byAdding: .day, value: -7, to: Date()) else {
-            return []
-        }
-
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-
-        let sessions: [WorkoutSession] = try await supabase.from("workout_sessions")
-            .select()
-            .eq("user_id", value: userId.uuidString)
-            .eq("status", value: "completed")
-            .gte("completed_at", value: formatter.string(from: startDate))
-            .execute()
-            .value
-
-        guard !sessions.isEmpty else { return [] }
-
-        let sessionIds = sessions.map(\.id)
-        let allSets = try await fetchSetsForSessions(sessionIds)
-        let workingSets = allSets.filter { $0.setType == .working }
-        guard !workingSets.isEmpty else { return [] }
-
-        let exerciseIds = Array(Set(workingSets.map(\.exerciseId)))
-        let exercises = try await fetchExercisesFull(ids: exerciseIds)
-        let exerciseMap = Dictionary(uniqueKeysWithValues: exercises.map { ($0.id, $0) })
-
-        // Count sets per muscle group
-        var setsByGroup: [String: Int] = [:]
-        for set in workingSets {
-            let group = exerciseMap[set.exerciseId]?.muscleGroup ?? "other"
-            setsByGroup[group, default: 0] += 1
-        }
-
-        return setsByGroup.compactMap { group, setCount in
-            guard group != "other" else { return nil }
-            let landmark = VolumeLandmarkReference.landmark(for: group)
-            let muscleGroup = MuscleGroup(rawValue: group)
-            return VolumeLandmarkData(
-                muscleGroup: group,
-                displayName: muscleGroup?.displayName ?? group.capitalized,
-                currentWeeklySets: setCount,
-                mev: landmark.mev,
-                mav: landmark.mavRange,
-                mrv: landmark.mrv
-            )
-        }
-        .sorted { $0.currentWeeklySets > $1.currentWeeklySets }
     }
 
     // MARK: - Strength Prediction (for ExerciseProgressView)
@@ -1202,51 +970,15 @@ struct AnalyticsService: Sendable {
             let delta = last.estimated1RM - priorE1RM
             let deltaPercent = priorE1RM > 0 ? (delta / priorE1RM) * 100 : 0
 
-            // Compute velocity from recent vs older split
-            let velocityStatus: VelocityStatus
-            let weeklyPercent: Double
-            if snapshots.count >= 4 {
-                let splitIndex = max(snapshots.count - 3, 1)
-                let older = Array(snapshots.prefix(splitIndex))
-                let recent = Array(snapshots.suffix(from: splitIndex))
-                let olderAvg = older.map(\.estimated1RM).reduce(0, +) / Double(older.count)
-                let recentAvg = recent.map(\.estimated1RM).reduce(0, +) / Double(recent.count)
-                guard olderAvg > 0 else {
-                    velocityStatus = .maintaining
-                    weeklyPercent = 0
-                    trajectories.append(TopLiftTrajectory(
-                        exerciseId: key.exerciseId,
-                        exerciseName: exerciseNames[key.exerciseId] ?? "Exercise",
-                        muscleGroup: exerciseMuscles[key.exerciseId] ?? "",
-                        workoutDayId: key.workoutDayId,
-                        dayName: key.workoutDayId.flatMap { dayNames[$0] },
-                        sessionCount: sessionCountByKey[key]?.count ?? 0,
-                        currentE1RM: last.estimated1RM,
-                        fourWeekDelta: delta,
-                        fourWeekDeltaPercent: deltaPercent,
-                        velocityStatus: velocityStatus,
-                        weeklyPercent: weeklyPercent,
-                        narrative: TopLiftTrajectory.buildNarrative(
-                            status: velocityStatus,
-                            weeklyPercent: weeklyPercent,
-                            deltaPercent: deltaPercent,
-                            sessionCount: snapshots.count
-                        ),
-                        sparkline: snapshots.map(\.estimated1RM),
-                        projection: projection,
-                        bestReps: last.bestReps
-                    ))
-                    continue
-                }
-                let percentChange = ((recentAvg - olderAvg) / olderAvg) * 100
-                let daysSpan = max(1, Double(Calendar.current.dateComponents([.day], from: older.last!.date, to: recent.last!.date).day ?? 7))
-                let weeksSpan = daysSpan / 7.0
-                weeklyPercent = weeksSpan > 0 ? percentChange / weeksSpan : 0
-                velocityStatus = VelocityStatus.from(weeklyPercent: weeklyPercent)
-            } else {
-                velocityStatus = .maintaining
-                weeklyPercent = 0
-            }
+            // Velocity is derived from the same four-week delta the row
+            // displays. Previously it came from a recent-vs-older average
+            // split, which could disagree in sign with the delta — producing
+            // rows that read "Progressing +0.8%/wk" in green beside "-7 lb" in
+            // orange. One source keeps the words and the number consistent.
+            let weeklyPercent: Double = snapshots.count >= 2 ? deltaPercent / 4.0 : 0
+            let velocityStatus: VelocityStatus = snapshots.count >= 2
+                ? VelocityStatus.from(weeklyPercent: weeklyPercent)
+                : .maintaining
 
             let narrative = TopLiftTrajectory.buildNarrative(
                 status: velocityStatus,
@@ -1275,6 +1007,91 @@ struct AnalyticsService: Sendable {
         }
 
         return trajectories
+    }
+
+    // MARK: - Progression Rate (Progress tab hero)
+
+    /// Aggregates the progression engine's own decisions into the hero verdict.
+    ///
+    /// Reads `progression_log` rather than deriving a strength trend from e1RM:
+    /// every exercise gets a decision regardless of modality, so bodyweight and
+    /// machine work count exactly like barbell work. One row is written per
+    /// exercise per completed session, so the row count per exercise doubles as
+    /// the session count — an exercise needs `minSessions` rows before it is
+    /// considered regularly trained and allowed to affect the verdict.
+    ///
+    /// Scoped by exercise *and* workout day, matching the rest of the app: the
+    /// same lift on two different days has independent progression histories.
+    func fetchProgressionRate(
+        userId: UUID,
+        days: Int = 56,
+        minSessions: Int = 3
+    ) async throws -> ProgressionVerdict {
+        struct DecisionRow: Decodable {
+            let exercise_id: String
+            let workout_day_id: String?
+            let decision: String
+            let created_at: String
+        }
+
+        let calendar = Calendar.current
+        guard let startDate = calendar.date(byAdding: .day, value: -days, to: Date()) else {
+            return ProgressionVerdict(
+                addedWeight: 0, addedReps: 0, holding: 0,
+                deloading: 0, buildingBaseline: 0
+            )
+        }
+
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        let rows: [DecisionRow] = try await supabase.from("progression_log")
+            .select("exercise_id,workout_day_id,decision,created_at")
+            .eq("user_id", value: userId.uuidString)
+            .gte("created_at", value: formatter.string(from: startDate))
+            .order("created_at", ascending: false)
+            .execute()
+            .value
+
+        // Rows arrive newest-first, so the first row seen for a key is its
+        // latest decision.
+        var latestByKey: [String: String] = [:]
+        var countByKey: [String: Int] = [:]
+        for row in rows {
+            let key = "\(row.exercise_id)-\(row.workout_day_id ?? "global")"
+            countByKey[key, default: 0] += 1
+            if latestByKey[key] == nil {
+                latestByKey[key] = row.decision
+            }
+        }
+
+        var addedWeight = 0
+        var addedReps = 0
+        var holding = 0
+        var deloading = 0
+        var buildingBaseline = 0
+
+        for (key, decisionRaw) in latestByKey {
+            guard (countByKey[key] ?? 0) >= minSessions else {
+                buildingBaseline += 1
+                continue
+            }
+            switch ProgressionDecision(rawValue: decisionRaw) {
+            case .increaseWeight: addedWeight += 1
+            case .increaseReps: addedReps += 1
+            case .maintain: holding += 1
+            case .deload, .deloadVolume: deloading += 1
+            case nil: break
+            }
+        }
+
+        return ProgressionVerdict(
+            addedWeight: addedWeight,
+            addedReps: addedReps,
+            holding: holding,
+            deloading: deloading,
+            buildingBaseline: buildingBaseline
+        )
     }
 
     // MARK: - Helpers

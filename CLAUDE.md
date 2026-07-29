@@ -298,19 +298,32 @@ The state pushed to the activity. Fields:
 
 ### Progress (`repIQ/Views/Progress/ProgressTabView.swift`)
 
-- Monthly stats header
-- Last-workout recap
-- **Strength trajectory** chart (top lifts, scoped by workout day)
-- **Consistency** section: consistency ring (0–100 score) + 12-week daily heatmap with PR-day dots. (The flame/"WEEK STREAK" chip was removed with the streak feature.)
+Order, top to bottom:
+
+- **Progression hero** (`ProgressionHeroCard`) — the tab's headline answer, "N/M exercises moving up"
+- Rep Sheet banner (only while last month's sheet is unread)
+- **Strength trajectory** (top lifts, scoped by workout day)
 - Smart insights (prescriptive coaching)
-- Volume trend (4-week baseline)
-- Muscle balance body diagram (uses `MuscleMap` Swift package)
+- Last-workout recap
+- **Training days** — 12-week heatmap with PR-day dots + session count
 - Recent PRs
-- Rep Sheet CTA (if ≥3 sessions this month) → `RepSheetView`
+- Monthly stats + lifetime totals
+- Vs-past-you (most-improved lift)
+- Volume trend (4-week baseline)
+- **Weekly sets per muscle** — body diagram (uses `MuscleMap` Swift package)
+- Rep Sheet CTA (only once the sheet has been read)
 
 Driven by `ProgressDashboardViewModel`. The exercise drill-in is `ExerciseProgressView` (via `ExerciseProgressLoaderView`) — trend chart, PRs, recent sessions. (Its lift-percentile card and community-tips section were removed with the social layer.)
 
-**Consistency score** (`AnalyticsService.fetchConsistencyScore`) is a 0–100 composite of three factors: **frequency (50%)**, **volume stability (30%)**, **recency (20%)**. The old streak factor (20%) was removed and its weight redistributed. `ConsistencyScore` no longer has a `streakScore` field.
+**The hero metric is progression rate, not an e1RM trend.** `AnalyticsService.fetchProgressionRate` reads `progression_log`, scoped by exercise *and* workout day, and counts how many regularly-trained exercises (3+ logged sessions — one row is written per exercise per completed session, so the row count is the session count) had a latest decision of `increaseWeight` or `increaseReps`. e1RM was rejected as the headline because it is meaningless for bodyweight work and unreliable in the 10–15 rep band — the same reason `ProgressionService` doesn't feed it into hypertrophy decisions. e1RM still drives the per-lift trajectory rows, where the reps are low enough for it to hold.
+
+**Muscle balance is measured in sets per week, not volume.** Absolute load differs between muscle groups for physiological reasons, so a volume share painted legs and back as dominant and arms as neglected for every user regardless of programming. `MuscleGroupVolume.setCount` is a `Double` because synergists earn half a set on compound lifts.
+
+**Layout is a flow, not stacked cards.** The hero is the only bordered element; everything else is separated by whitespace and hairline rules. `RQCard` takes `bordered: Bool = true` — the Progress components pass `false`. This is currently piloted on Progress only, so the tab deliberately looks different from Home and Profile.
+
+**No coloured left accent bars anywhere on this tab.** They read as generated-UI boilerplate; state is signalled by a hairline rule plus a coloured uppercase label instead. Colour marks data (a number, a percentage, a status word), never a container.
+
+**Removed from this tab** (see Recent ships for reasoning): MEV/MAV/MRV volume landmarks, effective reps, the push:pull ratio strip, and the 0–100 consistency score with its letter grade. `AnalyticsService.fetchVolumeLandmarkData`, `fetchEffectiveRepsSummary`, `fetchPushPullBalance` and `fetchConsistencyScore` were deleted along with their model types.
 
 ### Profile (`repIQ/Views/Profile/ProfileView.swift`)
 
@@ -454,6 +467,7 @@ The following were stripped to focus the first release on core tracking. The cli
 
 ## Recent ships
 
+- **Unreleased (post-build 11)** — Jul 2026 — **Progress tab: progression-rate hero, honesty audit, flow layout.** Replaced the tab's implicit "read the charts yourself" framing with a **hero that answers "am I progressing?" in one number** — `N/M exercises moving up`, from `AnalyticsService.fetchProgressionRate` over `progression_log`. Chosen over an e1RM trend because e1RM is meaningless for bodyweight and unreliable at 10–15 reps, so the metric now covers every exercise the app can log. A **forward-looking coaching line** sits under it, preferring an insight that names a tracked lift (`InsightEngine` gained a positive "Room to push" rule for when nothing is wrong) — this is the gap Strong and Hevy leave open, and the one place repIQ's autoregulation engine shows up on the Progress tab. Then an **audit of every visual for honesty**, cutting four: **MEV/MAV/MRV landmarks** (per-individual estimates presented as precise thresholds, and our counting gave synergists no set credit so pressing showed triceps "below MEV"), **effective reps** (`effectiveReps` assumes RPE 8 when unlogged, and RPE is optional — so non-RPE users saw `3 × setCount` dressed as analysis), the **push:pull strip** (redundant beside the muscle diagram), and the **0–100 consistency score** (its weights penalised 3-day programs, periodised volume variation, and deload weeks — telling well-programmed lifters they were inconsistent; the heatmap stayed). Muscle balance switched from **volume to sets per week**; `StrengthPrediction.isReliable` raised R² 0.3 → 0.5; vs-past-you now ranks candidates on the three-month window it actually displays; trajectory velocity now derives from the same four-week delta the row shows, so the words can't contradict the number. Visually, a **flow layout** (hero is the only bordered element, `RQCard` gained `bordered:`) with **no coloured left accent bars**, piloted on Progress only. Net ~-580 lines.
 - **Unreleased (post-build 11)** — Jul 2026 — **Monthly recap redesign: "Rep Sheet" card deck.** Renamed *Monthly Wrapped* → **Rep Sheet** (`MonthlyWrapped` → `RepSheet`, `MonthlyWrappedView` → `RepSheetView`, `WrappedStoryView` → `RepSheetDeckView`, `WrappedBannerCard` → `RepSheetBannerCard`) and replaced the Spotify-style one-way story with a swipeable **industrial spec-card deck** on a single accent blue (tap-zones + drag, depleting/restacking stack, exit-any-time). Shifted content from vanity totals to insight: a **13-card pool** (strength gained, biggest mover, breakthrough moment, PR wall, all-time rank, consistency heatmap, relative strength, muscle balance, month-over-month, when-you-train, style) each with a data-sufficiency **drop gate**, **notability-ranked** to ≤10 with cover first + an always-on next-month **coaching** closer; sparse months degrade gracefully. Two commits: (A) `DigestService.generateRepSheet` computes the full display-ready deck (`RepSheetContent`) and persists it to the previously-unused `monthly_wrapped.data` JSONB column — **no migration**; (B) the deck UI + rename + surfacing. Coaching is a month-scoped tip generator (not `InsightEngine`, whose rules are real-time nudges). Relative strength converts bodyweight kg→lb to match pound-canonical set weights. Internal `DigestService` helper names (`fetchWrappedHistory`, `markWrappedViewed`, …) and the `monthly_wrapped` table keep their names; `MonthlyReportView`/`MonthlyComparisonView` kept as the full report.
 - **Unreleased (post-build 11)** — Jul 2026 — **Progression rewrite: mode-split double progression.** Replaced `calculateTarget`'s unified e1RM-trend + confidence-gate model (which stalled the prescribed weight whenever the median rep count sat below the cap, and never credited exceeding the prescription) with two mode-specific state machines. **Hypertrophy** = strict double progression driven by actual reps vs the range — weight advances one increment only when every working set reaches the top (`minReps >= top`) or the hardest set had 3+ RIR (RPE early-bump); e1RM is no longer a decision input (unreliable at 10–15 reps). **Strength** = top-set double progression — bump when the top set hits 5, e1RM sizes the (floored) jump since it's valid at 3–5 reps. Targets are a **single rep goal**, not a range (`targetRepsLow == targetRepsHigh`; displays as one number that climbs toward the band top, e.g. "185 × 10"). Bodyweight path rewritten to the same single-target double progression with a below-floor guard (also fixes an inverted stored range on rep-drop deloads). Deload nets + Keep-Progressing path preserved. No schema change (`progression_log` shape unchanged; `estimated_1rm` unused for hypertrophy).
 - **Unreleased (post-build 11)** — Jul 2026 — **v1 scope-down: removed social + gamification + streak.** Deleted the Social tab and its ~21 views, `SocialViewModel`, and 9 services (`SocialService`, `FeedService`, `ChallengeService`, `MatchmakingService`, `LiftPercentileService`, `PresenceService`, `TipsService`, `NudgeService`, `GamificationService`). Stripped all IQ/badge/feed/presence work from `completeWorkout`. Removed the **training streak** in its entirety (both the profile-daily and analytics-weekly systems), reweighted the consistency score to frequency 50% / volume-stability 30% / recency 20% (dropped `ConsistencyScore.streakScore`), and removed the streak-protection notification. `MonthlyWrappedView` was decoupled from `SocialViewModel` and kept as a standalone recap. Three tabs remain (Home / Progress / Profile). No schema changes — social/streak tables are left idle in the DB.

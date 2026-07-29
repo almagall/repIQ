@@ -48,7 +48,15 @@ struct InsightEngine {
         }
         guard insights.count < maxInsights else { return insights }
 
-        // Rule 6: New PR celebration
+        // Rule 6: Headroom to push. Deliberately last of the actionable rules —
+        // it should only surface when none of the problem rules fired, which is
+        // also what makes it a safe default for the hero's coaching line.
+        if let ready = readyToProgressInsight(topLifts: topLifts, averageRPE: averageRPE) {
+            insights.append(ready)
+        }
+        guard insights.count < maxInsights else { return insights }
+
+        // Rule 7: New PR celebration
         if let pr = prCelebration(recentPRs: recentPRs) {
             insights.append(pr)
         }
@@ -77,6 +85,34 @@ struct InsightEngine {
             message: "\(lift.exerciseName)\(dayContext) is \(verb). Consider adding weight, changing rep range, or taking a deload week.",
             accentColor: lift.velocityStatus == .regressing ? RQColors.error : RQColors.warning,
             priority: 1
+        )
+    }
+
+    /// Surfaces a lift worth pushing when recent effort has been comfortable.
+    ///
+    /// An average RPE at or below 7 means roughly three reps in reserve across
+    /// the fortnight — headroom the progression engine will only exploit one
+    /// increment at a time. Naming the fastest-moving lift gives the user a
+    /// specific place to spend that headroom rather than generic encouragement.
+    private static func readyToProgressInsight(
+        topLifts: [TopLiftTrajectory],
+        averageRPE: Double?
+    ) -> InsightCard? {
+        guard let rpe = averageRPE, rpe > 0, rpe <= 7.0 else { return nil }
+
+        // Prefer a lift that's already moving; fall back to any tracked lift so
+        // the message still names something concrete.
+        let candidate = topLifts.first(where: { $0.velocityStatus.trend == .rising })
+            ?? topLifts.first
+        guard let lift = candidate else { return nil }
+
+        let dayContext = lift.dayName.map { " on \($0)" } ?? ""
+        return InsightCard(
+            icon: "arrow.up.right.circle",
+            title: "Room to push",
+            message: "Effort has averaged RPE \(String(format: "%.1f", rpe)) — you're leaving reps in reserve. \(lift.exerciseName)\(dayContext) is the one to load up next.",
+            accentColor: RQColors.success,
+            priority: 6
         )
     }
 
