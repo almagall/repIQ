@@ -14,7 +14,10 @@ import SwiftUI
 /// meaningful events (set logged, exercise changed, rest started/ended,
 /// stepper tapped).
 struct repIQActivityLiveActivity: Widget {
-    private let accent = Color(red: 0.0, green: 0.85, blue: 1.0) // matches RQColors.accent
+    // Manual mirror of RQColors.accent (#00AAFF) — the widget target cannot see
+    // the main app's Design/ files, so Theme.swift changes must be hand-copied
+    // here and in repIQActivityBundle.swift.
+    private let accent = Color(red: 0.0, green: 0.667, blue: 1.0)
 
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: WorkoutActivityAttributes.self) { context in

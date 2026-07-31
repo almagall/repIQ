@@ -6,18 +6,31 @@ enum RQColors {
     static let accentLight = Color(hex: "33BBFF")
     static let accentDark = Color(hex: "0088CC")
 
-    // Backgrounds - pure black, high contrast
-    static let background = Color(hex: "000000")
-    static let surfacePrimary = Color(hex: "0A0A0A")
-    static let surfaceSecondary = Color(hex: "141414")
-    static let surfaceTertiary = Color(hex: "1C1C1C")
+    // Backgrounds - near-black, biased a few points toward the accent's hue so
+    // #00AAFF reads as part of the page rather than floating above it. A truly
+    // neutral ground makes the accent look pasted on.
+    static let background = Color(hex: "05080C")
+    static let surfacePrimary = Color(hex: "0A0F16")
+    static let surfaceSecondary = Color(hex: "131A23")
+    static let surfaceTertiary = Color(hex: "1C2430")
 
-    // Text - pure white, sharp contrast
+    // Structure - the 1px rules the flow layout is built on. Distinct from the
+    // text ramp: a border is not disabled text and should not borrow its value.
+    static let hairline = Color(hex: "1E2732")
+
+    // Text - carries the same hue bias as the surfaces
     static let textPrimary = Color(hex: "FFFFFF")
-    static let textSecondary = Color(hex: "999999")
-    static let textTertiary = Color(hex: "555555")
+    static let textSecondary = Color(hex: "8A93A1")
+    static let textTertiary = Color(hex: "565E6B")
 
-    // Semantic
+    // Progression state - the vocabulary behind StrengthTrend. Deliberately not
+    // the semantic set below: a deload is a plan, not an error, and holding a
+    // weight to bank reps is not a warning.
+    static let stateAdvancing = Color(hex: "2FD48A")
+    static let stateHolding = Color(hex: "E0A93B")
+    static let stateBacking = Color(hex: "FF5C5C")
+
+    // Semantic - reserved for actual confirmations, alerts and failures
     static let success = Color(hex: "00CC66")
     static let warning = Color(hex: "FF9500")
     static let error = Color(hex: "FF3B30")
@@ -40,7 +53,7 @@ enum RQColors {
     // Chart Colors
     static let chartPositive = Color(hex: "00CC66")
     static let chartNegative = Color(hex: "FF3B30")
-    static let chartGrid = Color(hex: "1C1C1C")
+    static let chartGrid = Color(hex: "161D26")
 
     // Muscle Group Colors (for balance chart)
     static let muscleGroupColors: [String: Color] = [

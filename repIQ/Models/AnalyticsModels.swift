@@ -186,9 +186,9 @@ enum StrengthTrend: String, Sendable {
 
     var color: Color {
         switch self {
-        case .rising: return RQColors.success
-        case .holding: return RQColors.warning
-        case .slipping: return RQColors.error
+        case .rising: return RQColors.stateAdvancing
+        case .holding: return RQColors.stateHolding
+        case .slipping: return RQColors.stateBacking
         }
     }
 

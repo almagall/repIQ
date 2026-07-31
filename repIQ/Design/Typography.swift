@@ -22,6 +22,25 @@ enum RQTypography {
     // Big target display - monospaced for TE feel
     static let targetWeight = Font.system(size: 44, weight: .heavy, design: .monospaced)
 
-    // Technical label - uppercase section headers
+    // The set prescription, read at rack distance mid-set. One per screen.
+    static let poster = Font.system(size: 76, weight: .heavy, design: .monospaced)
+
+    // The progression answer on Home and Progress. One per screen.
+    static let hero = Font.system(size: 52, weight: .heavy, design: .monospaced)
+
+    // Technical label - uppercase section headers. Pair with labelTracking;
+    // prefer the rqLabel() modifier so the two never drift apart.
     static let label = Font.system(size: 10, weight: .semibold, design: .monospaced)
+
+    /// 0.2em at 10pt. Uppercase monospace set solid reads as a rendering bug.
+    static let labelTracking: CGFloat = 2
+}
+
+extension View {
+    /// Uppercase technical label: the font and the tracking it depends on.
+    /// SwiftUI's `Font` cannot carry tracking, so the pair has to travel as a
+    /// modifier rather than a single token.
+    func rqLabel() -> some View {
+        font(RQTypography.label).tracking(RQTypography.labelTracking)
+    }
 }

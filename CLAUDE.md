@@ -389,9 +389,11 @@ The `expandedBinding` in `MainTabView` is custom: its `set` calls `coordinator.m
 ### Colors (`RQColors`)
 
 - **Accent**: `accent` (#00AAFF electric blue), `accentLight`, `accentDark`
-- **Backgrounds**: `background` (#000), `surfacePrimary` (#0A0A0A), `surfaceSecondary` (#141414), `surfaceTertiary` (#1C1C1C)
-- **Text**: `textPrimary` (white), `textSecondary` (#999), `textTertiary` (#555)
-- **Semantic**: `success` (green), `warning` (gold), `error` (red), `info` (light blue)
+- **Backgrounds**: `background` (#05080C), `surfacePrimary` (#0A0F16), `surfaceSecondary` (#131A23), `surfaceTertiary` (#1C2430). Near-black but **biased toward the accent's hue** — a neutral ground makes #00AAFF look pasted on.
+- **Structure**: `hairline` (#1E2732) — the 1px rules the flow layout is built on. Not part of the text ramp; a border is not disabled text.
+- **Text**: `textPrimary` (white), `textSecondary` (#8A93A1), `textTertiary` (#565E6B) — same hue bias as the surfaces.
+- **Progression state**: `stateAdvancing` (#2FD48A), `stateHolding` (#E0A93B), `stateBacking` (#FF5C5C). Backs `StrengthTrend.color`, which is the app's shared trend vocabulary. Deliberately *not* the semantic set — a deload is a plan, not an error; holding a weight to bank reps is not a warning.
+- **Semantic**: `success` (green), `warning` (gold), `error` (red), `info` (light blue) — reserved for actual confirmations, alerts and failures.
 - **Training modes**: `hypertrophy` (purple), `strength` (orange)
 - **Set types**: `warmup`, `working` (green), `cooldown`, `dropSet`, `failure` (red)
 - **Muscle groups**: 11 unique colors (chest, back, shoulders, biceps, triceps, etc.)
@@ -409,7 +411,8 @@ The `expandedBinding` in `MainTabView` is custom: its `set` calls `coordinator.m
 - **Titles** are monospaced (industrial feel): `largeTitle, title1, title2, title3`.
 - **Body** is proportional: `headline, body, callout, subheadline, footnote, caption`.
 - **Numbers** are monospaced: `numbers, numbersSmall`.
-- **Special**: `targetWeight` (44pt heavy mono — rest timer big number), `label` (10pt mono uppercase — section headers).
+- **Special**: `poster` (76pt heavy mono — the set prescription, one per screen), `hero` (52pt heavy mono — the progression answer, one per screen), `targetWeight` (44pt heavy mono — rest timer big number), `label` (10pt mono uppercase — section headers).
+- **Labels need tracking.** SwiftUI `Font` can't carry it, so `label` travels with `labelTracking` (2pt = 0.2em). Use the **`.rqLabel()`** view modifier rather than pairing them by hand — the manual `.font(RQTypography.label).tracking(1.5)` pattern had already drifted across call sites.
 
 ### Components (`repIQ/Views/Components/`)
 

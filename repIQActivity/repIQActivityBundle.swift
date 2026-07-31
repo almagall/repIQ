@@ -105,7 +105,10 @@ private struct WidgetEntryView: View {
 
 // MARK: - Layouts
 
-private let widgetAccent = Color(red: 0.0, green: 0.667, blue: 1.0) // #00AAFF — RQColors.accent
+// Manual mirror of RQColors.accent (#00AAFF) — the widget target cannot see the
+// main app's Design/ files, so Theme.swift changes must be hand-copied here and
+// in repIQActivityLiveActivity.swift.
+private let widgetAccent = Color(red: 0.0, green: 0.667, blue: 1.0)
 private let widgetTextPrimary = Color.white
 private let widgetTextSecondary = Color.white.opacity(0.7)
 private let widgetTextTertiary = Color.white.opacity(0.45)
