@@ -245,7 +245,7 @@ struct ExercisePickerView: View {
                 .cornerRadius(RQRadius.small)
                 .overlay(
                     RoundedRectangle(cornerRadius: RQRadius.small)
-                        .stroke(isSelected ? RQColors.accent : RQColors.textTertiary, lineWidth: 1)
+                        .stroke(isSelected ? RQColors.accent : RQColors.hairline, lineWidth: 1)
                 )
         }
     }

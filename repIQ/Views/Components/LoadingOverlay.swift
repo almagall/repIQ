@@ -24,7 +24,7 @@ struct LoadingOverlay: View {
             .cornerRadius(RQRadius.large)
             .overlay(
                 RoundedRectangle(cornerRadius: RQRadius.large)
-                    .stroke(RQColors.textTertiary, lineWidth: 1)
+                    .stroke(RQColors.hairline, lineWidth: 1)
             )
         }
     }

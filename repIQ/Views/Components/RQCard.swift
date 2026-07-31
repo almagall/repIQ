@@ -20,7 +20,7 @@ struct RQCard<Content: View>: View {
         .overlay {
             if bordered {
                 RoundedRectangle(cornerRadius: RQSpacing.cardCornerRadius)
-                    .stroke(RQColors.textTertiary, lineWidth: 1)
+                    .stroke(RQColors.hairline, lineWidth: 1)
             }
         }
     }

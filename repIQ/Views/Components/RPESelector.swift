@@ -26,7 +26,7 @@ struct RPESelector: View {
                             .cornerRadius(RQRadius.small)
                             .overlay(
                                 RoundedRectangle(cornerRadius: RQRadius.small)
-                                    .stroke(selectedRPE == value ? modeColor : RQColors.textTertiary, lineWidth: 1)
+                                    .stroke(selectedRPE == value ? modeColor : RQColors.hairline, lineWidth: 1)
                             )
                     }
                 }

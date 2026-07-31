@@ -104,7 +104,7 @@ struct ProgramBrowserView: View {
             .padding(.vertical, RQSpacing.xxs)
             .overlay(
                 RoundedRectangle(cornerRadius: RQRadius.small)
-                    .stroke(RQColors.textTertiary.opacity(0.5), lineWidth: 1)
+                    .stroke(RQColors.hairline, lineWidth: 1)
             )
     }
 
@@ -121,7 +121,7 @@ struct ProgramBrowserView: View {
                 .cornerRadius(RQRadius.small)
                 .overlay(
                     RoundedRectangle(cornerRadius: RQRadius.small)
-                        .stroke(isSelected ? RQColors.accent : RQColors.textTertiary, lineWidth: 1)
+                        .stroke(isSelected ? RQColors.accent : RQColors.hairline, lineWidth: 1)
                 )
         }
     }

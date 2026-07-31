@@ -120,7 +120,7 @@ struct ProgressionHeroCard: View {
         .padding(.top, RQSpacing.lg)
         .overlay(alignment: .top) {
             Rectangle()
-                .fill(RQColors.surfaceTertiary)
+                .fill(RQColors.hairline)
                 .frame(height: 0.5)
         }
     }

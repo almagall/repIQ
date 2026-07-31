@@ -221,10 +221,10 @@ struct ProgressTabView: View {
             .padding(.vertical, RQSpacing.md)
             .contentShape(Rectangle())
             .overlay(alignment: .top) {
-                Rectangle().fill(RQColors.surfaceTertiary).frame(height: 0.5)
+                Rectangle().fill(RQColors.hairline).frame(height: 0.5)
             }
             .overlay(alignment: .bottom) {
-                Rectangle().fill(RQColors.surfaceTertiary).frame(height: 0.5)
+                Rectangle().fill(RQColors.hairline).frame(height: 0.5)
             }
         }
         .buttonStyle(.plain)

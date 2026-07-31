@@ -28,7 +28,7 @@ struct RQTextField: View {
         .cornerRadius(RQRadius.medium)
         .overlay(
             RoundedRectangle(cornerRadius: RQRadius.medium)
-                .stroke(isFocused ? RQColors.accent : RQColors.textTertiary, lineWidth: 1)
+                .stroke(isFocused ? RQColors.accent : RQColors.hairline, lineWidth: 1)
         )
     }
 }
