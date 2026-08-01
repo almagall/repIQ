@@ -265,45 +265,35 @@ struct ExerciseLogView: View {
         VStack(spacing: RQSpacing.sm) {
             // Target row (if progression target exists)
             if let target = exercise.progressionTarget {
-                HStack(spacing: RQSpacing.sm) {
-                    Image(systemName: decisionIcon(target.decision))
-                        .font(.system(size: 11))
-                        .foregroundColor(decisionColor(target.decision))
+                VStack(alignment: .leading, spacing: RQSpacing.md) {
+                    HStack(spacing: RQSpacing.xs) {
+                        Image(systemName: decisionIcon(target.decision))
+                            .font(.system(size: 10, weight: .bold))
 
-                    Text(target.decision.displayName)
-                        .font(RQTypography.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(decisionColor(target.decision))
+                        Text(target.decision.displayName.uppercased())
+                            .rqLabel()
 
-                    Button {
-                        showDecisionInfoSheet = true
-                    } label: {
-                        Image(systemName: "info.circle")
-                            .font(.system(size: 11))
-                            .foregroundColor(RQColors.textTertiary)
+                        Button {
+                            showDecisionInfoSheet = true
+                        } label: {
+                            Image(systemName: "info.circle")
+                                .font(.system(size: 11))
+                                .foregroundColor(RQColors.textTertiary)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
+                    .foregroundColor(decisionColor(target.decision))
 
-                    Text("·")
-                        .foregroundColor(RQColors.textTertiary)
+                    HStack(alignment: .bottom, spacing: RQSpacing.md) {
+                        prescriptionFigure(exercise, target)
 
-                    Text("\(formatWeight(target.targetWeight)) lbs × \(target.targetRepRangeDisplay)")
-                        .font(RQTypography.numbersSmall)
-                        .foregroundColor(RQColors.textPrimary)
+                        Spacer(minLength: RQSpacing.sm)
 
-                    Spacer()
-
-                    // RPE range for hypertrophy, ascending range for strength
-                    if exercise.trainingMode == .hypertrophy {
-                        let baseRPE = target.targetRPE
-                        let topRPE = min(baseRPE + Double(exercise.targetSets - 1) * 0.5, 9.0)
-                        Text("RPE \(formatRPE(baseRPE))–\(formatRPE(topRPE))")
-                            .font(RQTypography.caption)
-                            .foregroundColor(RQColors.textTertiary)
-                    } else {
-                        Text("RPE 6–\(formatRPE(target.targetRPE))")
-                            .font(RQTypography.caption)
-                            .foregroundColor(RQColors.textTertiary)
+                        // No LAST here on purpose: the context strip on the live
+                        // set already shows it, sourced from the actual set at
+                        // that position rather than the engine's stored summary.
+                        // Both on screen would visibly disagree.
+                        prescriptionStat("TARGET RPE", targetRPEDisplay(exercise, target))
                     }
                 }
                 .sheet(isPresented: $showDecisionInfoSheet) {
@@ -399,6 +389,59 @@ struct ExerciseLogView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Prescription
+
+    /// The session's instruction, sized to be read from the rack rather than at
+    /// arm's length. Bodyweight lifts have no load to show, so reps carry the
+    /// poster weight instead.
+    @ViewBuilder
+    private func prescriptionFigure(_ exercise: ExerciseLogEntry, _ target: ProgressionTarget) -> some View {
+        let usesLoad = !(exercise.isBodyweightOnly && !exercise.useAddedWeight)
+
+        HStack(alignment: .firstTextBaseline, spacing: RQSpacing.xs) {
+            if usesLoad {
+                Text(formatWeight(target.targetWeight))
+                    .font(RQTypography.poster)
+                    .foregroundColor(RQColors.textPrimary)
+            } else {
+                Text("BW")
+                    .font(RQTypography.hero)
+                    .foregroundColor(RQColors.textSecondary)
+            }
+
+            Text("×")
+                .font(RQTypography.title2)
+                .foregroundColor(RQColors.textTertiary)
+
+            Text("\(target.targetRepsLow)")
+                .font(usesLoad ? RQTypography.hero : RQTypography.poster)
+                .foregroundColor(RQColors.textPrimary)
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.5)
+    }
+
+    private func prescriptionStat(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .trailing, spacing: 1) {
+            Text(label)
+                .rqLabel()
+                .foregroundColor(RQColors.textTertiary)
+            Text(value)
+                .font(RQTypography.numbersSmall)
+                .foregroundColor(RQColors.textSecondary)
+        }
+    }
+
+    /// Hypertrophy climbs 0.5 per set from the base; strength ramps from 6.
+    private func targetRPEDisplay(_ exercise: ExerciseLogEntry, _ target: ProgressionTarget) -> String {
+        if exercise.trainingMode == .hypertrophy {
+            let base = target.targetRPE
+            let top = min(base + Double(exercise.targetSets - 1) * 0.5, 9.0)
+            return "\(formatRPE(base))–\(formatRPE(top))"
+        }
+        return "6–\(formatRPE(target.targetRPE))"
     }
 
     // MARK: - Decision Helpers

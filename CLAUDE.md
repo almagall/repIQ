@@ -362,6 +362,8 @@ Standalone monthly recap. `RepSheetView` self-fetches the current user id (via `
    - Inline PR detection → `prCelebration` overlay if PR.
    - Auto-starts rest timer (with superset-aware logic).
    - Strong haptic for PR, medium for normal set.
+
+   **The prescription is the largest object on the screen.** `ExerciseLogView`'s header renders `targetWeight × targetReps` at `RQTypography.poster` (76pt) — the screen is read at rack distance, one-handed, between efforts, so the instruction has to survive that. Bodyweight lifts have no load, so reps take the poster size and `BW` drops to `hero`. `SetContextStrip` pays for that height: it renders **only on the live set** (`SetRowView.isLiveSet`, the first incomplete one) rather than above every row, where it repeated an identical LAST/TARGET pair once per set. Per-set height dropped ~40%. The header deliberately carries **no LAST** — the strip's comes from the actual set at that position while the header's would come from the engine's stored summary, and the two visibly disagree.
 7. **Minimize:** chevron-down → `coordinator.minimize()` → `presentation = .minimized` → `fullScreenCover` dismisses → mini-bar shows above tab bar (`MainTabView.withMiniBar`). Tap mini-bar → `coordinator.expand()` → cover re-presents with state intact.
 8. **Lock Screen / DI:** Live Activity steppers + LOG SET button do the same operation as in-app set completion (via `WorkoutIntentBridge`).
 9. **Finish:** alert confirm → `viewModel.completeWorkout()`:

@@ -39,6 +39,15 @@ struct SetRowView: View {
         (equipment == "barbell" || equipment == "smith_machine") && (set?.weight ?? 0) > AppConstants.Defaults.barWeight
     }
 
+    /// The next set the user will actually perform. The context strip renders
+    /// only here — on every row it repeated the same LAST/TARGET pair once per
+    /// set, and that duplicated height is what the poster prescription above
+    /// the list is spending.
+    private var isLiveSet: Bool {
+        guard let sets = viewModel.exercises[safe: exerciseIndex]?.sets else { return false }
+        return sets.firstIndex(where: { !$0.isCompleted }) == setIndex
+    }
+
     @State private var weightText: String = ""
     @State private var repsText: String = ""
     @State private var showNotes: Bool = false
@@ -63,20 +72,22 @@ struct SetRowView: View {
         return AnyView(
             VStack(alignment: .leading, spacing: RQSpacing.xs) {
                 // Comparison strip — replaces old Target/Last/baseline/Fill stack
-                SetContextStrip(
-                    previousSet: previousSet,
-                    targetWeight: stripTarget?.weight,
-                    targetReps: stripTarget?.reps,
-                    isBodyweightOnly: isBodyweightOnly,
-                    isCompleted: set.isCompleted,
-                    completedWeight: set.weight,
-                    completedReps: set.reps,
-                    completedRPE: set.rpe,
-                    showHypertrophyDropNote: trainingMode == .hypertrophy
-                        && setPosition >= 2 && !isBodyweightOnly,
-                    setTypeColor: setTypeColor,
-                    onTargetTap: { fillFromTarget() }
-                )
+                if isLiveSet {
+                    SetContextStrip(
+                        previousSet: previousSet,
+                        targetWeight: stripTarget?.weight,
+                        targetReps: stripTarget?.reps,
+                        isBodyweightOnly: isBodyweightOnly,
+                        isCompleted: set.isCompleted,
+                        completedWeight: set.weight,
+                        completedReps: set.reps,
+                        completedRPE: set.rpe,
+                        showHypertrophyDropNote: trainingMode == .hypertrophy
+                            && setPosition >= 2 && !isBodyweightOnly,
+                        setTypeColor: setTypeColor,
+                        onTargetTap: { fillFromTarget() }
+                    )
+                }
 
                 // Input row
                 HStack(spacing: RQSpacing.sm) {
