@@ -13,28 +13,13 @@ struct LifetimeTotalsStrip: View {
             RQSectionHeader(title: "LIFETIME")
 
             RQCard(bordered: false) {
-                HStack(spacing: 0) {
-                    statTile(value: "\(totalSessions)", label: "WORKOUTS")
-                    Divider().frame(height: 36).background(RQColors.surfaceTertiary)
-                    statTile(value: formatVolume(totalVolume), label: "VOLUME")
-                    Divider().frame(height: 36).background(RQColors.surfaceTertiary)
-                    statTile(value: "\(totalPRCount)", label: "PRS")
-                }
+                RQStatRow(items: [
+                    .init("WORKOUTS", "\(totalSessions)"),
+                    .init("VOLUME", formatVolume(totalVolume)),
+                    .init("PRS", "\(totalPRCount)"),
+                ])
             }
         }
-    }
-
-    private func statTile(value: String, label: String) -> some View {
-        VStack(spacing: RQSpacing.xxs) {
-            Text(value)
-                .font(RQTypography.title3)
-                .foregroundColor(RQColors.textPrimary)
-            Text(label)
-                .font(.system(size: 9, weight: .semibold))
-                .tracking(0.5)
-                .foregroundColor(RQColors.textTertiary)
-        }
-        .frame(maxWidth: .infinity)
     }
 
     private func formatVolume(_ volume: Double) -> String {

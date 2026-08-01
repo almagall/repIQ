@@ -423,7 +423,8 @@ The `expandedBinding` in `MainTabView` is custom: its `set` calls `coordinator.m
 
 | Component | Use for |
 |---|---|
-| `RQCard` | Bordered card container. Pass content via view builder. |
+| `RQCard` | Bordered card container. Pass content via view builder. `bordered: false` drops the border and inset for the flow layout. |
+| `RQStatRow` | 2–4 figures split by vertical hairlines: value over a tracked label, optional delta. `prominence` picks the value size (`.section` for lifetime/monthly totals, `.inline` inside a card that already has a headline). Reserves the delta line across the row so labels share a baseline when only some tiles have one. |
 | `RQButton` | Primary (accent bg, black text), secondary (outlined), destructive (red outline). Uppercase. |
 | `RQTextField` | Standard text input. |
 | `EmptyStateView` | Icon + title + message + optional CTA. |

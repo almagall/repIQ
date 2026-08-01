@@ -88,29 +88,18 @@ struct LastWorkoutRecapCard: View {
 
                         Divider().background(RQColors.surfaceTertiary)
 
-                        // Stats row
-                        HStack(spacing: 0) {
-                            statTile(value: durationLabel, label: "DURATION")
-                            statTile(value: "\(recap.workingSets)", label: "SETS")
-                            statTile(value: volumeLabel, label: "VOLUME")
-                        }
+                        RQStatRow(
+                            items: [
+                                .init("DURATION", durationLabel),
+                                .init("SETS", "\(recap.workingSets)"),
+                                .init("VOLUME", volumeLabel),
+                            ],
+                            prominence: .inline
+                        )
                     }
                 }
             }
             .buttonStyle(.plain)
         }
-    }
-
-    private func statTile(value: String, label: String) -> some View {
-        VStack(spacing: 2) {
-            Text(value)
-                .font(RQTypography.numbersSmall)
-                .foregroundColor(RQColors.textPrimary)
-            Text(label)
-                .font(.system(size: 9, weight: .semibold))
-                .tracking(0.5)
-                .foregroundColor(RQColors.textTertiary)
-        }
-        .frame(maxWidth: .infinity)
     }
 }
