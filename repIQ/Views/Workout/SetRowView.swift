@@ -39,13 +39,17 @@ struct SetRowView: View {
         (equipment == "barbell" || equipment == "smith_machine") && (set?.weight ?? 0) > AppConstants.Defaults.barWeight
     }
 
-    /// The next set the user will actually perform. The context strip renders
-    /// only here — on every row it repeated the same LAST/TARGET pair once per
-    /// set, and that duplicated height is what the poster prescription above
-    /// the list is spending.
+    /// The next *working* set. The context strip renders only here — on every
+    /// row it repeated the same LAST/TARGET pair once per set, and that
+    /// duplicated height is what the poster prescription above the list is
+    /// spending.
+    ///
+    /// Scoped to working sets because warmups and cooldowns carry no target to
+    /// compare against: anchoring to the literal next set hid the strip from
+    /// the whole exercise until every warmup had been logged.
     private var isLiveSet: Bool {
         guard let sets = viewModel.exercises[safe: exerciseIndex]?.sets else { return false }
-        return sets.firstIndex(where: { !$0.isCompleted }) == setIndex
+        return sets.firstIndex(where: { !$0.isCompleted && $0.setType == .working }) == setIndex
     }
 
     @State private var weightText: String = ""
