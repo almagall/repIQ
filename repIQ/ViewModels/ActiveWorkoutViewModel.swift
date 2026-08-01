@@ -236,21 +236,27 @@ final class ActiveWorkoutViewModel {
         let modeUpper = trainingMode.repRange.upperBound
         let effectiveUpper = min(repCap ?? modeUpper, modeUpper)
 
-        // Bail early when the saved range is already in-range AND ordered correctly.
-        // (Old rows in progression_log can have low > high when the engine bug
-        // generated an inverted range — those still need normalizing.)
-        let alreadyValid = target.targetRepsLow <= effectiveUpper
-            && target.targetRepsHigh <= effectiveUpper
-            && target.targetRepsLow <= target.targetRepsHigh
-        if alreadyValid { return target }
-
         var clampedLow = min(target.targetRepsLow, effectiveUpper)
-        let clampedHigh = min(target.targetRepsHigh, effectiveUpper)
-        // Final guard: if the saved row was inverted, collapse to a single value
-        // rather than letting it propagate as a nonsense "low-high" display.
+        var clampedHigh = min(target.targetRepsHigh, effectiveUpper)
+        // Guard against inverted rows written by the old rep-cap clamping bug.
         if clampedLow > clampedHigh {
             clampedLow = clampedHigh
         }
+
+        // The engine prescribes a single rep goal, so a stored row that still
+        // carries a spread predates the mode-split rewrite. Collapse it to the
+        // bottom of the range — where the current engine resets to after a
+        // weight increase — and drop the stored reasoning, which was written by
+        // the e1RM-trend model the rewrite removed and would otherwise be
+        // attributed to the live engine. Self-heals: completing the exercise
+        // once writes a fresh row.
+        let carriesLegacySpread = clampedLow != clampedHigh
+        if carriesLegacySpread { clampedHigh = clampedLow }
+
+        guard carriesLegacySpread
+            || clampedLow != target.targetRepsLow
+            || clampedHigh != target.targetRepsHigh
+        else { return target }
         return ProgressionTarget(
             exerciseId: target.exerciseId,
             trainingMode: target.trainingMode,
@@ -259,7 +265,7 @@ final class ActiveWorkoutViewModel {
             targetRepsHigh: clampedHigh,
             targetRPE: target.targetRPE,
             decision: target.decision,
-            reasoning: target.reasoning,
+            reasoning: carriesLegacySpread ? "" : target.reasoning,
             previousWeight: target.previousWeight,
             previousReps: target.previousReps,
             previousRPE: target.previousRPE,

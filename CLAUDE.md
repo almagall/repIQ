@@ -164,6 +164,8 @@ Both mode functions share the same preamble ordering: **deload safety nets → b
 
 **The prescription is a single rep goal, not a range.** `targetRepsLow == targetRepsHigh` always (so `targetRepRangeDisplay` renders one number, e.g. "185 × 10"). The rep *band* (10–15 etc.) still lives on `TrainingMode.repRange` and drives the weight-bump trigger and reset; the target is just the one number to hit this session, which climbs week to week toward the top of the band.
 
+**Legacy `progression_log` rows are normalized at read, not migrated.** Rows written before the rewrite still carry a rep *spread* and reasoning prose from the old e1RM-trend model. `ActiveWorkoutViewModel.clampedTarget` treats `low != high` as the legacy marker (the current engine writes `low == high` at all three construction sites), collapses the spread to `low`, and clears the stored reasoning rather than attributing the removed model's explanation to the live engine. The stored *decision and weight* are left alone — they're what the old engine prescribed, and recomputing every exercise at workout start would put N extra queries on the critical path for something that self-heals after one logged session.
+
 ### Hypertrophy — strict double progression (in order)
 
 Reference = the whole set (uses `minReps`, the *minimum* reps across working sets, and `workingWeight` = median). Range 10–15 (narrowed by `repCap`).

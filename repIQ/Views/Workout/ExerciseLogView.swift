@@ -310,9 +310,11 @@ struct ExerciseLogView: View {
                     InfoSheet(topic: decisionTopic(target))
                 }
 
-                // Inline reasoning — always visible for non-deload decisions
-                // (deload decisions have their own banner below)
-                if target.decision != .deload && target.decision != .deloadVolume {
+                // Inline reasoning — visible for non-deload decisions that carry
+                // it. Legacy rows have theirs cleared by clampedTarget, so the
+                // emptiness check keeps the icon from rendering on its own.
+                if target.decision != .deload && target.decision != .deloadVolume,
+                   !target.reasoning.isEmpty {
                     VStack(alignment: .leading, spacing: RQSpacing.xxs) {
                         HStack(alignment: .top, spacing: RQSpacing.xs) {
                             Image(systemName: "text.bubble")
@@ -404,37 +406,51 @@ struct ExerciseLogView: View {
     private func decisionTopic(_ target: ProgressionTarget) -> ProgressExplainer.Topic {
         let (title, icon, explanation, keyPoints, howToUse): (String, String, String, [String], String)
 
+        let isStrength = target.trainingMode == .strength
+
         switch target.decision {
         case .increaseWeight:
             title = "Increase Weight"
             icon = "arrow.up.circle.fill"
             explanation = target.reasoning
-            keyPoints = [
-                "Your estimated 1RM is trending upward across recent sessions.",
-                "Weight is prescribed as a percentage of your current e1RM for your target rep range.",
-                "After increasing weight, your reps will reset to the bottom of the range — this is normal.",
-            ]
-            howToUse = "Focus on hitting the target weight for the prescribed reps on each set. If you can't complete the minimum reps, the weight may auto-adjust next session."
+            keyPoints = isStrength
+                ? [
+                    "Your top set reached the top of its rep range last session.",
+                    "The size of the jump comes from your estimated 1RM, which is reliable at 3–5 reps.",
+                    "Reps reset to the bottom of the range — this is normal.",
+                ]
+                : [
+                    "Every working set reached the top of your rep range last session.",
+                    "Weight goes up by one equipment increment, not by a percentage — beating the range earns the jump sooner, not a bigger one.",
+                    "Reps reset to the bottom of the range — this is normal.",
+                ]
+            howToUse = "Focus on hitting the target weight for the prescribed reps on each set. If you can't reach the bottom of the range, the weight holds next session while you rebuild."
 
         case .increaseReps:
             title = "Increase Reps"
             icon = "arrow.up.right.circle.fill"
             explanation = target.reasoning
-            keyPoints = [
-                "Your strength is stable — estimated 1RM hasn't changed significantly.",
-                "Adding reps at the same weight is how you earn the next weight increase.",
-                "Once you hit the top of your rep range on all sets, weight will go up.",
-            ]
-            howToUse = "Keep the same weight and aim for 1-2 more reps than last session. When you consistently hit the top of your rep range, the algorithm will prescribe a weight increase."
+            keyPoints = isStrength
+                ? [
+                    "Your top set landed inside the rep range but not at the top of it.",
+                    "Adding a rep to the top set at the same weight is how you earn the next increase.",
+                    "Reach the top of the range and the weight goes up.",
+                ]
+                : [
+                    "Your sets landed inside the rep range but not all at the top of it.",
+                    "Banking reps at the same weight is how you earn the next increase.",
+                    "Once every working set hits the top of the range, the weight goes up.",
+                ]
+            howToUse = "Keep the same weight and aim for the prescribed rep goal, which climbs by one each session you stay in range."
 
         case .maintain:
             title = "Maintain"
             icon = "arrow.right.circle.fill"
             explanation = target.reasoning
             keyPoints = [
-                "This is not a setback — maintaining is part of the progression cycle.",
-                "Your body may need time to adapt before the next jump.",
-                "Repeating the same performance builds the capacity for future progress.",
+                "Either you finished below the bottom of the rep range, or the session read as a one-off off-day.",
+                "This is not a setback — holding the weight to rebuild is part of the cycle.",
+                "Repeating the same performance builds the capacity for the next jump.",
             ]
             howToUse = "Match what you did last session. Focus on form and controlled reps. Consistent effort at the same load builds the foundation for your next progression."
 
@@ -443,11 +459,11 @@ struct ExerciseLogView: View {
             icon = "arrow.down.circle.fill"
             explanation = target.reasoning
             keyPoints = [
-                "Your estimated 1RM has been declining — a sign of accumulated fatigue.",
-                "Reducing weight temporarily allows your body to recover and rebuild.",
-                "Deloads are a proven strategy for breaking through plateaus.",
+                "Triggered either by how long it's been since your last deload, or by consecutive sessions with a sharp drop in working weight.",
+                "Targets drop to roughly 90% so your body can recover and rebuild.",
+                "It's a plan, not a failure — and it's your call. You can decline it and keep progressing.",
             ]
-            howToUse = "Use the reduced weight this session. Focus on crisp, controlled reps. You should feel strong again within 1-2 sessions, at which point the algorithm will push you forward."
+            howToUse = "Use the reduced weight this session. Focus on crisp, controlled reps. You should feel strong again within 1-2 sessions, at which point the engine will push you forward."
 
         case .deloadVolume:
             title = "Reduce Volume"
