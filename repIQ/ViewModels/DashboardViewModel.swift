@@ -16,10 +16,14 @@ final class DashboardViewModel {
     /// The prior month's wrapped, if it's been generated and not yet viewed.
     /// Drives the dashboard banner that appears on the 1st–14th of a new month.
     var priorMonthWrapped: RepSheet?
+    /// Same verdict the Progress tab leads with. Both screens read it from
+    /// `fetchProgressionRate` so the headline number can't drift between them.
+    var progressionVerdict: ProgressionVerdict?
 
     private let workoutService = WorkoutService()
     private let templateService = TemplateService()
     private let digestService = DigestService()
+    private let analyticsService = AnalyticsService()
 
     /// Whether the dashboard should surface the "Your X Wrapped is ready"
     /// banner card. True only on the 1st–14th of a month, when the prior
@@ -40,6 +44,9 @@ final class DashboardViewModel {
             async let allSessions = workoutService.fetchAllSessions(userId: userId)
             async let templates = templateService.fetchTemplates(userId: userId)
             async let lastPR = fetchLastPRSummary(userId: userId)
+            async let verdict = analyticsService.fetchProgressionRate(userId: userId)
+
+            progressionVerdict = try? await verdict
 
             recentSession = try await sessions.first
             weeklySetCount = try await setCount

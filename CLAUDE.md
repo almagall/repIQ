@@ -290,6 +290,7 @@ The state pushed to the activity. Fields:
 
 - **Welcome card** — first-time users only (`@AppStorage("hasSeenWelcomeCard")`).
 - **Rep Sheet banner** — appears 1st–14th of each month if prior month's Rep Sheet is ready & unviewed (`RepSheetBannerCard` → pushes `RepSheetView`).
+- **Progression ring** (`ProgressionHeroCard(style: .ring)`) — same verdict the Progress tab leads with, above the CTA so "am I progressing?" is answered before "train now". Hidden while `verdict.isBaseline`. `DashboardViewModel` fetches it with the same `fetchProgressionRate` call, so the two screens cannot disagree. Sized deliberately: a larger ring pushed Start Workout behind the tab bar.
 - **Quick Start** — hero CTA. Triggers template picker → `WorkoutDayPickerView` → `coordinator.startWorkout(template:day:date:)`.
 - **My Templates** — list of user templates. Tap → `WorkoutDayPickerView`.
 - **Workout History** — link to `WorkoutHistoryView`.
@@ -302,7 +303,7 @@ The state pushed to the activity. Fields:
 
 Order, top to bottom:
 
-- **Progression hero** (`ProgressionHeroCard`) — the tab's headline answer, "N/M exercises moving up"
+- **Progression hero** (`ProgressionHeroCard`, `.inline` style) — the tab's headline answer, "N/M exercises moving up", followed by the four **decision rails** (`addedWeight` / `addedReps` / `holding` / `deloading`). The rails replaced a flattened breakdown string; they sum to `total`, so the headline can't drift from its own explanation. Rails with a zero count are dropped, so sparse accounts degrade cleanly.
 - Rep Sheet banner (only while last month's sheet is unread)
 - **Strength trajectory** (top lifts, scoped by workout day)
 - Smart insights (prescriptive coaching)

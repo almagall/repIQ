@@ -31,6 +31,12 @@ struct DashboardView: View {
                         }
                     }
 
+                    // Progression answer — the screen's headline, above the CTA
+                    // so "am I progressing?" is answered before "train now".
+                    if let verdict = viewModel.progressionVerdict, !verdict.isBaseline {
+                        ProgressionHeroCard(verdict: verdict, coaching: nil, style: .ring)
+                    }
+
                     // Quick Start
                     QuickStartCard {
                         if !viewModel.templates.isEmpty {

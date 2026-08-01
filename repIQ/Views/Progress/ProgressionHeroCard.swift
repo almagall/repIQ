@@ -11,10 +11,19 @@ import SwiftUI
 /// The card is the only bordered element on the tab, so it reads as the single
 /// focal point in an otherwise borderless scroll.
 struct ProgressionHeroCard: View {
+    /// How the figure reads. Home leads with the ring because the fraction is
+    /// the whole screen's answer; Progress sets it inline because the tab
+    /// continues into per-lift detail underneath.
+    enum Style {
+        case inline
+        case ring
+    }
+
     let verdict: ProgressionVerdict
     /// Forward-looking coaching line — the top-priority insight. Optional
     /// because a brand-new account has nothing worth saying yet.
     let coaching: InsightCard?
+    var style: Style = .inline
 
     @State private var hasAppeared = false
 
@@ -25,13 +34,11 @@ struct ProgressionHeroCard: View {
             if verdict.isBaseline {
                 baselineFigure
             } else {
-                verdictFigure
-                if !verdict.breakdown.isEmpty {
-                    Text(verdict.breakdown)
-                        .font(RQTypography.caption)
-                        .foregroundColor(RQColors.textSecondary)
-                        .padding(.top, RQSpacing.md)
+                switch style {
+                case .inline: verdictFigure
+                case .ring: ringFigure
                 }
+                decisionRails
             }
 
             if let coaching {
@@ -47,6 +54,94 @@ struct ProgressionHeroCard: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: RQRadius.extraLarge))
         .onAppear { hasAppeared = true }
+    }
+
+    // MARK: - Ring
+
+    /// The arc is literally movingUp / total — the geometry is the data, not a
+    /// weighted index. That distinction is why this can be a ring at all.
+    private var ringFigure: some View {
+        HStack {
+            Spacer()
+            ZStack {
+                Circle()
+                    .stroke(RQColors.surfaceTertiary, lineWidth: 8)
+                Circle()
+                    .trim(from: 0, to: hasAppeared ? verdict.progressingShare : 0)
+                    .stroke(
+                        verdict.trend.color,
+                        style: StrokeStyle(lineWidth: 8, lineCap: .butt)
+                    )
+                    .rotationEffect(.degrees(-90))
+                    .animation(.easeOut(duration: 0.9), value: hasAppeared)
+
+                VStack(spacing: RQSpacing.xxs) {
+                    HStack(alignment: .firstTextBaseline, spacing: 0) {
+                        Text("\(verdict.movingUp)")
+                            .font(RQTypography.title1)
+                            .foregroundColor(RQColors.textPrimary)
+                        Text("/\(verdict.total)")
+                            .font(RQTypography.title3)
+                            .foregroundColor(RQColors.textTertiary)
+                    }
+                    .contentTransition(.numericText())
+                    .animation(.easeOut(duration: 0.4), value: verdict.movingUp)
+
+                    Text("MOVING UP")
+                        .rqLabel()
+                        .foregroundColor(RQColors.textTertiary)
+                }
+            }
+            .frame(width: 132, height: 132)
+            Spacer()
+        }
+        .padding(.top, RQSpacing.md)
+    }
+
+    // MARK: - Rails
+
+    /// The four decision counts the verdict is built from. They sum to `total`,
+    /// so the headline can never drift from its own explanation.
+    private var decisionRails: some View {
+        VStack(spacing: 0) {
+            rail("Weight increases", verdict.addedWeight, RQColors.stateAdvancing)
+            rail("Rep increases", verdict.addedReps, RQColors.stateAdvancing)
+            rail("Holding", verdict.holding, RQColors.stateHolding)
+            rail("Backing off", verdict.deloading, RQColors.stateBacking)
+        }
+        .padding(.top, RQSpacing.md)
+    }
+
+    @ViewBuilder
+    private func rail(_ name: String, _ count: Int, _ tint: Color) -> some View {
+        if count > 0 {
+            VStack(alignment: .leading, spacing: RQSpacing.xs) {
+                HStack {
+                    Text(name)
+                        .font(RQTypography.callout)
+                        .foregroundColor(RQColors.textSecondary)
+                    Spacer()
+                    Text("\(count)")
+                        .font(RQTypography.numbersSmall)
+                        .foregroundColor(tint)
+                }
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Rectangle().fill(RQColors.surfaceTertiary)
+                        Rectangle()
+                            .fill(tint)
+                            .frame(width: geo.size.width * share(count))
+                    }
+                }
+                .frame(height: 2)
+            }
+            .padding(.vertical, RQSpacing.xs)
+        }
+    }
+
+    private func share(_ count: Int) -> CGFloat {
+        guard verdict.total > 0 else { return 0 }
+        return CGFloat(count) / CGFloat(verdict.total)
     }
 
     // MARK: - Status
@@ -69,10 +164,10 @@ struct ProgressionHeroCard: View {
         HStack(alignment: .firstTextBaseline, spacing: RQSpacing.md) {
             HStack(alignment: .firstTextBaseline, spacing: 0) {
                 Text("\(verdict.movingUp)")
-                    .font(.system(size: 46, weight: .bold, design: .monospaced))
+                    .font(RQTypography.hero)
                     .foregroundColor(RQColors.textPrimary)
                 Text("/\(verdict.total)")
-                    .font(.system(size: 24, weight: .medium, design: .monospaced))
+                    .font(RQTypography.title1)
                     .foregroundColor(RQColors.textTertiary)
             }
             .contentTransition(.numericText())
