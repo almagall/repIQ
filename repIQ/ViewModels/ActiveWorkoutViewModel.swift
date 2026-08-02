@@ -643,7 +643,7 @@ final class ActiveWorkoutViewModel {
             exercises[currentExerciseIndex].sets[upcomingIndex].weight = max(0, weight)
         }
         exercises[currentExerciseIndex].sets[upcomingIndex].reps = reps
-        if let rpe {
+        if let rpe = Self.normalizedRPE(rpe) {
             exercises[currentExerciseIndex].sets[upcomingIndex].rpe = rpe
         }
 
@@ -685,12 +685,12 @@ final class ActiveWorkoutViewModel {
             let next: Double?
             if let c = setEntry.rpe {
                 let bumped = c + sign
-                next = (bumped < 1) ? nil : min(10, bumped)
+                next = (bumped < 1) ? nil : Self.normalizedRPE(bumped)
             } else {
                 // First tap from nil seeds at the program's target RPE so the
                 // user lands on a sensible value matched to their training
                 // mode (hypertrophy ~7-8, strength ~8-9). Falls back to 7.
-                next = setEntry.targetRPE ?? 7
+                next = Self.normalizedRPE(setEntry.targetRPE ?? 7)
             }
             exercises[currentExerciseIndex].sets[upcomingIndex].rpe = next
         }
@@ -1613,7 +1613,17 @@ final class ActiveWorkoutViewModel {
         guard exercises.indices.contains(exerciseIndex),
               exercises[exerciseIndex].sets.indices.contains(setIndex),
               !exercises[exerciseIndex].sets[setIndex].isCompleted else { return }
-        exercises[exerciseIndex].sets[setIndex].rpe = rpe
+        exercises[exerciseIndex].sets[setIndex].rpe = Self.normalizedRPE(rpe)
+    }
+
+    /// A *logged* RPE is always a whole number 1-10. The engine's prescribed
+    /// RPE is not: the hypertrophy per-set ramp adds 0.5 per set and the
+    /// mesocycle offset adds 0.5/1.0, so any path that seeds a logged value
+    /// from a target (fill-from-target, the Live Activity stepper) would
+    /// otherwise store a half step that `%.0f` then displays as whole.
+    static func normalizedRPE(_ rpe: Double?) -> Double? {
+        guard let rpe else { return nil }
+        return min(max(rpe.rounded(), 1), 10)
     }
 
     func updateNote(exerciseIndex: Int, setIndex: Int, notes: String?) {

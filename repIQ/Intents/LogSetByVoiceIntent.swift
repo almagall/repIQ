@@ -41,10 +41,11 @@ struct LogSetByVoiceIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        // Clamp RPE into the valid range. Siri occasionally hands back values
-        // outside 1–10 from edge phrasings ("RPE eleven"); silently clamping
-        // beats throwing.
-        let clampedRPE: Double? = rpe.map { min(max($0, 1), 10) }
+        // Round to a whole number and clamp into the valid range. Siri hands
+        // back values outside 1–10 from edge phrasings ("RPE eleven") and
+        // fractional ones from "eight and a half"; silently normalizing beats
+        // throwing.
+        let clampedRPE: Double? = rpe.map { min(max($0.rounded(), 1), 10) }
 
         try await WorkoutIntentBridge.shared.logSetWithValues(
             weight: weight,
