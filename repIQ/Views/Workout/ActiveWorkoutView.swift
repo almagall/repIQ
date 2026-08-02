@@ -10,14 +10,9 @@ struct ActiveWorkoutView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // Main workout content
+                // Main workout content. Rest lives in the set logger's hero
+                // ring now — no full-screen timer overlay.
                 workoutContent
-
-                // Rest timer overlay
-                if viewModel.restTimerActive {
-                    RestTimerView(viewModel: viewModel)
-                        .transition(.opacity)
-                }
 
                 // PR celebration overlay
                 if let celebration = viewModel.prCelebration {
@@ -232,67 +227,32 @@ struct ActiveWorkoutView: View {
                 exerciseSelector
             }
 
-            // Exercise content — stacked for supersets, single for solo
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(spacing: RQSpacing.lg) {
-                        // Error message
-                        if let error = viewModel.errorMessage {
-                            Text(error)
-                                .font(RQTypography.footnote)
-                                .foregroundColor(RQColors.error)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, RQSpacing.md)
-                        }
-
-                        let groupIndices = viewModel.currentGroupIndices
-                        let isSuperset = groupIndices.count > 1
-
-                        // Superset header with round indicator
-                        if isSuperset {
-                            supersetHeader(groupIndices: groupIndices)
-                        }
-
-                        // Stacked exercise cards (or single for solo)
-                        HStack(alignment: .top, spacing: RQSpacing.sm) {
-                            // Gold bracket bar for supersets
-                            if isSuperset {
-                                RoundedRectangle(cornerRadius: 2)
-                                    .fill(RQColors.supersetGold)
-                                    .frame(width: 3)
-                            }
-
-                            VStack(spacing: 0) {
-                                ForEach(Array(groupIndices.enumerated()), id: \.element) { position, exerciseIdx in
-                                    VStack(spacing: 0) {
-                                        ExerciseLogView(
-                                            viewModel: viewModel,
-                                            exerciseIndex: exerciseIdx
-                                        )
-                                        .id(exerciseIdx)
-
-                                        // Gold connector between superset exercises
-                                        if isSuperset && position < groupIndices.count - 1 {
-                                            supersetConnector
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .padding(.horizontal, RQSpacing.screenHorizontal)
-                    .padding(.top, RQSpacing.lg)
-                    .padding(.bottom, RQSpacing.xxxl)
+            // One exercise per screen: the set logger owns its own internal
+            // scroll so the hero ring stays pinned. Superset members page
+            // between each other (the logger auto-advances on log).
+            if !viewModel.exercises.isEmpty {
+                if let error = viewModel.errorMessage {
+                    Text(error)
+                        .font(RQTypography.footnote)
+                        .foregroundColor(RQColors.error)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, RQSpacing.md)
                 }
-                .scrollDismissesKeyboard(.interactively)
-                .onChange(of: viewModel.scrollToExerciseIndex) { _, newValue in
-                    if let target = newValue {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            proxy.scrollTo(target, anchor: .top)
-                        }
-                        viewModel.scrollToExerciseIndex = nil
-                    }
+
+                let groupIndices = viewModel.currentGroupIndices
+                if groupIndices.count > 1 {
+                    supersetHeader(groupIndices: groupIndices)
+                        .padding(.horizontal, RQSpacing.screenHorizontal)
+                        .padding(.top, RQSpacing.sm)
                 }
+
+                SetLoggerView(
+                    viewModel: viewModel,
+                    exerciseIndex: viewModel.currentExerciseIndex
+                )
+                .id(viewModel.currentExerciseIndex)
+            } else {
+                Spacer()
             }
         }
     }
@@ -562,25 +522,6 @@ struct ActiveWorkoutView: View {
         .padding(.vertical, RQSpacing.sm)
         .background(RQColors.supersetGold.opacity(0.1))
         .cornerRadius(RQRadius.small)
-    }
-
-    private var supersetConnector: some View {
-        HStack(spacing: RQSpacing.sm) {
-            Rectangle()
-                .fill(RQColors.supersetGold)
-                .frame(width: 3, height: 20)
-
-            Image(systemName: "arrow.down")
-                .font(.system(size: 10, weight: .bold))
-                .foregroundColor(RQColors.supersetGold)
-
-            Text("no rest")
-                .font(.system(size: 9, weight: .semibold, design: .rounded))
-                .foregroundColor(RQColors.supersetGold.opacity(0.7))
-
-            Spacer()
-        }
-        .padding(.leading, RQSpacing.md)
     }
 
     private func supersetGroupLabel(for groupIndices: [Int]) -> String {
