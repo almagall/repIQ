@@ -222,6 +222,18 @@ enum ProgressExplainer {
 
     // MARK: - Dashboard Topics
 
+    static let targetsHit = Topic(
+        title: "Targets Hit",
+        icon: "scope",
+        explanation: "Before every working set, repIQ gives you a weight and a rep goal based on how your last session went. This is how often you met it.",
+        keyPoints: [
+            "A set counts as hit when you match or beat both the weight and the reps. Lifting lighter doesn't count, however many reps you get.",
+            "Warm-ups and any extra sets you add have no target, so they're left out entirely rather than counted against you.",
+            "On strength lifts only the top set counts — the ramp-up sets are meant to feel easy.",
+        ],
+        howToUse: "Around 75–90% is the zone: hard enough that the weights keep climbing, close enough that you keep hitting them. Much lower and the plan is ahead of you. Sitting at 100% usually means the targets are too soft and you're leaving progress behind."
+    )
+
     static let volumeTrend = Topic(
         title: "Volume Trend",
         icon: "chart.bar.fill",
