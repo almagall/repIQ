@@ -20,7 +20,7 @@ This file is auto-loaded into every Claude session in this repo. Keep it accurat
 | Archive for App Store | `xcodebuild ... -configuration Release -destination 'generic/platform=iOS' -archivePath build/repIQ.xcarchive archive` |
 | Supabase URL | `https://yuwtotiahdmnjplrumdu.supabase.co` (config in `repIQ/Config/Supabase.swift`) |
 | App Group | `group.com.repiq.shared` (used by Live Activity intent bridging) |
-| Current shipping version | `1.5 (build 11)` (May 2026) — the social/streak strip is unreleased post-11 work |
+| Current shipping version | `1.5 (build 13)` (Aug 2026) — first build carrying the hero-ring logger, the v1 scope-down, the progression rewrite, the Rep Sheet, and the target-adherence Progress tab |
 
 ---
 
