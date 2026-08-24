@@ -6,22 +6,29 @@ enum RQColors {
     static let accentLight = Color(hex: "33BBFF")
     static let accentDark = Color(hex: "0088CC")
 
-    // Backgrounds - near-black, biased a few points toward the accent's hue so
-    // #00AAFF reads as part of the page rather than floating above it. A truly
-    // neutral ground makes the accent look pasted on.
-    static let background = Color(hex: "05080C")
-    static let surfacePrimary = Color(hex: "0A0F16")
-    static let surfaceSecondary = Color(hex: "131A23")
-    static let surfaceTertiary = Color(hex: "1C2430")
+    // Backgrounds - the "Tide" ramp. Neutrals are pulled toward the accent's
+    // hue as flat tints, never gradients, so #00AAFF reads as part of the page
+    // rather than floating above it. The four values sit within a narrow
+    // lightness band on purpose: depth comes from small consistent steps plus
+    // a shadow, and wide jumps between surfaces look cheap.
+    static let background = Color(hex: "080C11")
+    static let surfacePrimary = Color(hex: "0E161E")
+    static let surfaceSecondary = Color(hex: "12202C")
+    static let surfaceTertiary = Color(hex: "1A2A38")
 
     // Structure - the 1px rules the flow layout is built on. Distinct from the
     // text ramp: a border is not disabled text and should not borrow its value.
-    static let hairline = Color(hex: "1E2732")
+    static let hairline = Color(hex: "16232F")
+
+    /// Inset top edge on a raised sheet — the highlight a real surface catches
+    /// along its upper lip. Tinted rather than pure white so it belongs to the
+    /// same ramp as everything else.
+    static let edgeHighlight = Color(hex: "96CDFF").opacity(0.07)
 
     // Text - carries the same hue bias as the surfaces
     static let textPrimary = Color(hex: "FFFFFF")
-    static let textSecondary = Color(hex: "8A93A1")
-    static let textTertiary = Color(hex: "565E6B")
+    static let textSecondary = Color(hex: "8FA5BA")
+    static let textTertiary = Color(hex: "5E7488")
 
     // Progression state - the vocabulary behind StrengthTrend. Deliberately not
     // the semantic set below: a deload is a plan, not an error, and holding a
@@ -92,4 +99,61 @@ enum RQRadius {
     static let medium: CGFloat = 4
     static let large: CGFloat = 6
     static let extraLarge: CGFloat = 12
+
+    // MARK: - Sheet geometry (Tide)
+    //
+    // The rounded surface system the Progress tab is built on. Kept separate
+    // from the sharp scale above so screens can migrate one at a time rather
+    // than every corner in the app changing at once.
+    //
+    // `sheetInner` is deliberately `sheet - pad`: a nested element inside a
+    // padded card needs a smaller radius or the two curves fight, which is the
+    // most common tell of a layout nobody measured.
+
+    static let sheet: CGFloat = 18
+    static let sheetInner: CGFloat = 11
+    static let control: CGFloat = 9
+    /// Any value beyond half the height gives a capsule; this is the intent.
+    static let pill: CGFloat = 999
+}
+
+// MARK: - Sheet surface
+
+/// The raised plane the Tide layout is built from.
+///
+/// Two shadows rather than one: a tight contact shadow that anchors the card
+/// to the page, and a wide soft one that gives it height. A single blurred
+/// shadow reads as a stock component; the pair reads as an object resting on
+/// a surface. The inset top edge is the highlight along the card's upper lip.
+struct RQSheet: ViewModifier {
+    var fill: Color = RQColors.surfacePrimary
+    var radius: CGFloat = RQRadius.sheet
+    /// Raised sheets sit above the page's own cards and carry a deeper shadow.
+    var elevated: Bool = false
+
+    func body(content: Content) -> some View {
+        content
+            .background(fill)
+            .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+            .overlay(alignment: .top) {
+                RQColors.edgeHighlight
+                    .frame(height: 1)
+                    .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+            }
+            .shadow(color: .black.opacity(elevated ? 0.55 : 0.45), radius: 2, x: 0, y: 1)
+            .shadow(color: .black.opacity(elevated ? 0.45 : 0.32), radius: elevated ? 30 : 26, x: 0, y: elevated ? 12 : 10)
+    }
+}
+
+extension View {
+    /// Applies the Tide sheet surface. Pass `elevated` for a card that sits
+    /// above the page's other cards, such as the tab's headline or its
+    /// single call to action.
+    func rqSheet(
+        fill: Color = RQColors.surfacePrimary,
+        radius: CGFloat = RQRadius.sheet,
+        elevated: Bool = false
+    ) -> some View {
+        modifier(RQSheet(fill: fill, radius: radius, elevated: elevated))
+    }
 }
