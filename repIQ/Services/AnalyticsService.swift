@@ -1022,9 +1022,16 @@ struct AnalyticsService: Sendable {
     ///
     /// Scoped by exercise *and* workout day, matching the rest of the app: the
     /// same lift on two different days has independent progression histories.
+    /// - Parameters:
+    ///   - days: must match the window the Progress tab's target section uses.
+    ///     Both describe "targets going up", and the day rows count within this
+    ///     same span — a wider window here made the headline disagree with the
+    ///     rows directly beneath it.
+    ///   - minSessions: a lift needs real history before its latest decision
+    ///     means anything. The day rows apply the same gate.
     func fetchProgressionRate(
         userId: UUID,
-        days: Int = 56,
+        days: Int = 28,
         minSessions: Int = 3
     ) async throws -> ProgressionVerdict {
         struct DecisionRow: Decodable {
