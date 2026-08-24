@@ -54,7 +54,10 @@ final class OfflineSetQueue {
                     setType: pendingSet.setType,
                     weight: pendingSet.weight,
                     reps: pendingSet.reps,
-                    rpe: pendingSet.rpe
+                    rpe: pendingSet.rpe,
+                    targetWeight: pendingSet.targetWeight,
+                    targetReps: pendingSet.targetReps,
+                    targetRPE: pendingSet.targetRPE
                 )
                 // Successfully saved — don't add to remaining
             } catch {
@@ -108,6 +111,11 @@ struct PendingSet: Codable, Identifiable {
     let rpe: Double?
     let queuedAt: Date
 
+    /// Optional so queue files written before targets existed still decode.
+    let targetWeight: Double?
+    let targetReps: Int?
+    let targetRPE: Double?
+
     init(
         sessionId: UUID,
         exerciseId: UUID,
@@ -115,7 +123,10 @@ struct PendingSet: Codable, Identifiable {
         setType: SetType,
         weight: Double,
         reps: Int,
-        rpe: Double?
+        rpe: Double?,
+        targetWeight: Double? = nil,
+        targetReps: Int? = nil,
+        targetRPE: Double? = nil
     ) {
         self.id = UUID()
         self.sessionId = sessionId
@@ -126,5 +137,8 @@ struct PendingSet: Codable, Identifiable {
         self.reps = reps
         self.rpe = rpe
         self.queuedAt = Date()
+        self.targetWeight = targetWeight
+        self.targetReps = targetReps
+        self.targetRPE = targetRPE
     }
 }

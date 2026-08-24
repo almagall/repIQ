@@ -1218,6 +1218,17 @@ final class ActiveWorkoutViewModel {
         exercises[exerciseIndex].sets[setIndex].isSaving = true
         errorMessage = nil
 
+        // Only persist a target when the engine actually prescribed one.
+        // `SetEntry` falls back to the pending values when no target was
+        // snapshotted, so warm-ups (never pre-filled by design) and the first
+        // session of a new exercise would otherwise store a 0×0 "target" that
+        // every set trivially meets. Reps are the discriminator rather than
+        // weight, because bodyweight work legitimately prescribes zero load.
+        let hasPrescription = set.setType == .working && set.targetReps > 0
+        let targetWeight = hasPrescription ? set.targetWeight : nil
+        let targetReps = hasPrescription ? set.targetReps : nil
+        let targetRPE = hasPrescription ? set.targetRPE : nil
+
         do {
             let savedSet = try await workoutService.saveSet(
                 sessionId: sessionId,
@@ -1227,7 +1238,10 @@ final class ActiveWorkoutViewModel {
                 weight: set.weight,
                 reps: set.reps,
                 rpe: set.rpe,
-                notes: set.notes
+                notes: set.notes,
+                targetWeight: targetWeight,
+                targetReps: targetReps,
+                targetRPE: targetRPE
             )
 
             exercises[exerciseIndex].sets[setIndex].savedSetId = savedSet.id
@@ -1242,7 +1256,10 @@ final class ActiveWorkoutViewModel {
                 setType: set.setType,
                 weight: set.weight,
                 reps: set.reps,
-                rpe: set.rpe
+                rpe: set.rpe,
+                targetWeight: targetWeight,
+                targetReps: targetReps,
+                targetRPE: targetRPE
             )
             OfflineSetQueue.shared.enqueue(pending)
 
