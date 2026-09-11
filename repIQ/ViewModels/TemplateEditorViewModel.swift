@@ -28,14 +28,9 @@ final class TemplateEditorViewModel {
     var isLoading = false
     var errorMessage: String?
     var saveStatus: SaveStatus = .idle
-    var isShared: Bool = false
 
     /// Whether the template exists in the database (has been created).
     var isSaved: Bool { templateId != nil }
-
-    /// Public accessor for the underlying template id (used by the UI to
-    /// call `TemplateService.setIsShared` directly without re-fetching).
-    var currentTemplateId: UUID? { templateId }
 
     private var templateId: UUID?
     private var isEditing: Bool { templateId != nil }
@@ -60,22 +55,7 @@ final class TemplateEditorViewModel {
         templateName = template.name
         templateDescription = template.description ?? ""
         workoutDays = template.workoutDays ?? []
-        isShared = template.safeIsShared
         saveStatus = .saved
-    }
-
-    /// Toggles share visibility on the persisted template. No-op when the
-    /// template hasn't been saved yet (no id to update).
-    func setIsShared(_ value: Bool) async {
-        guard let templateId else { return }
-        let previous = isShared
-        isShared = value
-        do {
-            try await templateService.setTemplateIsShared(id: templateId, isShared: value)
-        } catch {
-            // Revert on failure so the toggle reflects reality.
-            isShared = previous
-        }
     }
 
     // MARK: - Auto-Save

@@ -58,35 +58,6 @@ struct TemplateService: Sendable {
             .execute()
     }
 
-    /// Flips the shareable bit on a template. Friends can read shareable
-    /// templates via the RLS policy added in migration
-    /// 20260518_shared_templates_and_presence.sql.
-    func setTemplateIsShared(id: UUID, isShared: Bool) async throws {
-        struct Payload: Encodable {
-            let is_shared: Bool
-            let updated_at: String
-        }
-        try await supabase.from("templates")
-            .update(Payload(
-                is_shared: isShared,
-                updated_at: ISO8601DateFormatter().string(from: Date())
-            ))
-            .eq("id", value: id.uuidString)
-            .execute()
-    }
-
-    /// Fetches a friend's shareable templates. RLS hides non-shared
-    /// templates from non-owners; this returns whatever the policy allows.
-    func fetchSharedTemplates(of ownerId: UUID) async throws -> [Template] {
-        try await supabase.from("templates")
-            .select()
-            .eq("user_id", value: ownerId.uuidString)
-            .eq("is_shared", value: true)
-            .order("sort_order")
-            .execute()
-            .value
-    }
-
     // MARK: - Workout Days
 
     func createWorkoutDay(templateId: UUID, name: String, description: String?, sortOrder: Int) async throws -> WorkoutDay {
