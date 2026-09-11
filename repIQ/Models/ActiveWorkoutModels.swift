@@ -20,6 +20,23 @@ enum PRType: Equatable {
     }
 }
 
+/// What inline PR detection compares each logged set against. Kept separate
+/// from `PersonalRecord` because the rep PR here is "most reps at this exact
+/// weight", whereas `personal_records.reps` is most reps at any weight (one
+/// row per type, so it cannot hold a per-weight best).
+struct PRBaseline {
+    struct Mark {
+        var weight: Double
+        var reps: Int
+        var achievedAt: Date
+    }
+
+    var heaviest: Mark?
+    var bestRepsAtWeight: [Double: Mark]
+
+    static let empty = PRBaseline(heaviest: nil, bestRepsAtWeight: [:])
+}
+
 /// Data for the PR celebration popup shown after completing a PR set.
 struct PRCelebration: Identifiable, Equatable {
     static func == (lhs: PRCelebration, rhs: PRCelebration) -> Bool { lhs.id == rhs.id }

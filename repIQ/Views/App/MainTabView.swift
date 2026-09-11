@@ -3,6 +3,8 @@ import SwiftUI
 struct MainTabView: View {
     let workoutCoordinator: WorkoutCoordinator
 
+    @Environment(\.scenePhase) private var scenePhase
+
     @State private var selectedTab = 0
     @State private var showRecoveryAlert = false
     @State private var recoveredState: SavedWorkoutState?
@@ -71,6 +73,14 @@ struct MainTabView: View {
                     recoveredState = nil
                 }
                 .environment(workoutCoordinator)
+            }
+        }
+        // Observed here rather than in ActiveWorkoutView: the cover leaves the
+        // hierarchy when the workout is minimized, so a backgrounded mini-bar
+        // workout would otherwise only be as fresh as the last 30s autosave tick.
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .background || newPhase == .inactive {
+                workoutCoordinator.activeViewModel?.saveWorkoutState()
             }
         }
         .task {

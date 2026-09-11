@@ -90,6 +90,12 @@ struct SavedExerciseState: Codable {
     // these fields existed still decode.
     var setScheme: SetScheme?
     var repCap: Int?
+    // Template-level config that no fetch can recover after a crash: history
+    // and targets are re-read from the DB on resume, but rest, notes and the
+    // added-weight toggle exist only on the day exercise / in the session.
+    var restSeconds: Int?
+    var notes: String?
+    var useAddedWeight: Bool?
 }
 
 /// Serializable set state.
@@ -101,4 +107,11 @@ struct SavedSetState: Codable {
     let rpe: Double?
     let isCompleted: Bool
     let savedSetId: UUID?
+    // The GOAL snapshot. Without it a recovered `SetEntry` falls back to its
+    // pending values as the target, and completion then persists a target
+    // the set trivially meets — polluting adherence for every set logged
+    // after a resume.
+    var targetWeight: Double?
+    var targetReps: Int?
+    var targetRPE: Double?
 }

@@ -64,6 +64,7 @@ final class WorkoutCoordinator {
             vm.restoreFromSavedState(state)
             vm.startAutoSavePublic()
             activeViewModel = vm
+            Task { await vm.hydrateRecoveredContext() }
         }
         presentation = .expanded
     }

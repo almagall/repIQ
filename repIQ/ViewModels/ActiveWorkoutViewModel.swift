@@ -74,8 +74,9 @@ final class ActiveWorkoutViewModel {
     var pendingSetCount: Int { OfflineSetQueue.shared.pendingCount }
 
     // MARK: - PR Tracking (for inline celebration)
-    /// Current personal records per exercise (keyed by exerciseId), fetched at workout start.
-    private var currentPRs: [UUID: [PersonalRecord]] = [:]
+    /// Per-exercise PR baseline fetched at workout start and advanced in place as
+    /// sets complete, so later sets in the same session compare against earlier ones.
+    private var prBaselines: [UUID: PRBaseline] = [:]
 
     // MARK: - Private
     private let workoutService = WorkoutService()
@@ -753,8 +754,8 @@ final class ActiveWorkoutViewModel {
 
             // 3b. Fetch current PRs for inline PR detection
             for exerciseId in exerciseIds {
-                if let prs = try? await progressionService.fetchCurrentPRs(userId: userId, exerciseId: exerciseId) {
-                    currentPRs[exerciseId] = prs
+                if let baseline = try? await progressionService.fetchPRBaseline(userId: userId, exerciseId: exerciseId) {
+                    prBaselines[exerciseId] = baseline
                 }
             }
 
@@ -1284,16 +1285,21 @@ final class ActiveWorkoutViewModel {
 
         // Check for inline PRs (weight PR and rep PR)
         let completedSet = exercises[exerciseIndex].sets[setIndex]
-        if completedSet.isCompleted && completedSet.setType == .working {
+        if completedSet.isCompleted && completedSet.setType == .working
+            && completedSet.weight > 0 && completedSet.reps > 0 {
             let exerciseId = exercises[exerciseIndex].exerciseId
             let exerciseName = exercises[exerciseIndex].exerciseName
-            let prs = currentPRs[exerciseId] ?? []
+            var baseline = prBaselines[exerciseId] ?? .empty
+            let newMark = PRBaseline.Mark(weight: completedSet.weight, reps: completedSet.reps, achievedAt: Date())
 
             // Weight PR: heaviest weight ever lifted
-            let weightPR = prs.first(where: { $0.recordType == .weight })
-            let currentWeightPR = weightPR?.value ?? 0
+            let heaviest = baseline.heaviest
+            // Rep PR: most reps ever at this exact weight. Needs a prior mark at
+            // this weight — a lighter weight lifted for the first time is not a
+            // record over anything, and would fire on every new ramp step.
+            let previous = baseline.bestRepsAtWeight[completedSet.weight]
 
-            if completedSet.weight > currentWeightPR && completedSet.weight > 0 {
+            if completedSet.weight > (heaviest?.weight ?? 0) {
                 // Clear previous weight PR badge from earlier sets of the same exercise
                 for i in 0..<exercises[exerciseIndex].sets.count where i != setIndex {
                     if exercises[exerciseIndex].sets[i].prType == .weight {
@@ -1301,8 +1307,7 @@ final class ActiveWorkoutViewModel {
                     }
                 }
                 exercises[exerciseIndex].sets[setIndex].prType = .weight
-                let weightDelta = completedSet.weight - currentWeightPR
-                let pctImprovement = currentWeightPR > 0 ? (weightDelta / currentWeightPR) * 100 : nil
+                let weightDelta = completedSet.weight - (heaviest?.weight ?? 0)
                 // Epley formula: 1RM = weight × (1 + reps / 30)
                 let est1RM = completedSet.reps > 1
                     ? completedSet.weight * (1.0 + Double(completedSet.reps) / 30.0)
@@ -1311,89 +1316,41 @@ final class ActiveWorkoutViewModel {
                     exerciseName: exerciseName,
                     prType: .weight,
                     newValue: "\(formatWeightForPR(completedSet.weight)) lbs × \(completedSet.reps)",
-                    previousValue: currentWeightPR > 0
-                        ? "\(formatWeightForPR(currentWeightPR)) lbs × \(weightPR?.repsAtWeight ?? 0)"
-                        : "None",
-                    previousDate: weightPR?.achievedAt,
-                    delta: currentWeightPR > 0 ? "+\(formatWeightForPR(weightDelta)) lbs" : nil,
-                    percentImprovement: pctImprovement,
+                    previousValue: heaviest.map { "\(formatWeightForPR($0.weight)) lbs × \($0.reps)" } ?? "None",
+                    previousDate: heaviest?.achievedAt,
+                    delta: heaviest.map { _ in "+\(formatWeightForPR(weightDelta)) lbs" },
+                    percentImprovement: heaviest.map { (weightDelta / $0.weight) * 100 },
                     estimated1RM: est1RM
                 )
-                // Update tracked PR so subsequent sets compare against the new best.
-                // Critical: must also INSERT if no record exists yet (first-ever PR),
-                // otherwise repeating the same weight in a later set would clear this
-                // badge and move it to that set since the cache still shows no PR.
-                let userIdForCache = (try? await supabase.auth.session.user.id) ?? UUID()
-                let updatedPR = PersonalRecord(
-                    id: UUID(), userId: userIdForCache,
-                    exerciseId: exerciseId, recordType: .weight,
-                    value: completedSet.weight, repsAtWeight: completedSet.reps,
-                    sessionId: sessionId, achievedAt: Date(), createdAt: Date()
+                baseline.heaviest = newMark
+                // A new heaviest weight is also, trivially, the most reps ever at
+                // that weight — record it so the next set at the same weight is
+                // judged against this one instead of celebrating a "Rep PR" over
+                // nothing.
+                baseline.bestRepsAtWeight[completedSet.weight] = newMark
+            } else if let previous, completedSet.reps > previous.reps {
+                // Clear previous rep PR badge at this weight from earlier sets
+                for i in 0..<exercises[exerciseIndex].sets.count where i != setIndex {
+                    if exercises[exerciseIndex].sets[i].prType == .reps
+                        && exercises[exerciseIndex].sets[i].weight == completedSet.weight {
+                        exercises[exerciseIndex].sets[i].prType = nil
+                    }
+                }
+                exercises[exerciseIndex].sets[setIndex].prType = .reps
+                let repDelta = completedSet.reps - previous.reps
+                prCelebration = PRCelebration(
+                    exerciseName: exerciseName,
+                    prType: .reps,
+                    newValue: "\(formatWeightForPR(completedSet.weight)) lbs × \(completedSet.reps)",
+                    previousValue: "\(formatWeightForPR(previous.weight)) lbs × \(previous.reps)",
+                    previousDate: previous.achievedAt,
+                    delta: "+\(repDelta) reps",
+                    percentImprovement: (Double(repDelta) / Double(previous.reps)) * 100,
+                    estimated1RM: nil
                 )
-                var exercisePRs = currentPRs[exerciseId] ?? []
-                if let prIndex = exercisePRs.firstIndex(where: { $0.recordType == .weight }) {
-                    // Preserve original id/userId for existing record
-                    exercisePRs[prIndex] = PersonalRecord(
-                        id: exercisePRs[prIndex].id, userId: exercisePRs[prIndex].userId,
-                        exerciseId: exerciseId, recordType: .weight,
-                        value: completedSet.weight, repsAtWeight: completedSet.reps,
-                        sessionId: sessionId, achievedAt: Date(), createdAt: Date()
-                    )
-                } else {
-                    exercisePRs.append(updatedPR)
-                }
-                currentPRs[exerciseId] = exercisePRs
-            } else {
-                // Rep PR: most reps ever at this exact weight
-                let repPR = prs.first(where: { $0.recordType == .reps && $0.value == completedSet.weight })
-                let currentRepPR = Int(repPR?.repsAtWeight ?? 0)
-
-                if completedSet.reps > currentRepPR && completedSet.reps > 0 && completedSet.weight > 0 {
-                    // Clear previous rep PR badge at this weight from earlier sets
-                    for i in 0..<exercises[exerciseIndex].sets.count where i != setIndex {
-                        if exercises[exerciseIndex].sets[i].prType == .reps
-                            && exercises[exerciseIndex].sets[i].weight == completedSet.weight {
-                            exercises[exerciseIndex].sets[i].prType = nil
-                        }
-                    }
-                    exercises[exerciseIndex].sets[setIndex].prType = .reps
-                    let repDelta = completedSet.reps - currentRepPR
-                    let pctImprovement = currentRepPR > 0 ? (Double(repDelta) / Double(currentRepPR)) * 100 : nil
-                    prCelebration = PRCelebration(
-                        exerciseName: exerciseName,
-                        prType: .reps,
-                        newValue: "\(formatWeightForPR(completedSet.weight)) lbs × \(completedSet.reps)",
-                        previousValue: currentRepPR > 0
-                            ? "\(formatWeightForPR(completedSet.weight)) lbs × \(currentRepPR)"
-                            : "None",
-                        previousDate: repPR?.achievedAt,
-                        delta: currentRepPR > 0 ? "+\(repDelta) reps" : nil,
-                        percentImprovement: pctImprovement,
-                        estimated1RM: nil
-                    )
-                    // Update tracked rep PR — must INSERT if no record exists yet,
-                    // otherwise a later set with the same weight+reps would re-trigger
-                    // the badge since the cache wouldn't reflect this PR.
-                    let userIdForRepCache = (try? await supabase.auth.session.user.id) ?? UUID()
-                    var exercisePRs = currentPRs[exerciseId] ?? []
-                    if let prIndex = exercisePRs.firstIndex(where: { $0.recordType == .reps && $0.value == completedSet.weight }) {
-                        exercisePRs[prIndex] = PersonalRecord(
-                            id: exercisePRs[prIndex].id, userId: exercisePRs[prIndex].userId,
-                            exerciseId: exerciseId, recordType: .reps,
-                            value: completedSet.weight, repsAtWeight: completedSet.reps,
-                            sessionId: sessionId, achievedAt: Date(), createdAt: Date()
-                        )
-                    } else {
-                        exercisePRs.append(PersonalRecord(
-                            id: UUID(), userId: userIdForRepCache,
-                            exerciseId: exerciseId, recordType: .reps,
-                            value: completedSet.weight, repsAtWeight: completedSet.reps,
-                            sessionId: sessionId, achievedAt: Date(), createdAt: Date()
-                        ))
-                    }
-                    currentPRs[exerciseId] = exercisePRs
-                }
+                baseline.bestRepsAtWeight[completedSet.weight] = newMark
             }
+            prBaselines[exerciseId] = baseline
         }
 
         // Compute coaching feedback for working sets
@@ -1700,13 +1657,19 @@ final class ActiveWorkoutViewModel {
                         reps: set.reps,
                         rpe: set.rpe,
                         isCompleted: set.isCompleted,
-                        savedSetId: set.savedSetId
+                        savedSetId: set.savedSetId,
+                        targetWeight: set.targetWeight,
+                        targetReps: set.targetReps,
+                        targetRPE: set.targetRPE
                     )
                 },
                 originalExerciseId: exercise.originalExerciseId,
                 supersetGroup: exercise.supersetGroup,
                 setScheme: exercise.setScheme,
-                repCap: exercise.repCap
+                repCap: exercise.repCap,
+                restSeconds: exercise.restSeconds,
+                notes: exercise.notes,
+                useAddedWeight: exercise.useAddedWeight
             )
         }
 
@@ -1731,7 +1694,7 @@ final class ActiveWorkoutViewModel {
         elapsedSeconds = Int(Date().timeIntervalSince(state.startTime))
 
         exercises = state.exercises.map { saved in
-            ExerciseLogEntry(
+            var entry = ExerciseLogEntry(
                 id: UUID(),
                 exerciseId: saved.exerciseId,
                 exerciseName: saved.exerciseName,
@@ -1740,7 +1703,7 @@ final class ActiveWorkoutViewModel {
                 trainingMode: saved.trainingMode,
                 setScheme: saved.setScheme ?? .ramped,
                 targetSets: saved.targetSets,
-                restSeconds: AppConstants.Defaults.restTimerSeconds,
+                restSeconds: saved.restSeconds ?? AppConstants.Defaults.restTimerSeconds,
                 sortOrder: saved.sortOrder,
                 sets: saved.sets.map { savedSet in
                     var entry = SetEntry(
@@ -1748,7 +1711,10 @@ final class ActiveWorkoutViewModel {
                         setType: savedSet.setType,
                         weight: savedSet.weight,
                         reps: savedSet.reps,
-                        rpe: savedSet.rpe
+                        rpe: savedSet.rpe,
+                        targetWeight: savedSet.targetWeight,
+                        targetReps: savedSet.targetReps,
+                        targetRPE: savedSet.targetRPE
                     )
                     entry.isCompleted = savedSet.isCompleted
                     entry.savedSetId = savedSet.savedSetId
@@ -1757,14 +1723,61 @@ final class ActiveWorkoutViewModel {
                 previousSets: [],
                 originalExerciseId: saved.originalExerciseId,
                 repCap: saved.repCap,
+                notes: saved.notes,
                 supersetGroup: saved.supersetGroup
             )
+            entry.useAddedWeight = saved.useAddedWeight ?? false
+            return entry
         }
 
         // Start timers
         startElapsedTimer()
         timerStarted = true
         UIApplication.shared.isIdleTimerDisabled = true
+    }
+
+    /// Re-attaches the history a recovered workout lost with the process: last
+    /// session's sets, the prescribed targets, and the PR baseline. The snapshot
+    /// deliberately doesn't carry these — they live in the DB and the previous
+    /// session is still the last *completed* one, so the same fetches
+    /// `startWorkout` makes resolve identically. Sets are left untouched; only
+    /// exercise-level context is filled in.
+    func hydrateRecoveredContext() async {
+        guard let userId = try? await supabase.auth.session.user.id else { return }
+        let exerciseIds = exercises.map(\.exerciseId)
+
+        async let previousDataTask = workoutService.fetchPreviousSetsForExercises(
+            exerciseIds: exerciseIds,
+            userId: userId,
+            workoutDayId: currentWorkoutDayId
+        )
+        async let targetsTask = progressionService.fetchLatestTargets(
+            userId: userId,
+            exerciseIds: exerciseIds,
+            workoutDayId: currentWorkoutDayId
+        )
+        let previousData = (try? await previousDataTask) ?? [:]
+        let targets = (try? await targetsTask) ?? [:]
+
+        for exerciseId in exerciseIds {
+            if let baseline = try? await progressionService.fetchPRBaseline(userId: userId, exerciseId: exerciseId) {
+                prBaselines[exerciseId] = baseline
+            }
+        }
+
+        for i in exercises.indices {
+            let exerciseId = exercises[i].exerciseId
+            let prevSets = (previousData[exerciseId] ?? []).filter { $0.setType == .working }
+            exercises[i].previousSets = prevSets.isEmpty ? [] : [prevSets]
+            // A substituted exercise never carries a target (see substituteExercise).
+            if exercises[i].originalExerciseId == nil {
+                exercises[i].progressionTarget = Self.clampedTarget(
+                    targets[exerciseId],
+                    trainingMode: exercises[i].trainingMode,
+                    repCap: exercises[i].repCap
+                )
+            }
+        }
     }
 
     /// Public entry point for starting auto-save (used by recovery flow).
@@ -1818,6 +1831,9 @@ final class ActiveWorkoutViewModel {
                 limit: 1
             )) ?? []
             previousSets = (history.first ?? []).filter { $0.setType == .working }
+            if let baseline = try? await progressionService.fetchPRBaseline(userId: userId, exerciseId: newExercise.id) {
+                prBaselines[newExercise.id] = baseline
+            }
         }
 
         // Build new sets: pre-fill from substitute's history or leave blank

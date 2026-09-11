@@ -830,32 +830,8 @@ struct ProgressionService: Sendable {
     /// Deriving from `workout_sets` makes the source of truth the actual
     /// logged sets, not the (denormalized) PR cache.
     func fetchCurrentPRs(userId: UUID, exerciseId: UUID) async throws -> [PersonalRecord] {
-        struct WorkingSetRow: Decodable {
-            let session_id: UUID
-            let weight: Double
-            let reps: Int
-            let completed_at: String?
-        }
-
-        let rows: [WorkingSetRow] = try await supabase.from("workout_sets")
-            .select("session_id, weight, reps, completed_at, workout_sessions!inner(user_id, status)")
-            .eq("workout_sessions.user_id", value: userId.uuidString)
-            .eq("workout_sessions.status", value: "completed")
-            .eq("exercise_id", value: exerciseId.uuidString)
-            .eq("set_type", value: "working")
-            .execute()
-            .value
-
+        let rows = try await fetchCompletedWorkingSets(userId: userId, exerciseId: exerciseId)
         guard !rows.isEmpty else { return [] }
-
-        let isoFractional = ISO8601DateFormatter()
-        isoFractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let isoPlain = ISO8601DateFormatter()
-        isoPlain.formatOptions = [.withInternetDateTime]
-        func parseDate(_ str: String?) -> Date {
-            guard let str else { return Date() }
-            return isoFractional.date(from: str) ?? isoPlain.date(from: str) ?? Date()
-        }
 
         var prs: [PersonalRecord] = []
 
@@ -865,7 +841,7 @@ struct ProgressionService: Sendable {
                 id: UUID(), userId: userId, exerciseId: exerciseId,
                 recordType: .weight, value: best.weight,
                 repsAtWeight: best.reps, sessionId: best.session_id,
-                achievedAt: parseDate(best.completed_at), createdAt: parseDate(best.completed_at)
+                achievedAt: best.completedAt, createdAt: best.completedAt
             ))
         }
 
@@ -875,7 +851,7 @@ struct ProgressionService: Sendable {
                 id: UUID(), userId: userId, exerciseId: exerciseId,
                 recordType: .reps, value: Double(best.reps),
                 repsAtWeight: nil, sessionId: best.session_id,
-                achievedAt: parseDate(best.completed_at), createdAt: parseDate(best.completed_at)
+                achievedAt: best.completedAt, createdAt: best.completedAt
             ))
         }
 
@@ -886,7 +862,7 @@ struct ProgressionService: Sendable {
                 id: UUID(), userId: userId, exerciseId: exerciseId,
                 recordType: .estimated1rm, value: best.1,
                 repsAtWeight: nil, sessionId: best.0.session_id,
-                achievedAt: parseDate(best.0.completed_at), createdAt: parseDate(best.0.completed_at)
+                achievedAt: best.0.completedAt, createdAt: best.0.completedAt
             ))
         }
 
@@ -898,16 +874,81 @@ struct ProgressionService: Sendable {
         }
         if let (bestSessionId, maxVolume) = volumeBySession.max(by: { $0.value < $1.value }),
            maxVolume > 0 {
-            let representativeDate = rows.first(where: { $0.session_id == bestSessionId })?.completed_at
+            let representativeDate = rows.first(where: { $0.session_id == bestSessionId })?.completedAt ?? Date()
             prs.append(PersonalRecord(
                 id: UUID(), userId: userId, exerciseId: exerciseId,
                 recordType: .volume, value: maxVolume,
                 repsAtWeight: nil, sessionId: bestSessionId,
-                achievedAt: parseDate(representativeDate), createdAt: parseDate(representativeDate)
+                achievedAt: representativeDate, createdAt: representativeDate
             ))
         }
 
         return prs
+    }
+
+    /// Baseline for the inline (mid-workout) PR celebration: the heaviest set
+    /// ever, plus the most reps ever logged at each distinct weight. Reads the
+    /// same `workout_sets` history as `fetchCurrentPRs` — the rep-at-weight
+    /// bests live nowhere else, since `personal_records` keeps one row per type.
+    func fetchPRBaseline(userId: UUID, exerciseId: UUID) async throws -> PRBaseline {
+        let rows = try await fetchCompletedWorkingSets(userId: userId, exerciseId: exerciseId)
+            .filter { $0.weight > 0 && $0.reps > 0 }
+
+        var baseline = PRBaseline.empty
+        if let best = rows.max(by: { $0.weight < $1.weight }) {
+            baseline.heaviest = PRBaseline.Mark(weight: best.weight, reps: best.reps, achievedAt: best.completedAt)
+        }
+        // Strict `>` keeps the earliest date for a tied best, so "Previous"
+        // reports when the mark was first set rather than last matched.
+        for row in rows.sorted(by: { $0.completedAt < $1.completedAt })
+        where row.reps > (baseline.bestRepsAtWeight[row.weight]?.reps ?? 0) {
+            baseline.bestRepsAtWeight[row.weight] = PRBaseline.Mark(
+                weight: row.weight, reps: row.reps, achievedAt: row.completedAt
+            )
+        }
+        return baseline
+    }
+
+    private struct CompletedWorkingSetRow: Decodable {
+        let session_id: UUID
+        let weight: Double
+        let reps: Int
+        let completedAt: Date
+
+        private enum CodingKeys: String, CodingKey {
+            case session_id, weight, reps, completed_at
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            session_id = try c.decode(UUID.self, forKey: .session_id)
+            weight = try c.decode(Double.self, forKey: .weight)
+            reps = try c.decode(Int.self, forKey: .reps)
+            let raw = try c.decodeIfPresent(String.self, forKey: .completed_at)
+            completedAt = Self.parseDate(raw)
+        }
+
+        private static func parseDate(_ str: String?) -> Date {
+            guard let str else { return Date() }
+            let isoFractional = ISO8601DateFormatter()
+            isoFractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            let isoPlain = ISO8601DateFormatter()
+            isoPlain.formatOptions = [.withInternetDateTime]
+            return isoFractional.date(from: str) ?? isoPlain.date(from: str) ?? Date()
+        }
+    }
+
+    /// Every working set the user has logged for this exercise in a completed
+    /// session, across all workout days — PRs are per exercise, not per day.
+    private func fetchCompletedWorkingSets(userId: UUID, exerciseId: UUID) async throws -> [CompletedWorkingSetRow] {
+        try await supabase.from("workout_sets")
+            .select("session_id, weight, reps, completed_at, workout_sessions!inner(user_id, status)")
+            .eq("workout_sessions.user_id", value: userId.uuidString)
+            .eq("workout_sessions.status", value: "completed")
+            .eq("exercise_id", value: exerciseId.uuidString)
+            .eq("set_type", value: "working")
+            .execute()
+            .value
     }
 
     func upsertPR(_ pr: PersonalRecord) async throws {
