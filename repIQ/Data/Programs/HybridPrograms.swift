@@ -133,59 +133,6 @@ enum HybridPrograms {
                 ]),
         ])
 
-    // MARK: - Conjugate (Westside Barbell)
-
-    static let conjugate = ProgramDefinition(
-        id: "conjugate",
-        name: "Conjugate Method",
-        description: "Based on Westside Barbell's system, the conjugate method uses max effort and dynamic effort days for both upper and lower body. Trains maximal strength, speed-strength, and repetition effort across four sessions per week.",
-        category: .hybrid,
-        difficulty: .advanced,
-        daysPerWeek: 4,
-        tags: ["advanced", "4 days", "Westside", "speed work"],
-        days: [
-            ProgramDayDefinition(
-                id: "conj-meu", name: "Max Effort Upper",
-                description: "Work up to a heavy single, double, or triple on a pressing variation, followed by accessories.",
-                exercises: [
-                    ProgramExerciseDefinition(exerciseName: "Barbell Bench Press", trainingMode: .strength, targetSets: 5, restSecondsOverride: 300, notes: "Work up to heavy single/triple"),
-                    ProgramExerciseDefinition(exerciseName: "Close-Grip Bench Press", trainingMode: .hypertrophy, targetSets: 4, restSecondsOverride: 120, notes: "Supplemental volume"),
-                    ProgramExerciseDefinition(exerciseName: "Dumbbell Row", trainingMode: .hypertrophy, targetSets: 4),
-                    ProgramExerciseDefinition(exerciseName: "Tricep Pushdown", trainingMode: .hypertrophy, targetSets: 3),
-                    ProgramExerciseDefinition(exerciseName: "Face Pulls", trainingMode: .hypertrophy, targetSets: 3),
-                ]),
-            ProgramDayDefinition(
-                id: "conj-mel", name: "Max Effort Lower",
-                description: "Work up to a heavy single, double, or triple on a squat or deadlift variation.",
-                exercises: [
-                    ProgramExerciseDefinition(exerciseName: "Barbell Squat", trainingMode: .strength, targetSets: 5, restSecondsOverride: 300, notes: "Work up to heavy single/triple"),
-                    ProgramExerciseDefinition(exerciseName: "Good Mornings", trainingMode: .strength, targetSets: 4, restSecondsOverride: 120, notes: "Supplemental posterior chain"),
-                    ProgramExerciseDefinition(exerciseName: "Romanian Deadlift", trainingMode: .hypertrophy, targetSets: 3),
-                    ProgramExerciseDefinition(exerciseName: "Leg Curls", trainingMode: .hypertrophy, targetSets: 3),
-                    ProgramExerciseDefinition(exerciseName: "Ab Wheel Rollout", trainingMode: .hypertrophy, targetSets: 3),
-                ]),
-            ProgramDayDefinition(
-                id: "conj-deu", name: "Dynamic Effort Upper",
-                description: "Fast, explosive pressing at 50-60% 1RM with short rest, followed by hypertrophy work.",
-                exercises: [
-                    ProgramExerciseDefinition(exerciseName: "Barbell Bench Press", trainingMode: .strength, targetSets: 9, restSecondsOverride: 60, notes: "9x3 at 50-60% — focus on bar speed"),
-                    ProgramExerciseDefinition(exerciseName: "Incline Dumbbell Press", trainingMode: .hypertrophy, targetSets: 4),
-                    ProgramExerciseDefinition(exerciseName: "Lat Pulldown", trainingMode: .hypertrophy, targetSets: 4),
-                    ProgramExerciseDefinition(exerciseName: "Lateral Raises", trainingMode: .hypertrophy, targetSets: 4),
-                    ProgramExerciseDefinition(exerciseName: "Skull Crushers", trainingMode: .hypertrophy, targetSets: 3),
-                ]),
-            ProgramDayDefinition(
-                id: "conj-del", name: "Dynamic Effort Lower",
-                description: "Fast, explosive squats at 50-60% 1RM with short rest, followed by hypertrophy work.",
-                exercises: [
-                    ProgramExerciseDefinition(exerciseName: "Box Squat", trainingMode: .strength, targetSets: 12, restSecondsOverride: 60, notes: "12x2 at 50-60% — focus on explosiveness"),
-                    ProgramExerciseDefinition(exerciseName: "Deadlift", trainingMode: .strength, targetSets: 3, restSecondsOverride: 120, notes: "Speed pulls — 3x1 at 60-70%"),
-                    ProgramExerciseDefinition(exerciseName: "Hip Thrust", trainingMode: .hypertrophy, targetSets: 3),
-                    ProgramExerciseDefinition(exerciseName: "Leg Extensions", trainingMode: .hypertrophy, targetSets: 3),
-                    ProgramExerciseDefinition(exerciseName: "Standing Calf Raise", trainingMode: .hypertrophy, targetSets: 3),
-                ]),
-        ])
-
     // MARK: - Reddit PPL
 
     static let redditPPL = ProgramDefinition(
@@ -201,7 +148,7 @@ enum HybridPrograms {
                 id: "rppl-push1", name: "Push A",
                 description: "Heavy bench press followed by hypertrophy pressing and shoulder/tricep work.",
                 exercises: [
-                    ProgramExerciseDefinition(exerciseName: "Barbell Bench Press", trainingMode: .strength, targetSets: 5, restSecondsOverride: 180, notes: "5x5 — strength focus"),
+                    ProgramExerciseDefinition(exerciseName: "Barbell Bench Press", trainingMode: .strength, setScheme: .straight, targetSets: 5, restSecondsOverride: 180, notes: "5x5 — strength focus"),
                     ProgramExerciseDefinition(exerciseName: "Overhead Press", trainingMode: .hypertrophy, targetSets: 3),
                     ProgramExerciseDefinition(exerciseName: "Incline Dumbbell Press", trainingMode: .hypertrophy, targetSets: 3),
                     ProgramExerciseDefinition(exerciseName: "Cable Flyes", trainingMode: .hypertrophy, targetSets: 3),
@@ -213,7 +160,7 @@ enum HybridPrograms {
                 id: "rppl-pull1", name: "Pull A",
                 description: "Heavy deadlift followed by hypertrophy back and bicep work.",
                 exercises: [
-                    ProgramExerciseDefinition(exerciseName: "Deadlift", trainingMode: .strength, targetSets: 3, restSecondsOverride: 180, notes: "1x5+ — strength focus"),
+                    ProgramExerciseDefinition(exerciseName: "Deadlift", trainingMode: .strength, setScheme: .straight, targetSets: 1, restSecondsOverride: 180, notes: "1x5+ — strength focus"),
                     ProgramExerciseDefinition(exerciseName: "Barbell Row", trainingMode: .hypertrophy, targetSets: 4),
                     ProgramExerciseDefinition(exerciseName: "Lat Pulldown", trainingMode: .hypertrophy, targetSets: 3),
                     ProgramExerciseDefinition(exerciseName: "Seated Cable Row", trainingMode: .hypertrophy, targetSets: 3),
@@ -225,7 +172,7 @@ enum HybridPrograms {
                 id: "rppl-legs1", name: "Legs A",
                 description: "Heavy squat followed by hypertrophy leg work.",
                 exercises: [
-                    ProgramExerciseDefinition(exerciseName: "Barbell Squat", trainingMode: .strength, targetSets: 3, restSecondsOverride: 300, notes: "2x5, 1x5+ — strength focus"),
+                    ProgramExerciseDefinition(exerciseName: "Barbell Squat", trainingMode: .strength, setScheme: .straight, targetSets: 3, restSecondsOverride: 300, notes: "2x5, 1x5+ — strength focus"),
                     ProgramExerciseDefinition(exerciseName: "Romanian Deadlift", trainingMode: .hypertrophy, targetSets: 3, restSecondsOverride: 120),
                     ProgramExerciseDefinition(exerciseName: "Leg Press", trainingMode: .hypertrophy, targetSets: 3),
                     ProgramExerciseDefinition(exerciseName: "Leg Curls", trainingMode: .hypertrophy, targetSets: 3),
@@ -235,7 +182,7 @@ enum HybridPrograms {
                 id: "rppl-push2", name: "Push B",
                 description: "Heavy overhead press followed by hypertrophy chest and tricep work.",
                 exercises: [
-                    ProgramExerciseDefinition(exerciseName: "Overhead Press", trainingMode: .strength, targetSets: 5, restSecondsOverride: 180, notes: "5x5 — strength focus"),
+                    ProgramExerciseDefinition(exerciseName: "Overhead Press", trainingMode: .strength, setScheme: .straight, targetSets: 5, restSecondsOverride: 180, notes: "5x5 — strength focus"),
                     ProgramExerciseDefinition(exerciseName: "Barbell Bench Press", trainingMode: .hypertrophy, targetSets: 3),
                     ProgramExerciseDefinition(exerciseName: "Dumbbell Bench Press", trainingMode: .hypertrophy, targetSets: 3),
                     ProgramExerciseDefinition(exerciseName: "Cable Flyes", trainingMode: .hypertrophy, targetSets: 3),
@@ -247,7 +194,7 @@ enum HybridPrograms {
                 id: "rppl-pull2", name: "Pull B",
                 description: "Heavy barbell row followed by hypertrophy back and bicep work.",
                 exercises: [
-                    ProgramExerciseDefinition(exerciseName: "Barbell Row", trainingMode: .strength, targetSets: 5, restSecondsOverride: 180, notes: "5x5 — strength focus"),
+                    ProgramExerciseDefinition(exerciseName: "Barbell Row", trainingMode: .strength, setScheme: .straight, targetSets: 5, restSecondsOverride: 180, notes: "5x5 — strength focus"),
                     ProgramExerciseDefinition(exerciseName: "Pull-Ups", trainingMode: .hypertrophy, targetSets: 3),
                     ProgramExerciseDefinition(exerciseName: "Dumbbell Row", trainingMode: .hypertrophy, targetSets: 3),
                     ProgramExerciseDefinition(exerciseName: "T-Bar Row", trainingMode: .hypertrophy, targetSets: 3),
@@ -259,7 +206,7 @@ enum HybridPrograms {
                 id: "rppl-legs2", name: "Legs B",
                 description: "Front squat focus with hypertrophy leg accessories.",
                 exercises: [
-                    ProgramExerciseDefinition(exerciseName: "Front Squat", trainingMode: .strength, targetSets: 3, restSecondsOverride: 180, notes: "3x5 — strength focus"),
+                    ProgramExerciseDefinition(exerciseName: "Front Squat", trainingMode: .strength, setScheme: .straight, targetSets: 3, restSecondsOverride: 180, notes: "3x5 — strength focus"),
                     ProgramExerciseDefinition(exerciseName: "Bulgarian Split Squat", trainingMode: .hypertrophy, targetSets: 3),
                     ProgramExerciseDefinition(exerciseName: "Leg Press", trainingMode: .hypertrophy, targetSets: 3),
                     ProgramExerciseDefinition(exerciseName: "Leg Extensions", trainingMode: .hypertrophy, targetSets: 3),
