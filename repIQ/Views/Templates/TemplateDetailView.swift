@@ -127,8 +127,7 @@ struct TemplateDetailView: View {
                                                     ? RQColors.hypertrophy
                                                     : RQColors.strength
                                             )
-                                        let range = dayExercise.trainingMode.repRange
-                                        Text("(\(range.lowerBound)-\(range.upperBound) reps)")
+                                        Text(schemeSummary(mode: dayExercise.trainingMode, scheme: dayExercise.setScheme, repCap: dayExercise.repCap))
                                             .font(RQTypography.caption)
                                             .foregroundColor(RQColors.textTertiary)
                                     }

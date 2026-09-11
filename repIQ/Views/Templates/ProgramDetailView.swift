@@ -168,11 +168,7 @@ struct ProgramDetailView: View {
                                             ? RQColors.hypertrophy
                                             : RQColors.strength
                                     )
-                                let range = exercise.trainingMode.repRange
-                                let top = min(exercise.repCap ?? range.upperBound, range.upperBound)
-                                Text(top == range.lowerBound
-                                     ? "(\(top) reps)"
-                                     : "(\(range.lowerBound)-\(top) reps)")
+                                Text(schemeSummary(mode: exercise.trainingMode, scheme: exercise.setScheme, repCap: exercise.repCap))
                                     .font(RQTypography.caption)
                                     .foregroundColor(RQColors.textTertiary)
                             }
