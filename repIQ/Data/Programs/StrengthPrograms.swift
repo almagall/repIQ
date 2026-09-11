@@ -11,7 +11,6 @@ enum StrengthPrograms {
         category: .strength,
         difficulty: .intermediate,
         daysPerWeek: 4,
-        progressionType: .percentageBased,
         tags: ["proven", "4 days", "submaximal", "long-term"],
         days: [
             ProgramDayDefinition(
@@ -61,7 +60,6 @@ enum StrengthPrograms {
         category: .strength,
         difficulty: .beginner,
         daysPerWeek: 3,
-        progressionType: .linearProgression,
         tags: ["beginner", "novice", "3 days", "linear progression", "proven"],
         days: [
             ProgramDayDefinition(
@@ -91,7 +89,6 @@ enum StrengthPrograms {
         category: .strength,
         difficulty: .beginner,
         daysPerWeek: 3,
-        progressionType: .linearProgression,
         tags: ["beginner", "popular", "3 days", "linear progression", "simple"],
         days: [
             ProgramDayDefinition(
@@ -121,7 +118,6 @@ enum StrengthPrograms {
         category: .strength,
         difficulty: .intermediate,
         daysPerWeek: 3,
-        progressionType: .percentageBased,
         tags: ["intermediate", "3 days", "weekly periodization"],
         days: [
             ProgramDayDefinition(
@@ -160,7 +156,6 @@ enum StrengthPrograms {
         category: .strength,
         difficulty: .intermediate,
         daysPerWeek: 4,
-        progressionType: .percentageBased,
         tags: ["intermediate", "4 days", "tiered", "flexible"],
         days: [
             ProgramDayDefinition(
@@ -210,7 +205,6 @@ enum StrengthPrograms {
         category: .strength,
         difficulty: .intermediate,
         daysPerWeek: 4,
-        progressionType: .percentageBased,
         tags: ["popular", "4 days", "strength + size", "Wendler", "BBB"],
         days: [
             ProgramDayDefinition(
@@ -264,7 +258,6 @@ enum StrengthPrograms {
         category: .strength,
         difficulty: .advanced,
         daysPerWeek: 5,
-        progressionType: .percentageBased,
         tags: ["advanced", "5 days", "high volume", "rapid progression"],
         days: [
             ProgramDayDefinition(

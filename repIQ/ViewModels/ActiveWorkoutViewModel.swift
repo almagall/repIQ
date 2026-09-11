@@ -813,6 +813,7 @@ final class ActiveWorkoutViewModel {
                     previousSets: prevSets.isEmpty ? [] : [prevSets],
                     progressionTarget: target,
                     repCap: dayExercise.repCap,
+                    notes: dayExercise.notes,
                     supersetGroup: dayExercise.supersetGroup
                 )
             }

@@ -68,6 +68,10 @@ struct SetLoggerView: View {
                             supersetStrip(exercise, group: group)
                         }
 
+                        if let notes = exercise.notes, !notes.isEmpty {
+                            exerciseNote(notes)
+                        }
+
                         if let set = liveSet, set.setType == .working {
                             targetLastCard(exercise, set: set)
                         }
@@ -322,6 +326,22 @@ struct SetLoggerView: View {
             }
             .buttonStyle(.plain)
         }
+    }
+
+    // MARK: - Exercise Note
+
+    private func exerciseNote(_ text: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: RQSpacing.sm) {
+            Text("NOTE")
+                .rqLabel()
+                .foregroundColor(RQColors.textTertiary)
+            Text(text)
+                .font(RQTypography.caption)
+                .foregroundColor(RQColors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, RQSpacing.xs)
     }
 
     // MARK: - Target / Last Card

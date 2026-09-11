@@ -22,12 +22,6 @@ enum ProgramDifficulty: String {
     var displayName: String { rawValue.capitalized }
 }
 
-enum ProgramProgressionType: String {
-    case standard
-    case percentageBased
-    case linearProgression
-}
-
 struct ProgramDefinition: Identifiable {
     let id: String
     let name: String
@@ -35,7 +29,6 @@ struct ProgramDefinition: Identifiable {
     let category: ProgramCategory
     let difficulty: ProgramDifficulty
     let daysPerWeek: Int
-    let progressionType: ProgramProgressionType
     let tags: [String]
     let days: [ProgramDayDefinition]
 }
@@ -52,6 +45,7 @@ struct ProgramExerciseDefinition: Identifiable {
     let exerciseName: String
     let trainingMode: TrainingMode
     let targetSets: Int
+    let repCap: Int?
     let restSecondsOverride: Int?
     let notes: String?
 
@@ -59,6 +53,7 @@ struct ProgramExerciseDefinition: Identifiable {
         exerciseName: String,
         trainingMode: TrainingMode,
         targetSets: Int,
+        repCap: Int? = nil,
         restSecondsOverride: Int? = nil,
         notes: String? = nil
     ) {
@@ -66,6 +61,7 @@ struct ProgramExerciseDefinition: Identifiable {
         self.exerciseName = exerciseName
         self.trainingMode = trainingMode
         self.targetSets = targetSets
+        self.repCap = repCap
         self.restSecondsOverride = restSecondsOverride
         self.notes = notes
     }

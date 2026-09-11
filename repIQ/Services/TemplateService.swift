@@ -127,16 +127,32 @@ struct TemplateService: Sendable {
         exerciseId: UUID,
         trainingMode: TrainingMode,
         targetSets: Int,
-        sortOrder: Int
+        sortOrder: Int,
+        restSecondsOverride: Int? = nil,
+        notes: String? = nil,
+        repCap: Int? = nil
     ) async throws -> WorkoutDayExercise {
-        try await supabase.from("workout_day_exercises")
-            .insert([
-                "workout_day_id": workoutDayId.uuidString,
-                "exercise_id": exerciseId.uuidString,
-                "training_mode": trainingMode.rawValue,
-                "target_sets": "\(targetSets)",
-                "sort_order": "\(sortOrder)"
-            ])
+        struct ExerciseInsert: Encodable {
+            let workout_day_id: UUID
+            let exercise_id: UUID
+            let training_mode: String
+            let target_sets: Int
+            let sort_order: Int
+            let rest_seconds_override: Int?
+            let notes: String?
+            let rep_cap: Int?
+        }
+        return try await supabase.from("workout_day_exercises")
+            .insert(ExerciseInsert(
+                workout_day_id: workoutDayId,
+                exercise_id: exerciseId,
+                training_mode: trainingMode.rawValue,
+                target_sets: targetSets,
+                sort_order: sortOrder,
+                rest_seconds_override: restSecondsOverride,
+                notes: notes,
+                rep_cap: repCap
+            ))
             .select("*, exercises(*)")
             .single()
             .execute()
@@ -225,19 +241,13 @@ struct TemplateService: Sendable {
                             exerciseId: exercise.exerciseId,
                             trainingMode: exercise.trainingMode,
                             targetSets: exercise.targetSets,
-                            sortOrder: exIndex
+                            sortOrder: exIndex,
+                            restSecondsOverride: exercise.restSecondsOverride,
+                            notes: exercise.notes,
+                            repCap: exercise.repCap
                         )
-                        // Preserve rep cap and superset group
-                        if exercise.repCap != nil || exercise.supersetGroup != nil {
-                            try await updateDayExercise(
-                                id: newExercise.id,
-                                trainingMode: exercise.trainingMode,
-                                targetSets: exercise.targetSets,
-                                repCap: exercise.repCap
-                            )
-                            if let group = exercise.supersetGroup {
-                                try await updateSupersetGroup(id: newExercise.id, supersetGroup: group)
-                            }
+                        if let group = exercise.supersetGroup {
+                            try await updateSupersetGroup(id: newExercise.id, supersetGroup: group)
                         }
                     }
                 }

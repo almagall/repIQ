@@ -11,7 +11,6 @@ enum HypertrophyPrograms {
         category: .hypertrophy,
         difficulty: .intermediate,
         daysPerWeek: 6,
-        progressionType: .standard,
         tags: ["popular", "high volume", "2x frequency"],
         days: [
             ProgramDayDefinition(
@@ -91,7 +90,6 @@ enum HypertrophyPrograms {
         category: .hypertrophy,
         difficulty: .beginner,
         daysPerWeek: 3,
-        progressionType: .standard,
         tags: ["beginner friendly", "3 days", "1x frequency"],
         days: [
             ProgramDayDefinition(
@@ -135,7 +133,6 @@ enum HypertrophyPrograms {
         category: .hypertrophy,
         difficulty: .intermediate,
         daysPerWeek: 4,
-        progressionType: .standard,
         tags: ["balanced", "2x frequency", "4 days"],
         days: [
             ProgramDayDefinition(
@@ -194,7 +191,6 @@ enum HypertrophyPrograms {
         category: .hypertrophy,
         difficulty: .advanced,
         daysPerWeek: 6,
-        progressionType: .standard,
         tags: ["classic", "high volume", "advanced", "2x frequency"],
         days: [
             ProgramDayDefinition(
@@ -274,7 +270,6 @@ enum HypertrophyPrograms {
         category: .hypertrophy,
         difficulty: .intermediate,
         daysPerWeek: 5,
-        progressionType: .standard,
         tags: ["bodybuilding", "high volume", "1x frequency"],
         days: [
             ProgramDayDefinition(
@@ -343,7 +338,6 @@ enum HypertrophyPrograms {
         category: .hypertrophy,
         difficulty: .beginner,
         daysPerWeek: 3,
-        progressionType: .standard,
         tags: ["beginner friendly", "3 days", "3x frequency", "efficient"],
         days: [
             ProgramDayDefinition(

@@ -11,7 +11,6 @@ enum HybridPrograms {
         category: .hybrid,
         difficulty: .intermediate,
         daysPerWeek: 4,
-        progressionType: .standard,
         tags: ["popular", "4 days", "2x frequency", "balanced"],
         days: [
             ProgramDayDefinition(
@@ -70,7 +69,6 @@ enum HybridPrograms {
         category: .hybrid,
         difficulty: .advanced,
         daysPerWeek: 5,
-        progressionType: .standard,
         tags: ["advanced", "5 days", "high volume", "Layne Norton"],
         days: [
             ProgramDayDefinition(
@@ -144,7 +142,6 @@ enum HybridPrograms {
         category: .hybrid,
         difficulty: .advanced,
         daysPerWeek: 4,
-        progressionType: .standard,
         tags: ["advanced", "4 days", "Westside", "speed work"],
         days: [
             ProgramDayDefinition(
@@ -198,7 +195,6 @@ enum HybridPrograms {
         category: .hybrid,
         difficulty: .intermediate,
         daysPerWeek: 6,
-        progressionType: .standard,
         tags: ["popular", "6 days", "2x frequency", "Reddit"],
         days: [
             ProgramDayDefinition(

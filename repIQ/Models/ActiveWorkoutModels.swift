@@ -106,6 +106,7 @@ struct ExerciseLogEntry: Identifiable {
     var originalExerciseId: UUID? // non-nil if this exercise was substituted
     var isSubstituted: Bool { originalExerciseId != nil }
     var repCap: Int? // optional rep cap from template exercise config
+    var notes: String? // template-level coaching cue, shown above the set controls
 
     /// Whether this bodyweight exercise has been toggled to track added weight (dip belt, vest, etc.)
     var useAddedWeight: Bool = false
