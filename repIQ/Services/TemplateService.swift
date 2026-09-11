@@ -145,6 +145,20 @@ struct TemplateService: Sendable {
             let set_scheme: String
             let target_sets: Int
             let rep_cap: Int?
+
+            // Synthesized Encodable skips nil keys, which turns "clear the cap"
+            // into "leave the cap alone". Encode the null explicitly.
+            func encode(to encoder: Encoder) throws {
+                var c = encoder.container(keyedBy: CodingKeys.self)
+                try c.encode(training_mode, forKey: .training_mode)
+                try c.encode(set_scheme, forKey: .set_scheme)
+                try c.encode(target_sets, forKey: .target_sets)
+                try c.encode(rep_cap, forKey: .rep_cap)
+            }
+
+            enum CodingKeys: String, CodingKey {
+                case training_mode, set_scheme, target_sets, rep_cap
+            }
         }
         try await supabase.from("workout_day_exercises")
             .update(ExerciseUpdate(
