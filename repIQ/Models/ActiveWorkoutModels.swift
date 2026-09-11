@@ -97,6 +97,7 @@ struct ExerciseLogEntry: Identifiable {
     var muscleGroup: String
     var equipment: String
     let trainingMode: TrainingMode
+    var setScheme: SetScheme = .ramped
     let targetSets: Int
     let restSeconds: Int
     let sortOrder: Int

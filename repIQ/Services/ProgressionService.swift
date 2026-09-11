@@ -18,6 +18,7 @@ struct ProgressionService: Sendable {
     func calculateTarget(
         exerciseId: UUID,
         trainingMode: TrainingMode,
+        setScheme: SetScheme = .ramped,
         equipment: String,
         recentSessions: [[WorkoutSet]],
         repCap: Int? = nil,
@@ -49,11 +50,20 @@ struct ProgressionService: Sendable {
                 weeksSinceDeload: weeksSinceDeload, allowDeload: allowDeload
             )
         case .strength:
-            return strengthTarget(
-                exerciseId: exerciseId, equipment: equipment,
-                recentSessions: recentSessions, repCap: repCap,
-                weeksSinceDeload: weeksSinceDeload, allowDeload: allowDeload
-            )
+            switch setScheme {
+            case .ramped:
+                return strengthTarget(
+                    exerciseId: exerciseId, equipment: equipment,
+                    recentSessions: recentSessions, repCap: repCap,
+                    weeksSinceDeload: weeksSinceDeload, allowDeload: allowDeload
+                )
+            case .straight:
+                return straightStrengthTarget(
+                    exerciseId: exerciseId, equipment: equipment,
+                    recentSessions: recentSessions, repCap: repCap,
+                    weeksSinceDeload: weeksSinceDeload, allowDeload: allowDeload
+                )
+            }
         }
     }
 
@@ -287,6 +297,107 @@ struct ProgressionService: Sendable {
         }
         return makeTarget(.increaseReps, weight: topSetWeight, reps: min(topSetReps + 1, top),
             reasoning: "Strength is building. Aim for \(min(topSetReps + 1, top)) on your top set before increasing weight.")
+    }
+
+    // MARK: - Strength, Straight Sets (Linear Progression with Rep Rebuild)
+
+    /// Every working set shares one weight, so the whole set is the reference
+    /// (same shape as hypertrophy: median weight, minimum reps). Two deliberate
+    /// departures from the ramped model:
+    ///
+    /// - A bump is exactly one increment, not e1RM-sized. The e1RM jump is
+    ///   calibrated for one top set; five straight sets at a new load is a much
+    ///   larger volume step.
+    /// - Reps stay at the top of the band after a bump instead of resetting to
+    ///   the bottom. This is the classic "add weight every session you get all
+    ///   your reps" rule; a 5x5 that dropped to 5x3 for a 2% load change would
+    ///   waste two sessions. A missed session falls into `.increaseReps`, which
+    ///   reads as "repeat this weight until you get every rep".
+    private func straightStrengthTarget(
+        exerciseId: UUID,
+        equipment: String,
+        recentSessions: [[WorkoutSet]],
+        repCap: Int?,
+        weeksSinceDeload: Int?,
+        allowDeload: Bool
+    ) -> ProgressionTarget? {
+        let mode = TrainingMode.strength
+        let repRange = mode.repRange
+        let bottom = repRange.lowerBound
+        let top = min(repCap ?? repRange.upperBound, repRange.upperBound)
+        let targetRPE = mode.targetRPE
+        let increment = weightIncrement(for: equipment)
+
+        guard let latestSession = recentSessions.first else { return nil }
+        let working = latestSession.filter { $0.setType == .working }
+        guard !working.isEmpty else { return nil }
+
+        let workingWeight = median(working.map(\.weight))
+        let medReps = medianInt(working.map(\.reps))
+        let minReps = working.map(\.reps).min() ?? medReps
+        let avgRPE = averageRPE(working, default: targetRPE)
+        let hardestRPE = working.compactMap(\.rpe).max()
+        let mesocycleOffset = mesocycleRPEOffset(weeksSinceDeload: weeksSinceDeload)
+        let currentE1RM = bestE1RM(from: latestSession)
+        let rpeFatigue = detectRPEFatigue(recentSessions: recentSessions, targetRPE: targetRPE)
+
+        func makeTarget(
+            _ decision: ProgressionDecision,
+            weight: Double, reps: Int, reasoning: String
+        ) -> ProgressionTarget {
+            let r = min(max(reps, 1), top)
+            return ProgressionTarget(
+                exerciseId: exerciseId, trainingMode: mode,
+                targetWeight: roundToIncrement(weight, increment),
+                targetRepsLow: r, targetRepsHigh: r,
+                targetRPE: targetRPE, decision: decision, reasoning: reasoning,
+                previousWeight: workingWeight, previousReps: medReps, previousRPE: avgRPE,
+                estimatedOneRM: currentE1RM, mesocycleRPEOffset: mesocycleOffset,
+                rpeFatigueDetected: rpeFatigue, e1rmConfidence: e1rmConfidenceFactor(medReps: medReps)
+            )
+        }
+
+        // Deload safety nets.
+        if let weeks = weeksSinceDeload, weeks >= 7, allowDeload {
+            return makeTarget(.deload, weight: workingWeight * 0.90, reps: bottom,
+                reasoning: "You've trained \(weeks) weeks without a deload. Scheduled recovery week to prevent overtraining.")
+        }
+        if allowDeload, countConsecutiveBadSessions(recentSessions: recentSessions) >= 2 {
+            return makeTarget(.deload, weight: workingWeight * 0.90, reps: bottom,
+                reasoning: "Performance has declined for multiple sessions. Deloading to allow recovery.")
+        }
+
+        // Baseline.
+        guard recentSessions.count >= 2 else {
+            return makeTarget(.maintain, weight: workingWeight, reps: min(medReps, top),
+                reasoning: "First session tracked. Repeat to establish a baseline.")
+        }
+
+        // Single off-day, same rule as the other modes.
+        let bestRecentWeight = recentSessions
+            .flatMap { $0.filter { $0.setType == .working } }
+            .map(\.weight).max() ?? workingWeight
+        let subParSession = minReps < bottom || (hardestRPE ?? 0) >= targetRPE + 1
+        if workingWeight < bestRecentWeight * 0.90, subParSession {
+            return makeTarget(.maintain, weight: bestRecentWeight, reps: bottom,
+                reasoning: "Last session was below your recent bests and effort was high. Holding at your proven working weight.")
+        }
+
+        // Every set got every rep: add one increment, keep the rep goal.
+        if minReps >= top {
+            return makeTarget(.increaseWeight, weight: workingWeight + increment, reps: top,
+                reasoning: "You got \(top) on every set. Adding weight — aim for \(top) on every set again.")
+        }
+        if minReps < bottom {
+            return makeTarget(.maintain, weight: workingWeight, reps: bottom,
+                reasoning: "A set fell below the rep range. Holding weight to rebuild.")
+        }
+        if let rpe = hardestRPE, rpe <= targetRPE - 2 {
+            return makeTarget(.increaseWeight, weight: workingWeight + increment, reps: top,
+                reasoning: "You had 2+ reps in reserve on your hardest set. Adding weight early.")
+        }
+        return makeTarget(.increaseReps, weight: workingWeight, reps: min(minReps + 1, top),
+            reasoning: "Repeat this weight. Aim for \(min(minReps + 1, top)) on every set on your way to \(top).")
     }
 
     // MARK: - Bodyweight Progression

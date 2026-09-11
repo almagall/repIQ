@@ -221,7 +221,12 @@ struct TargetAdherenceService {
     /// weights, and those were never graded.
     ///
     /// Hypertrophy counts every working set, since they all carry the same
-    /// prescription and are directly comparable. Strength counts one.
+    /// prescription and are directly comparable. Ramped strength counts one.
+    /// Straight-set strength counts every set for the same reason hypertrophy
+    /// does; it is recognised by its *stored* targets all sharing one weight
+    /// (the scheme itself isn't in `progression_log`). Reconstructed sessions
+    /// also share one weight but predate straight sets, so they keep the
+    /// top-set rule.
     private func gradedSets(
         _ sets: [WorkingSet],
         mode: TrainingMode,
@@ -244,6 +249,10 @@ struct TargetAdherenceService {
         case .hypertrophy:
             return resolved
         case .strength:
+            let storedWeights = Set(sets.compactMap(\.targetWeight))
+            if storedWeights.count == 1, sets.allSatisfy({ $0.targetWeight != nil }), resolved.count > 1 {
+                return resolved
+            }
             // Prefer the heaviest *prescribed* load, so a session the lifter
             // came in under doesn't promote a ramp set into the top-set slot.
             // Reconstructed sessions share one prescribed weight across every

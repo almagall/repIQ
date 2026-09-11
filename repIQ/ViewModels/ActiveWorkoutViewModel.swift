@@ -280,6 +280,7 @@ final class ActiveWorkoutViewModel {
         decision target: ProgressionTarget?,
         previousSet prev: WorkoutSet?,
         trainingMode: TrainingMode,
+        setScheme: SetScheme = .ramped,
         setPosition: Int,
         totalSets: Int = 4,
         equipment: String = ""
@@ -311,6 +312,11 @@ final class ActiveWorkoutViewModel {
                 setPosition: setPosition,
                 totalSets: totalSets
             )
+            return (target.targetWeight, target.targetRepsLow, rpe)
+
+        case .strength where setScheme == .straight:
+            // One weight across every set; effort climbs with fatigue like hypertrophy.
+            let rpe = min(target.targetRPE + mesocycleOffset + Double(setPosition) * 0.5, 9.0)
             return (target.targetWeight, target.targetRepsLow, rpe)
 
         case .strength:
@@ -784,6 +790,7 @@ final class ActiveWorkoutViewModel {
                         decision: target,
                         previousSet: prev,
                         trainingMode: dayExercise.trainingMode,
+                        setScheme: dayExercise.setScheme,
                         setPosition: i - 1,
                         totalSets: dayExercise.targetSets,
                         equipment: equipmentType
@@ -806,6 +813,7 @@ final class ActiveWorkoutViewModel {
                     muscleGroup: dayExercise.exercise?.muscleGroup ?? "",
                     equipment: dayExercise.exercise?.equipment ?? "",
                     trainingMode: dayExercise.trainingMode,
+                    setScheme: dayExercise.setScheme,
                     targetSets: dayExercise.targetSets,
                     restSeconds: restSeconds,
                     sortOrder: dayExercise.sortOrder,
@@ -896,7 +904,9 @@ final class ActiveWorkoutViewModel {
                     decision: exercises[i].progressionTarget,
                     previousSet: prev,
                     trainingMode: exercises[i].trainingMode,
+                    setScheme: exercises[i].setScheme,
                     setPosition: j,
+                    totalSets: exercises[i].targetSets,
                     equipment: exercises[i].equipment
                 )
                 exercises[i].sets[j].weight = w
@@ -935,6 +945,7 @@ final class ActiveWorkoutViewModel {
             guard let newTarget = progressionService.calculateTarget(
                 exerciseId: exercise.exerciseId,
                 trainingMode: exercise.trainingMode,
+                setScheme: exercise.setScheme,
                 equipment: exercise.equipment,
                 recentSessions: recentSessions,
                 repCap: exercise.repCap,
@@ -951,6 +962,7 @@ final class ActiveWorkoutViewModel {
                     decision: newTarget,
                     previousSet: prev,
                     trainingMode: exercises[i].trainingMode,
+                    setScheme: exercises[i].setScheme,
                     setPosition: j,
                     totalSets: exercises[i].targetSets,
                     equipment: exercises[i].equipment
@@ -1090,6 +1102,7 @@ final class ActiveWorkoutViewModel {
                 if let target = progressionService.calculateTarget(
                     exerciseId: exercise.exerciseId,
                     trainingMode: exercise.trainingMode,
+                    setScheme: exercise.setScheme,
                     equipment: exercise.equipment,
                     recentSessions: recentSessions,
                     repCap: exercise.repCap
@@ -1393,6 +1406,7 @@ final class ActiveWorkoutViewModel {
                 decision: exercise.progressionTarget,
                 previousSet: prevSet,
                 trainingMode: exercise.trainingMode,
+                setScheme: exercise.setScheme,
                 setPosition: setPosition,
                 totalSets: exercise.targetSets,
                 equipment: exercise.equipment
@@ -1407,6 +1421,7 @@ final class ActiveWorkoutViewModel {
                 targetRPE: tgtRPE,
                 decision: exercise.progressionTarget?.decision,
                 trainingMode: exercise.trainingMode,
+                setScheme: exercise.setScheme,
                 isBodyweightOnly: exercise.isBodyweightOnly,
                 hasTarget: exercise.progressionTarget != nil
             )
@@ -1689,7 +1704,9 @@ final class ActiveWorkoutViewModel {
                     )
                 },
                 originalExerciseId: exercise.originalExerciseId,
-                supersetGroup: exercise.supersetGroup
+                supersetGroup: exercise.supersetGroup,
+                setScheme: exercise.setScheme,
+                repCap: exercise.repCap
             )
         }
 
@@ -1721,6 +1738,7 @@ final class ActiveWorkoutViewModel {
                 muscleGroup: saved.muscleGroup,
                 equipment: saved.equipment,
                 trainingMode: saved.trainingMode,
+                setScheme: saved.setScheme ?? .ramped,
                 targetSets: saved.targetSets,
                 restSeconds: AppConstants.Defaults.restTimerSeconds,
                 sortOrder: saved.sortOrder,
@@ -1738,6 +1756,7 @@ final class ActiveWorkoutViewModel {
                 },
                 previousSets: [],
                 originalExerciseId: saved.originalExerciseId,
+                repCap: saved.repCap,
                 supersetGroup: saved.supersetGroup
             )
         }

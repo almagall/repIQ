@@ -85,6 +85,11 @@ struct SavedExerciseState: Codable {
     let sets: [SavedSetState]
     let originalExerciseId: UUID?
     let supersetGroup: Int?
+    // Feed the completion-time calculateTarget, so a recovered workout logs the
+    // same decision a normal one would. Optional so snapshots written before
+    // these fields existed still decode.
+    var setScheme: SetScheme?
+    var repCap: Int?
 }
 
 /// Serializable set state.

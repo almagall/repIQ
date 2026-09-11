@@ -26,11 +26,28 @@ enum TrainingMode: String, Codable, CaseIterable, Sendable {
     }
 }
 
+/// How working-set loads are laid out across a strength exercise. Hypertrophy
+/// is always straight sets and ignores this.
+enum SetScheme: String, Codable, CaseIterable, Sendable {
+    /// Weight ascends set to set; only the top set is heavy and only the top set is judged.
+    case ramped
+    /// Every set at the prescribed weight; the weakest set gates progression.
+    case straight
+
+    var displayName: String {
+        switch self {
+        case .ramped: return "Ramped"
+        case .straight: return "Straight"
+        }
+    }
+}
+
 struct WorkoutDayExercise: Codable, Identifiable, Sendable {
     let id: UUID
     var workoutDayId: UUID
     var exerciseId: UUID
     var trainingMode: TrainingMode
+    var setScheme: SetScheme
     var targetSets: Int
     var sortOrder: Int
     var restSecondsOverride: Int?
@@ -57,6 +74,7 @@ struct WorkoutDayExercise: Codable, Identifiable, Sendable {
         case workoutDayId = "workout_day_id"
         case exerciseId = "exercise_id"
         case trainingMode = "training_mode"
+        case setScheme = "set_scheme"
         case targetSets = "target_sets"
         case sortOrder = "sort_order"
         case restSecondsOverride = "rest_seconds_override"
@@ -65,5 +83,25 @@ struct WorkoutDayExercise: Codable, Identifiable, Sendable {
         case repCap = "rep_cap"
         case createdAt = "created_at"
         case exercise = "exercises"
+    }
+
+    // set_scheme arrived in 20260910_set_scheme.sql. Decoding it leniently means
+    // a client that ships ahead of the migration still loads templates instead
+    // of failing every fetch.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        workoutDayId = try c.decode(UUID.self, forKey: .workoutDayId)
+        exerciseId = try c.decode(UUID.self, forKey: .exerciseId)
+        trainingMode = try c.decode(TrainingMode.self, forKey: .trainingMode)
+        setScheme = try c.decodeIfPresent(SetScheme.self, forKey: .setScheme) ?? .ramped
+        targetSets = try c.decode(Int.self, forKey: .targetSets)
+        sortOrder = try c.decode(Int.self, forKey: .sortOrder)
+        restSecondsOverride = try c.decodeIfPresent(Int.self, forKey: .restSecondsOverride)
+        notes = try c.decodeIfPresent(String.self, forKey: .notes)
+        supersetGroup = try c.decodeIfPresent(Int.self, forKey: .supersetGroup)
+        repCap = try c.decodeIfPresent(Int.self, forKey: .repCap)
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        exercise = try c.decodeIfPresent(Exercise.self, forKey: .exercise)
     }
 }

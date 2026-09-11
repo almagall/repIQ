@@ -126,6 +126,7 @@ struct TemplateService: Sendable {
         workoutDayId: UUID,
         exerciseId: UUID,
         trainingMode: TrainingMode,
+        setScheme: SetScheme = .ramped,
         targetSets: Int,
         sortOrder: Int,
         restSecondsOverride: Int? = nil,
@@ -136,6 +137,7 @@ struct TemplateService: Sendable {
             let workout_day_id: UUID
             let exercise_id: UUID
             let training_mode: String
+            let set_scheme: String
             let target_sets: Int
             let sort_order: Int
             let rest_seconds_override: Int?
@@ -147,6 +149,7 @@ struct TemplateService: Sendable {
                 workout_day_id: workoutDayId,
                 exercise_id: exerciseId,
                 training_mode: trainingMode.rawValue,
+                set_scheme: setScheme.rawValue,
                 target_sets: targetSets,
                 sort_order: sortOrder,
                 rest_seconds_override: restSecondsOverride,
@@ -159,15 +162,23 @@ struct TemplateService: Sendable {
             .value
     }
 
-    func updateDayExercise(id: UUID, trainingMode: TrainingMode, targetSets: Int, repCap: Int? = nil) async throws {
+    func updateDayExercise(
+        id: UUID,
+        trainingMode: TrainingMode,
+        setScheme: SetScheme,
+        targetSets: Int,
+        repCap: Int? = nil
+    ) async throws {
         struct ExerciseUpdate: Encodable {
             let training_mode: String
+            let set_scheme: String
             let target_sets: Int
             let rep_cap: Int?
         }
         try await supabase.from("workout_day_exercises")
             .update(ExerciseUpdate(
                 training_mode: trainingMode.rawValue,
+                set_scheme: setScheme.rawValue,
                 target_sets: targetSets,
                 rep_cap: repCap
             ))
@@ -240,6 +251,7 @@ struct TemplateService: Sendable {
                             workoutDayId: newDay.id,
                             exerciseId: exercise.exerciseId,
                             trainingMode: exercise.trainingMode,
+                            setScheme: exercise.setScheme,
                             targetSets: exercise.targetSets,
                             sortOrder: exIndex,
                             restSecondsOverride: exercise.restSecondsOverride,

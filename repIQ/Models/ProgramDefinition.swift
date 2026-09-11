@@ -44,6 +44,7 @@ struct ProgramExerciseDefinition: Identifiable {
     let id: String
     let exerciseName: String
     let trainingMode: TrainingMode
+    let setScheme: SetScheme
     let targetSets: Int
     let repCap: Int?
     let restSecondsOverride: Int?
@@ -52,6 +53,7 @@ struct ProgramExerciseDefinition: Identifiable {
     init(
         exerciseName: String,
         trainingMode: TrainingMode,
+        setScheme: SetScheme = .ramped,
         targetSets: Int,
         repCap: Int? = nil,
         restSecondsOverride: Int? = nil,
@@ -60,6 +62,7 @@ struct ProgramExerciseDefinition: Identifiable {
         self.id = "\(exerciseName)-\(trainingMode.rawValue)"
         self.exerciseName = exerciseName
         self.trainingMode = trainingMode
+        self.setScheme = setScheme
         self.targetSets = targetSets
         self.repCap = repCap
         self.restSecondsOverride = restSecondsOverride

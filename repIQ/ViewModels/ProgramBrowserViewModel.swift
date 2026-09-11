@@ -83,6 +83,7 @@ final class ProgramBrowserViewModel {
                         workoutDayId: workoutDay.id,
                         exerciseId: resolved.id,
                         trainingMode: exercise.trainingMode,
+                        setScheme: exercise.setScheme,
                         targetSets: exercise.targetSets,
                         sortOrder: exIndex,
                         restSecondsOverride: exercise.restSecondsOverride,

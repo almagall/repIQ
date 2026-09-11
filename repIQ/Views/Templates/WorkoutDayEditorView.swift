@@ -42,6 +42,7 @@ struct WorkoutDayEditorView: View {
                         MultiInfoButton(
                             topics: [
                                 ProgressExplainer.trainingMode,
+                                ProgressExplainer.setScheme,
                                 ProgressExplainer.targetSets,
                                 ProgressExplainer.repRange,
                                 ProgressExplainer.repCap,
@@ -416,6 +417,18 @@ struct WorkoutDayEditorView: View {
                         trainingModeToggle(dayExercise)
                     }
 
+                    if dayExercise.trainingMode == .strength {
+                        HStack {
+                            Text("Sets")
+                                .font(RQTypography.label)
+                                .textCase(.uppercase)
+                                .tracking(1.5)
+                                .foregroundColor(RQColors.textSecondary)
+                            Spacer()
+                            setSchemeToggle(dayExercise)
+                        }
+                    }
+
                     // Target sets
                     HStack {
                         Text("Target Sets")
@@ -601,6 +614,32 @@ struct WorkoutDayEditorView: View {
                         .padding(.horizontal, RQSpacing.md)
                         .padding(.vertical, RQSpacing.sm)
                         .background(dayExercise.trainingMode == mode ? modeColor(mode) : RQColors.surfaceTertiary)
+                }
+            }
+        }
+        .cornerRadius(RQRadius.small)
+    }
+
+    private func setSchemeToggle(_ dayExercise: WorkoutDayExercise) -> some View {
+        HStack(spacing: 0) {
+            ForEach(SetScheme.allCases, id: \.self) { scheme in
+                Button {
+                    Task {
+                        await viewModel.updateExerciseMode(
+                            dayExercise,
+                            trainingMode: dayExercise.trainingMode,
+                            setScheme: scheme,
+                            targetSets: dayExercise.targetSets,
+                            repCap: dayExercise.repCap
+                        )
+                    }
+                } label: {
+                    Text(scheme.displayName)
+                        .font(RQTypography.caption)
+                        .foregroundColor(dayExercise.setScheme == scheme ? RQColors.background : RQColors.textSecondary)
+                        .padding(.horizontal, RQSpacing.md)
+                        .padding(.vertical, RQSpacing.sm)
+                        .background(dayExercise.setScheme == scheme ? RQColors.strength : RQColors.surfaceTertiary)
                 }
             }
         }

@@ -404,6 +404,18 @@ enum ProgressExplainer {
         howToUse: "Start with 3–4 sets. If you're consistently completing all sets with good form and manageable effort, consider adding a set. If you're struggling to finish or quality drops on the last sets, reduce by one."
     )
 
+    static let setScheme = Topic(
+        title: "Sets (Strength)",
+        icon: "chart.bar",
+        explanation: "Strength exercises can lay their working sets out two ways. Ramped builds up to one heavy top set; Straight puts every set at the prescribed weight. Hypertrophy is always straight sets.",
+        keyPoints: [
+            "Ramped (default): Weight climbs set to set and only the last set is at the target. The top set alone decides progression, and the jump is sized from your estimated 1RM.",
+            "Straight: Every set is at the target weight, like 5×5 or 3×5. The weakest set decides progression — get all your reps on every set and the weight goes up one increment next session.",
+            "Straight sets grade every set for target adherence; ramped grades only the top set.",
+        ],
+        howToUse: "Pick Straight for classic linear programs (Starting Strength, StrongLifts) or any time you want to hold one weight across sets. Pick Ramped when you want to work up to a single heavy set."
+    )
+
     static let repRange = Topic(
         title: "Rep Range",
         icon: "arrow.left.and.right",

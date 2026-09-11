@@ -225,17 +225,26 @@ final class TemplateEditorViewModel {
         }
     }
 
-    func updateExerciseMode(_ dayExercise: WorkoutDayExercise, trainingMode: TrainingMode, targetSets: Int, repCap: Int? = nil) async {
+    func updateExerciseMode(
+        _ dayExercise: WorkoutDayExercise,
+        trainingMode: TrainingMode,
+        setScheme: SetScheme? = nil,
+        targetSets: Int,
+        repCap: Int? = nil
+    ) async {
+        let scheme = setScheme ?? dayExercise.setScheme
         do {
             try await templateService.updateDayExercise(
                 id: dayExercise.id,
                 trainingMode: trainingMode,
+                setScheme: scheme,
                 targetSets: targetSets,
                 repCap: repCap
             )
             for dayIndex in workoutDays.indices {
                 if let exIndex = workoutDays[dayIndex].exercises?.firstIndex(where: { $0.id == dayExercise.id }) {
                     workoutDays[dayIndex].exercises?[exIndex].trainingMode = trainingMode
+                    workoutDays[dayIndex].exercises?[exIndex].setScheme = scheme
                     workoutDays[dayIndex].exercises?[exIndex].targetSets = targetSets
                     workoutDays[dayIndex].exercises?[exIndex].repCap = repCap
                 }

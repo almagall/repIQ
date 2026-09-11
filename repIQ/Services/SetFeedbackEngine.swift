@@ -15,6 +15,7 @@ struct SetFeedbackEngine {
         targetRPE: Double,
         decision: ProgressionDecision?,
         trainingMode: TrainingMode,
+        setScheme: SetScheme = .ramped,
         isBodyweightOnly: Bool,
         hasTarget: Bool
     ) -> SetFeedback {
@@ -26,7 +27,7 @@ struct SetFeedbackEngine {
             if isBodyweightOnly {
                 headline = "Baseline recorded — \(actualReps) reps logged"
                 detail = "The app will track your rep progression and suggest when to add weight or push for more."
-            } else if trainingMode == .strength {
+            } else if trainingMode == .strength, setScheme == .ramped {
                 headline = "Baseline recorded — \(formatDelta(actualWeight)) × \(actualReps)"
                 detail = "The app will build your ramping sets from this. Next session you'll see mode-specific targets that build to a challenging top set."
             } else {
