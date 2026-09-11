@@ -169,7 +169,10 @@ struct ProgramDetailView: View {
                                             : RQColors.strength
                                     )
                                 let range = exercise.trainingMode.repRange
-                                Text("(\(range.lowerBound)-\(range.upperBound) reps)")
+                                let top = min(exercise.repCap ?? range.upperBound, range.upperBound)
+                                Text(top == range.lowerBound
+                                     ? "(\(top) reps)"
+                                     : "(\(range.lowerBound)-\(top) reps)")
                                     .font(RQTypography.caption)
                                     .foregroundColor(RQColors.textTertiary)
                             }

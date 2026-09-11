@@ -9,18 +9,16 @@ enum ProgramCatalog {
         HypertrophyPrograms.arnoldSplit,
         HypertrophyPrograms.broSplit,
         HypertrophyPrograms.fullBody3Day,
-        // Strength (7)
-        StrengthPrograms.wendler531,
-        StrengthPrograms.wendler531BBB,
+        // Strength (3). Programs whose identity is a training-max /
+        // percentage / wave scheme (5/3/1 and its variants, Texas Method,
+        // Conjugate) are deliberately absent: the engine has no such layer,
+        // so materializing them would only reproduce the exercise list.
         StrengthPrograms.startingStrength,
         StrengthPrograms.strongLifts5x5,
-        StrengthPrograms.texasMethod,
         StrengthPrograms.gzclMethod,
-        StrengthPrograms.nsuns,
-        // Hybrid (4)
+        // Hybrid (3)
         HybridPrograms.phul,
         HybridPrograms.phat,
-        HybridPrograms.conjugate,
         HybridPrograms.redditPPL,
     ]
 
