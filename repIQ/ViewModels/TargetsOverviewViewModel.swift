@@ -42,6 +42,18 @@ final class TargetsOverviewViewModel {
     /// re-collapsing the day they actually care about.
     var expandedDayIds: Set<String> = []
 
+    /// Templates trained in the window, most recent first. The tab is scoped
+    /// to one of them so the hero, focus and day rows all describe the same
+    /// program; with a single template there is nothing to choose.
+    private(set) var scopes: [TemplateService.TemplateScope] = []
+    private(set) var selectedScope: TemplateService.TemplateScope?
+    /// A pick the user made this session. It holds until the tab is torn
+    /// down; every fresh load defaults back to the last-trained template, so
+    /// switching programs never leaves the tab on the old one.
+    private var userPickedScopeId: UUID?
+
+    var showsScopePicker: Bool { scopes.count > 1 }
+
     struct FocusItem: Identifiable, Sendable {
         let exercise: ExerciseAdherence
         let dayName: String
@@ -61,6 +73,7 @@ final class TargetsOverviewViewModel {
     private let adherenceService = TargetAdherenceService()
     private let analyticsService = AnalyticsService()
     private let digestService = DigestService()
+    private let templateService = TemplateService()
 
     // MARK: - Load
 
@@ -69,8 +82,20 @@ final class TargetsOverviewViewModel {
         isLoading = true
         defer { isLoading = false }
 
-        async let reportTask = try? adherenceService.fetchReport(userId: userId, windowDays: windowDays)
-        async let verdictTask = try? analyticsService.fetchProgressionRate(userId: userId, days: windowDays)
+        // Resolve the scope first: the report and verdict are filtered by it.
+        // No template with history (unplanned sessions only, or a brand-new
+        // account) means no scope, and the tab grades everything as before.
+        let loadedScopes = (try? await templateService.fetchTemplatesWithHistory(userId: userId, windowDays: windowDays)) ?? []
+        scopes = loadedScopes
+        selectedScope = loadedScopes.first { $0.id == userPickedScopeId } ?? loadedScopes.first
+        let scope = selectedScope
+
+        async let reportTask = try? adherenceService.fetchReport(
+            userId: userId, windowDays: windowDays, templateId: scope?.id
+        )
+        async let verdictTask = try? analyticsService.fetchProgressionRate(
+            userId: userId, days: windowDays, workoutDayIds: scope?.workoutDayIds
+        )
         async let repSheetTask = try? digestService.fetchPriorMonthWrapped(userId: userId)
 
         let loadedReport = await reportTask ?? .empty
@@ -88,6 +113,14 @@ final class TargetsOverviewViewModel {
         if expandedDayIds.isEmpty, let worst = worstDay(in: loadedReport) {
             expandedDayIds.insert(worst.id)
         }
+    }
+
+    func select(scope: TemplateService.TemplateScope) async {
+        guard scope.id != selectedScope?.id else { return }
+        userPickedScopeId = scope.id
+        // A day expanded under one program means nothing under another.
+        expandedDayIds = []
+        await load()
     }
 
     func toggleExpansion(_ dayId: String) {

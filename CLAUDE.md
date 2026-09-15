@@ -323,7 +323,7 @@ The state pushed to the activity. Fields:
 
 - **Welcome card** — first-time users only (`@AppStorage("hasSeenWelcomeCard")`).
 - **Rep Sheet banner** — appears 1st–14th of each month if prior month's Rep Sheet is ready & unviewed (`RepSheetBannerCard` → pushes `RepSheetView`).
-- **Progression ring** (`ProgressionHeroCard(style: .ring)`) — same verdict the Progress tab leads with, above the CTA so "am I progressing?" is answered before "train now". Hidden while `verdict.isBaseline`. `DashboardViewModel` fetches it with the same `fetchProgressionRate` call, so the two screens cannot disagree. Sized deliberately: a larger ring pushed Start Workout behind the tab bar.
+- **Progression ring** (`ProgressionHeroCard(style: .ring)`) — same verdict the Progress tab leads with, above the CTA so "am I progressing?" is answered before "train now". Hidden while `verdict.isBaseline`. `DashboardViewModel` fetches it with the same `fetchProgressionRate` call, scoped to the same last-trained template, so the two screens cannot disagree. Sized deliberately: a larger ring pushed Start Workout behind the tab bar.
 - **Quick Start** — hero CTA. Triggers template picker → `WorkoutDayPickerView` → `coordinator.startWorkout(template:day:date:)`.
 - **My Templates** — list of user templates. Tap → `WorkoutDayPickerView`.
 - **Workout History** — link to `WorkoutHistoryView`.
@@ -335,6 +335,8 @@ The state pushed to the activity. Fields:
 ### Progress (`repIQ/Views/Progress/ProgressTabView.swift`)
 
 Rebuilt Aug 2026 around **target adherence**. The tab answers one question — are your targets going up, and are you hitting them — and then stops. Order, top to bottom:
+
+- **Program scope** (Sep 2026) — the whole tab describes **one template**: the one trained most recently, recomputed on every load so switching programs never leaves the tab on the old one. A caption-style `Menu` above the hero (`Program · 5/3/1 Boring But Big ▾`) appears only when more than one template has a completed session in the 28-day window (`TemplateService.fetchTemplatesWithHistory`); a pick holds for the session (in-memory, like `expandedDayIds`) and reverts next launch. Scoping is a filter, not a restructure: `fetchReport(templateId:)` filters sessions, and `fetchProgressionRate(workoutDayIds:)` filters `progression_log` by the template's day ids (the log has no template column). **Unplanned sessions** (no template) and sessions of a **deleted template** drop out under a scope — neither can be tied to a program, and neither is actionable. A user with only unplanned sessions gets the unscoped tab. The Rep Sheet banner is month-wide and unscoped. The **Home ring** applies the same last-trained default (`DashboardViewModel.scopedProgressionVerdict`) so the two screens still cannot disagree.
 
 - **Targets hero** (`TargetsHeroCard`) — "N/M targets going up **next session**", plus a stacked bar of the four engine decisions (more weight / more reps / same target / eased back) and a coaching line. Reports *progression*, not adherence: adherence is the section underneath, and a hero summarising its own rows is a subtotal, not a headline.
 - **Rep Sheet banner** (only while last month's sheet is unread)

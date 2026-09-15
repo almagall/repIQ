@@ -60,6 +60,12 @@ struct ProgressTabView: View {
                 .frame(maxWidth: .infinity, minHeight: 300)
         } else {
             VStack(spacing: RQSpacing.xl) {
+                // 0. Which program the numbers below describe. Only a choice
+                //    when more than one has been trained in the window.
+                if viewModel.showsScopePicker, let scope = viewModel.selectedScope {
+                    scopePicker(current: scope)
+                }
+
                 // 1. The outcome — how many lifts get a harder target next time.
                 TargetsHeroCard(
                     verdict: viewModel.verdict,
@@ -105,6 +111,43 @@ struct ProgressTabView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Scope picker
+
+    /// A caption of what the hero measures, not a tab bar: the template name
+    /// with a chevron, backed by a menu so it scales past two programs.
+    private func scopePicker(current: TemplateService.TemplateScope) -> some View {
+        Menu {
+            ForEach(viewModel.scopes) { scope in
+                Button {
+                    Task { await viewModel.select(scope: scope) }
+                } label: {
+                    if scope.id == current.id {
+                        Label(scope.name, systemImage: "checkmark")
+                    } else {
+                        Text(scope.name)
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: RQSpacing.sm) {
+                Text("Program")
+                    .rqSheetLabel()
+                    .foregroundColor(RQColors.textTertiary)
+                Text(current.name)
+                    .font(RQTypography.sheetBody)
+                    .foregroundColor(RQColors.textPrimary)
+                    .lineLimit(1)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(RQColors.textTertiary)
+                Spacer()
+            }
+            .padding(.horizontal, RQSpacing.xs)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Section header

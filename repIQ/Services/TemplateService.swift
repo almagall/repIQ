@@ -14,6 +14,76 @@ struct TemplateService: Sendable {
             .value
     }
 
+    /// A template the Progress tab can be scoped to: one with a completed
+    /// session in the window. Carries its day ids because `progression_log`
+    /// is keyed by day, not template.
+    struct TemplateScope: Identifiable, Sendable, Equatable {
+        let id: UUID
+        let name: String
+        let lastTrained: Date
+        let workoutDayIds: [UUID]
+    }
+
+    /// Templates trained in the last `windowDays`, most recently trained first.
+    /// A deleted template's sessions keep their id but have no name, so they
+    /// drop out here rather than showing as a blank row.
+    func fetchTemplatesWithHistory(userId: UUID, windowDays: Int) async throws -> [TemplateScope] {
+        guard let since = Calendar.current.date(byAdding: .day, value: -windowDays, to: Date()) else { return [] }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        struct SessionRow: Decodable {
+            let template_id: String?
+            let completed_at: Date?
+        }
+        let sessions: [SessionRow] = try await supabase.from("workout_sessions")
+            .select("template_id,completed_at")
+            .eq("user_id", value: userId.uuidString)
+            .eq("status", value: "completed")
+            .not("template_id", operator: .is, value: "null")
+            .gte("completed_at", value: iso.string(from: since))
+            .order("completed_at", ascending: false)
+            .execute()
+            .value
+
+        var lastTrained: [UUID: Date] = [:]
+        for row in sessions {
+            guard let raw = row.template_id, let id = UUID(uuidString: raw), let date = row.completed_at else { continue }
+            if lastTrained[id] == nil { lastTrained[id] = date }
+        }
+        guard !lastTrained.isEmpty else { return [] }
+
+        struct TemplateRow: Decodable {
+            let id: UUID
+            let name: String
+        }
+        let templates: [TemplateRow] = try await supabase.from("templates")
+            .select("id,name")
+            .in("id", values: lastTrained.keys.map(\.uuidString))
+            .execute()
+            .value
+
+        struct DayRow: Decodable {
+            let id: UUID
+            let template_id: UUID
+        }
+        let days: [DayRow] = try await supabase.from("workout_days")
+            .select("id,template_id")
+            .in("template_id", values: templates.map(\.id.uuidString))
+            .execute()
+            .value
+        let daysByTemplate = Dictionary(grouping: days, by: \.template_id)
+
+        return templates.compactMap { row in
+            guard let trained = lastTrained[row.id] else { return nil }
+            return TemplateScope(
+                id: row.id, name: row.name, lastTrained: trained,
+                workoutDayIds: (daysByTemplate[row.id] ?? []).map(\.id)
+            )
+        }
+        .sorted { $0.lastTrained > $1.lastTrained }
+    }
+
     func fetchTemplate(id: UUID) async throws -> Template {
         try await supabase.from("templates")
             .select("*, workout_days(*, workout_day_exercises(*, exercises(*)))")

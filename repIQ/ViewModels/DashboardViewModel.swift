@@ -17,7 +17,8 @@ final class DashboardViewModel {
     /// Drives the dashboard banner that appears on the 1st–14th of a new month.
     var priorMonthWrapped: RepSheet?
     /// Same verdict the Progress tab leads with. Both screens read it from
-    /// `fetchProgressionRate` so the headline number can't drift between them.
+    /// `fetchProgressionRate`, scoped to the last-trained template the same
+    /// way, so the headline number can't drift between them.
     var progressionVerdict: ProgressionVerdict?
 
     private let workoutService = WorkoutService()
@@ -44,9 +45,9 @@ final class DashboardViewModel {
             async let allSessions = workoutService.fetchAllSessions(userId: userId)
             async let templates = templateService.fetchTemplates(userId: userId)
             async let lastPR = fetchLastPRSummary(userId: userId)
-            async let verdict = analyticsService.fetchProgressionRate(userId: userId)
+            async let verdict = scopedProgressionVerdict(userId: userId)
 
-            progressionVerdict = try? await verdict
+            progressionVerdict = await verdict
 
             recentSession = try await sessions.first
             weeklySetCount = try await setCount
@@ -118,6 +119,14 @@ final class DashboardViewModel {
     }
 
     // MARK: - Widget Sync Helpers
+
+    /// The Progress tab's default scope: the template trained most recently.
+    private func scopedProgressionVerdict(userId: UUID) async -> ProgressionVerdict? {
+        let scope = (try? await templateService.fetchTemplatesWithHistory(
+            userId: userId, windowDays: AdherenceRules.windowDays
+        ))?.first
+        return try? await analyticsService.fetchProgressionRate(userId: userId, workoutDayIds: scope?.workoutDayIds)
+    }
 
     /// Fetches the most recent PR with the exercise name, formatted as a
     /// glanceable string for the home screen widget. Returns `nil` if the

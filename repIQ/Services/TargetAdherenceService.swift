@@ -17,14 +17,16 @@ struct TargetAdherenceService {
 
     /// - Parameter windowDays: how far back to measure. The same span
     ///   immediately before it is measured too, to produce "up from 68%".
-    func fetchReport(userId: UUID, windowDays: Int = 28) async throws -> AdherenceReport {
+    /// - Parameter templateId: scopes the report to one template's sessions.
+    ///   Nil grades everything, unplanned sessions included.
+    func fetchReport(userId: UUID, windowDays: Int = 28, templateId: UUID? = nil) async throws -> AdherenceReport {
         let calendar = Calendar.current
         let now = Date()
         guard let windowStart = calendar.date(byAdding: .day, value: -windowDays, to: now),
               let priorStart = calendar.date(byAdding: .day, value: -windowDays * 2, to: now)
         else { return .empty }
 
-        let sessions = try await fetchSessions(userId: userId, since: priorStart)
+        let sessions = try await fetchSessions(userId: userId, since: priorStart, templateId: templateId)
         guard !sessions.isEmpty else { return .empty }
 
         let sets = try await fetchWorkingSets(sessionIds: sessions.map(\.id))
@@ -126,7 +128,7 @@ struct TargetAdherenceService {
         guard let since = Calendar.current.date(byAdding: .day, value: -240, to: Date())
         else { return nil }
 
-        let allSessions = try await fetchSessions(userId: userId, since: since)
+        let allSessions = try await fetchSessions(userId: userId, since: since, templateId: nil)
         let sessions = allSessions.filter { $0.workoutDayId == workoutDayId }
         guard !sessions.isEmpty else { return nil }
 
@@ -328,7 +330,7 @@ struct TargetAdherenceService {
 
     // MARK: - Fetches
 
-    private func fetchSessions(userId: UUID, since: Date) async throws -> [SessionRef] {
+    private func fetchSessions(userId: UUID, since: Date, templateId: UUID?) async throws -> [SessionRef] {
         struct Row: Decodable {
             let id: String
             let workout_day_id: String?
@@ -336,11 +338,15 @@ struct TargetAdherenceService {
             let started_at: String
         }
 
-        let rows: [Row] = try await supabase.from("workout_sessions")
+        var query = supabase.from("workout_sessions")
             .select("id,workout_day_id,completed_at,started_at")
             .eq("user_id", value: userId.uuidString)
             .eq("status", value: "completed")
             .gte("started_at", value: iso.string(from: since))
+        if let templateId {
+            query = query.eq("template_id", value: templateId.uuidString)
+        }
+        let rows: [Row] = try await query
             .order("started_at", ascending: true)
             .execute()
             .value

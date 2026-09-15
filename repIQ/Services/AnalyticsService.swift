@@ -1029,10 +1029,14 @@ struct AnalyticsService: Sendable {
     ///     rows directly beneath it.
     ///   - minSessions: a lift needs real history before its latest decision
     ///     means anything. The day rows apply the same gate.
+    ///   - workoutDayIds: when given, only decisions logged on these days count —
+    ///     `progression_log` has no template column, so a template scope is
+    ///     expressed as the set of its days.
     func fetchProgressionRate(
         userId: UUID,
         days: Int = 28,
-        minSessions: Int = 3
+        minSessions: Int = 3,
+        workoutDayIds: [UUID]? = nil
     ) async throws -> ProgressionVerdict {
         struct DecisionRow: Decodable {
             let exercise_id: String
@@ -1052,23 +1056,52 @@ struct AnalyticsService: Sendable {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
 
-        let rows: [DecisionRow] = try await supabase.from("progression_log")
+        var query = supabase.from("progression_log")
             .select("exercise_id,workout_day_id,decision,created_at")
             .eq("user_id", value: userId.uuidString)
             .gte("created_at", value: formatter.string(from: startDate))
+        if let workoutDayIds {
+            query = query.in("workout_day_id", values: workoutDayIds.map(\.uuidString))
+        }
+        let rows: [DecisionRow] = try await query
             .order("created_at", ascending: false)
             .execute()
             .value
 
         // Rows arrive newest-first, so the first row seen for a key is its
-        // latest decision.
+        // latest decision. A wave lift's mid-cycle rows are `.wave` — neither
+        // progress nor a hold — so its latest *verdict* is the last cycle-end
+        // row (TM bump, hold or reset); three weeks out of four it would
+        // otherwise read as nothing. Sessions still count toward the gate.
         var latestByKey: [String: String] = [:]
         var countByKey: [String: Int] = [:]
+        var waveOnlyExerciseIds: Set<String> = []
         for row in rows {
             let key = "\(row.exercise_id)-\(row.workout_day_id ?? "global")"
             countByKey[key, default: 0] += 1
-            if latestByKey[key] == nil {
+            if latestByKey[key] == nil, row.decision != ProgressionDecision.wave.rawValue {
                 latestByKey[key] = row.decision
+            }
+        }
+        for key in countByKey.keys where latestByKey[key] == nil {
+            waveOnlyExerciseIds.insert(String(key.prefix(36)))
+        }
+        // A cycle is four sessions, so an actively trained wave lift's last
+        // verdict usually predates the window. Reach back for it.
+        if !waveOnlyExerciseIds.isEmpty {
+            let verdicts: [DecisionRow] = try await supabase.from("progression_log")
+                .select("exercise_id,workout_day_id,decision,created_at")
+                .eq("user_id", value: userId.uuidString)
+                .in("exercise_id", values: Array(waveOnlyExerciseIds))
+                .neq("decision", value: ProgressionDecision.wave.rawValue)
+                .order("created_at", ascending: false)
+                .execute()
+                .value
+            for row in verdicts {
+                let key = "\(row.exercise_id)-\(row.workout_day_id ?? "global")"
+                if countByKey[key] != nil, latestByKey[key] == nil {
+                    latestByKey[key] = row.decision
+                }
             }
         }
 
