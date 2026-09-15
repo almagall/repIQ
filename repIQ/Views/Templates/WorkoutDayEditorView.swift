@@ -419,6 +419,27 @@ struct WorkoutDayEditorView: View {
 
                     if dayExercise.trainingMode == .strength {
                         HStack {
+                            Text("Progression")
+                                .font(RQTypography.label)
+                                .textCase(.uppercase)
+                                .tracking(1.5)
+                                .foregroundColor(RQColors.textSecondary)
+                            Spacer()
+                            progressionRuleToggle(dayExercise)
+                        }
+                    }
+
+                    // A 5/3/1 wave owns its layout: three sets at fixed
+                    // percentages of the training max. Nothing below applies.
+                    if dayExercise.progressionRule == .wave531 {
+                        Text("Three sets per session at 65–95% of your training max, cycling 5s → 3s → 5/3/1 → deload. The TM is set the first time you log this lift.")
+                            .font(RQTypography.caption)
+                            .foregroundColor(RQColors.textTertiary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    if dayExercise.trainingMode == .strength, dayExercise.progressionRule == .autoregulated {
+                        HStack {
                             Text("Sets")
                                 .font(RQTypography.label)
                                 .textCase(.uppercase)
@@ -429,6 +450,7 @@ struct WorkoutDayEditorView: View {
                         }
                     }
 
+                    if dayExercise.progressionRule == .autoregulated {
                     // Target sets
                     HStack {
                         Text("Target Sets")
@@ -494,6 +516,7 @@ struct WorkoutDayEditorView: View {
                             .foregroundColor(RQColors.textSecondary)
                         Spacer()
                         repCapControl(dayExercise)
+                    }
                     }
                 }
             }
@@ -614,6 +637,33 @@ struct WorkoutDayEditorView: View {
                         .padding(.horizontal, RQSpacing.md)
                         .padding(.vertical, RQSpacing.sm)
                         .background(dayExercise.trainingMode == mode ? modeColor(mode) : RQColors.surfaceTertiary)
+                }
+            }
+        }
+        .cornerRadius(RQRadius.small)
+    }
+
+    private func progressionRuleToggle(_ dayExercise: WorkoutDayExercise) -> some View {
+        HStack(spacing: 0) {
+            ForEach(ProgressionRule.allCases, id: \.self) { rule in
+                Button {
+                    Task {
+                        await viewModel.updateExerciseMode(
+                            dayExercise,
+                            trainingMode: dayExercise.trainingMode,
+                            setScheme: dayExercise.setScheme,
+                            progressionRule: rule,
+                            targetSets: rule == .wave531 ? WaveProgression.setsPerWave : dayExercise.targetSets,
+                            repCap: rule == .wave531 ? nil : dayExercise.repCap
+                        )
+                    }
+                } label: {
+                    Text(rule.displayName)
+                        .font(RQTypography.caption)
+                        .foregroundColor(dayExercise.progressionRule == rule ? RQColors.background : RQColors.textSecondary)
+                        .padding(.horizontal, RQSpacing.md)
+                        .padding(.vertical, RQSpacing.sm)
+                        .background(dayExercise.progressionRule == rule ? RQColors.strength : RQColors.surfaceTertiary)
                 }
             }
         }

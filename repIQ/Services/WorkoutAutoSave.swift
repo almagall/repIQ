@@ -96,6 +96,10 @@ struct SavedExerciseState: Codable {
     var restSeconds: Int?
     var notes: String?
     var useAddedWeight: Bool?
+    // A wave lift's prescription comes from its TM + wave, not the DB target,
+    // so the recovered entry must carry them or it would look autoregulated.
+    var progressionRule: ProgressionRule?
+    var waveContext: WaveContext?
 }
 
 /// Serializable set state.

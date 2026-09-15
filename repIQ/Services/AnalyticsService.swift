@@ -1078,8 +1078,8 @@ struct AnalyticsService: Sendable {
         var deloading = 0
         var buildingBaseline = 0
 
-        for (key, decisionRaw) in latestByKey {
-            guard (countByKey[key] ?? 0) >= minSessions else {
+        for key in countByKey.keys {
+            guard (countByKey[key] ?? 0) >= minSessions, let decisionRaw = latestByKey[key] else {
                 buildingBaseline += 1
                 continue
             }
@@ -1088,7 +1088,7 @@ struct AnalyticsService: Sendable {
             case .increaseReps: addedReps += 1
             case .maintain: holding += 1
             case .deload, .deloadVolume: deloading += 1
-            case nil: break
+            case .wave, nil: break
             }
         }
 

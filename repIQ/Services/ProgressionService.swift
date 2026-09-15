@@ -159,8 +159,12 @@ struct ProgressionService: Sendable {
         // also satisfies it — beating the top just earns the bump sooner, never a
         // larger-than-one-increment jump.
         if minReps >= top {
+            // A rep cap can collapse the band to one number (BBB's 5x10), and
+            // "resetting to the bottom" reads wrong when bottom is top.
             return makeTarget(.increaseWeight, weight: workingWeight + increment, reps: bottom,
-                reasoning: "You hit the top of the rep range on every set. Adding weight and resetting reps to the bottom of the range.")
+                reasoning: bottom == top
+                    ? "You got \(top) on every set. Adding weight."
+                    : "You hit the top of the rep range on every set. Adding weight and resetting reps to the bottom of the range.")
         }
         // Missed the floor — hold weight and rebuild before progressing.
         if minReps < bottom {
@@ -722,6 +726,7 @@ struct ProgressionService: Sendable {
             let decision: String
             let reasoning: String?
             let estimated_1rm: Double?
+            let mesocycle_week: Int?
         }
 
         let entry = ProgressionLogEntry(
@@ -739,12 +744,74 @@ struct ProgressionService: Sendable {
             target_rpe: target.targetRPE,
             decision: target.decision.rawValue,
             reasoning: target.reasoning,
-            estimated_1rm: target.estimatedOneRM
+            estimated_1rm: target.estimatedOneRM,
+            mesocycle_week: target.programWeek
         )
 
         try await supabase.from("progression_log")
             .insert(entry)
             .execute()
+    }
+
+    /// Decoded `progression_log` row; also used to walk a wave lift's cycle.
+    struct ProgressionRow: Decodable {
+        let exercise_id: String
+        let training_mode: String
+        let target_weight: Double
+        let target_reps_low: Int
+        let target_reps_high: Int
+        let target_rpe: Double
+        let decision: String
+        let reasoning: String?
+        let previous_weight: Double?
+        let previous_reps: Int?
+        let previous_rpe: Double?
+        let estimated_1rm: Double?
+        let mesocycle_week: Int?
+
+        var target: ProgressionTarget? {
+            guard let exerciseId = UUID(uuidString: exercise_id) else { return nil }
+            return ProgressionTarget(
+                exerciseId: exerciseId,
+                trainingMode: TrainingMode(rawValue: training_mode) ?? .hypertrophy,
+                targetWeight: target_weight,
+                targetRepsLow: target_reps_low,
+                targetRepsHigh: target_reps_high,
+                targetRPE: target_rpe,
+                decision: ProgressionDecision(rawValue: decision) ?? .maintain,
+                reasoning: reasoning ?? "",
+                previousWeight: previous_weight,
+                previousReps: previous_reps,
+                previousRPE: previous_rpe,
+                estimatedOneRM: estimated_1rm,
+                programWeek: mesocycle_week
+            )
+        }
+    }
+
+    /// The last `limit` rows for one exercise on one day, newest first. A wave
+    /// lift's cycle-end verdict reads the AMRAP results back from these — each
+    /// row's `previous_weight/previous_reps` is the + set of the session that
+    /// wrote it, and `mesocycle_week` names the wave that followed it.
+    func fetchRecentTargets(
+        userId: UUID,
+        exerciseId: UUID,
+        workoutDayId: UUID?,
+        limit: Int
+    ) async throws -> [ProgressionTarget] {
+        var query = supabase.from("progression_log")
+            .select()
+            .eq("user_id", value: userId.uuidString)
+            .eq("exercise_id", value: exerciseId.uuidString)
+        if let workoutDayId {
+            query = query.eq("workout_day_id", value: workoutDayId.uuidString)
+        }
+        let rows: [ProgressionRow] = try await query
+            .order("created_at", ascending: false)
+            .limit(limit)
+            .execute()
+            .value
+        return rows.compactMap(\.target)
     }
 
     /// Fetches the most recent progression target for each exercise.
@@ -756,21 +823,6 @@ struct ProgressionService: Sendable {
         workoutDayId: UUID? = nil
     ) async throws -> [UUID: ProgressionTarget] {
         guard !exerciseIds.isEmpty else { return [:] }
-
-        struct ProgressionRow: Decodable {
-            let exercise_id: String
-            let training_mode: String
-            let target_weight: Double
-            let target_reps_low: Int
-            let target_reps_high: Int
-            let target_rpe: Double
-            let decision: String
-            let reasoning: String?
-            let previous_weight: Double?
-            let previous_reps: Int?
-            let previous_rpe: Double?
-            let estimated_1rm: Double?
-        }
 
         let rows: [ProgressionRow]
         if let workoutDayId {
@@ -794,28 +846,9 @@ struct ProgressionService: Sendable {
 
         var result: [UUID: ProgressionTarget] = [:]
         for row in rows {
-            guard let exerciseId = UUID(uuidString: row.exercise_id),
-                  result[exerciseId] == nil else { continue }
-
-            let trainingMode = TrainingMode(rawValue: row.training_mode) ?? .hypertrophy
-            let decision = ProgressionDecision(rawValue: row.decision) ?? .maintain
-
-            result[exerciseId] = ProgressionTarget(
-                exerciseId: exerciseId,
-                trainingMode: trainingMode,
-                targetWeight: row.target_weight,
-                targetRepsLow: row.target_reps_low,
-                targetRepsHigh: row.target_reps_high,
-                targetRPE: row.target_rpe,
-                decision: decision,
-                reasoning: row.reasoning ?? "",
-                previousWeight: row.previous_weight,
-                previousReps: row.previous_reps,
-                previousRPE: row.previous_rpe,
-                estimatedOneRM: row.estimated_1rm
-            )
+            guard let target = row.target, result[target.exerciseId] == nil else { continue }
+            result[target.exerciseId] = target
         }
-
         return result
     }
 

@@ -127,7 +127,7 @@ struct TemplateDetailView: View {
                                                     ? RQColors.hypertrophy
                                                     : RQColors.strength
                                             )
-                                        Text(schemeSummary(mode: dayExercise.trainingMode, scheme: dayExercise.setScheme, repCap: dayExercise.repCap))
+                                        Text(schemeSummary(mode: dayExercise.trainingMode, scheme: dayExercise.setScheme, rule: dayExercise.progressionRule, repCap: dayExercise.repCap))
                                             .font(RQTypography.caption)
                                             .foregroundColor(RQColors.textTertiary)
                                     }

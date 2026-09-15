@@ -1,10 +1,116 @@
 import Foundation
 
-// Only programs the engine can run honestly belong here. Percentage-of-training-max
-// cycles (5/3/1, nSuns), cross-day dependencies (Texas Method) and max-effort /
-// speed work (Conjugate) have no representation in the engine and were removed
-// rather than shipped under a name that promises a scheme the app doesn't follow.
+// Only programs the app can run honestly belong here. 5/3/1 runs on its own
+// rule (`ProgressionRule.wave531`: a training max and a four-session wave).
+// Other percentage cycles (nSuns), cross-day dependencies (Texas Method) and
+// max-effort / speed work (Conjugate) still have no representation and stay
+// out rather than ship under a name that promises a scheme the app doesn't follow.
 enum StrengthPrograms {
+
+    private static let mainLiftNote = "5/3/1 — three sets from your training max; the last is as many as you can. The TM moves when the cycle ends."
+    private static let bbbNote = "BBB: 5×10 — starts near 50% of that lift's training max; weight goes up when you get all 50."
+
+    // MARK: - Wendler's 5/3/1
+
+    static let wendler531 = ProgramDefinition(
+        id: "wendler-531",
+        name: "Wendler's 5/3/1",
+        description: "Jim Wendler's submaximal strength program. Each day is one main lift — press, deadlift, bench, squat — run as three sets at percentages of a training max (90% of your 1RM), with the last set taken for as many reps as you can. Four sessions per lift make a cycle: 5s, 3s, 5/3/1, deload; then the training max goes up. Assistance work follows the engine.",
+        category: .strength,
+        difficulty: .intermediate,
+        daysPerWeek: 4,
+        tags: ["proven", "4 days", "submaximal", "training max", "long-term"],
+        days: [
+            ProgramDayDefinition(
+                id: "531-ohp", name: "Overhead Press",
+                description: "5/3/1 press, then push, pull and core assistance.",
+                exercises: [
+                    ProgramExerciseDefinition(exerciseName: "Overhead Press", trainingMode: .strength, progressionRule: .wave531, targetSets: 3, restSecondsOverride: 180, notes: mainLiftNote),
+                    ProgramExerciseDefinition(exerciseName: "Dips (Chest)", trainingMode: .hypertrophy, targetSets: 5, notes: "Assistance: push"),
+                    ProgramExerciseDefinition(exerciseName: "Chin-Ups", trainingMode: .hypertrophy, targetSets: 5, notes: "Assistance: pull"),
+                    ProgramExerciseDefinition(exerciseName: "Hanging Leg Raises", trainingMode: .hypertrophy, targetSets: 3, notes: "Assistance: core"),
+                ]),
+            ProgramDayDefinition(
+                id: "531-deadlift", name: "Deadlift",
+                description: "5/3/1 deadlift, then pull, single-leg and core assistance.",
+                exercises: [
+                    ProgramExerciseDefinition(exerciseName: "Deadlift", trainingMode: .strength, progressionRule: .wave531, targetSets: 3, restSecondsOverride: 300, notes: mainLiftNote),
+                    ProgramExerciseDefinition(exerciseName: "Dumbbell Row", trainingMode: .hypertrophy, targetSets: 5, notes: "Assistance: pull"),
+                    ProgramExerciseDefinition(exerciseName: "Bulgarian Split Squat", trainingMode: .hypertrophy, targetSets: 3, notes: "Assistance: single-leg"),
+                    ProgramExerciseDefinition(exerciseName: "Ab Wheel Rollout", trainingMode: .hypertrophy, targetSets: 3, notes: "Assistance: core"),
+                ]),
+            ProgramDayDefinition(
+                id: "531-bench", name: "Bench Press",
+                description: "5/3/1 bench, then push and pull assistance.",
+                exercises: [
+                    ProgramExerciseDefinition(exerciseName: "Barbell Bench Press", trainingMode: .strength, progressionRule: .wave531, targetSets: 3, restSecondsOverride: 180, notes: mainLiftNote),
+                    ProgramExerciseDefinition(exerciseName: "Dumbbell Bench Press", trainingMode: .hypertrophy, targetSets: 5, notes: "Assistance: push"),
+                    ProgramExerciseDefinition(exerciseName: "Barbell Row", trainingMode: .hypertrophy, targetSets: 5, notes: "Assistance: pull"),
+                    ProgramExerciseDefinition(exerciseName: "Face Pulls", trainingMode: .hypertrophy, targetSets: 3, notes: "Shoulder health"),
+                ]),
+            ProgramDayDefinition(
+                id: "531-squat", name: "Squat",
+                description: "5/3/1 squat, then leg and core assistance.",
+                exercises: [
+                    ProgramExerciseDefinition(exerciseName: "Barbell Squat", trainingMode: .strength, progressionRule: .wave531, targetSets: 3, restSecondsOverride: 300, notes: mainLiftNote),
+                    ProgramExerciseDefinition(exerciseName: "Leg Press", trainingMode: .hypertrophy, targetSets: 5, notes: "Assistance: legs"),
+                    ProgramExerciseDefinition(exerciseName: "Leg Curls", trainingMode: .hypertrophy, targetSets: 3, notes: "Assistance: hamstrings"),
+                    ProgramExerciseDefinition(exerciseName: "Cable Crunch", trainingMode: .hypertrophy, targetSets: 3, notes: "Assistance: core"),
+                ]),
+        ])
+
+    // MARK: - 5/3/1 Boring But Big
+
+    // The opposite-lift variant (press day carries bench volume and vice
+    // versa, squat and deadlift likewise). The same-lift version would put
+    // one exercise on a day twice, and history and targets are keyed by
+    // exercise per day, so the two entries would share one prescription.
+    static let wendler531BBB = ProgramDefinition(
+        id: "wendler-531-bbb",
+        name: "5/3/1 Boring But Big",
+        description: "The most popular 5/3/1 template. The main lift runs the 5/3/1 wave; then five sets of ten on the opposite lift — bench on press day, press on bench day, squat on deadlift day, deadlift on squat day — starting near 50% of that lift's training max and climbing as you earn all fifty reps. Strength and size in the same block.",
+        category: .strength,
+        difficulty: .intermediate,
+        daysPerWeek: 4,
+        tags: ["popular", "4 days", "strength + size", "Wendler", "BBB"],
+        days: [
+            ProgramDayDefinition(
+                id: "531bbb-ohp", name: "Overhead Press",
+                description: "5/3/1 press, BBB bench 5×10, then pull and shoulder-health work.",
+                exercises: [
+                    ProgramExerciseDefinition(exerciseName: "Overhead Press", trainingMode: .strength, progressionRule: .wave531, targetSets: 3, restSecondsOverride: 180, notes: mainLiftNote),
+                    ProgramExerciseDefinition(exerciseName: "Barbell Bench Press", trainingMode: .hypertrophy, setScheme: .straight, targetSets: 5, repCap: 10, restSecondsOverride: 90, notes: bbbNote),
+                    ProgramExerciseDefinition(exerciseName: "Pull-Ups", trainingMode: .hypertrophy, targetSets: 5, restSecondsOverride: 90, notes: "Assistance: pull"),
+                    ProgramExerciseDefinition(exerciseName: "Face Pulls", trainingMode: .hypertrophy, targetSets: 3, notes: "Shoulder health"),
+                ]),
+            ProgramDayDefinition(
+                id: "531bbb-deadlift", name: "Deadlift",
+                description: "5/3/1 deadlift, BBB squat 5×10, then pull and core work.",
+                exercises: [
+                    ProgramExerciseDefinition(exerciseName: "Deadlift", trainingMode: .strength, progressionRule: .wave531, targetSets: 3, restSecondsOverride: 300, notes: mainLiftNote),
+                    ProgramExerciseDefinition(exerciseName: "Barbell Squat", trainingMode: .hypertrophy, setScheme: .straight, targetSets: 5, repCap: 10, restSecondsOverride: 120, notes: bbbNote),
+                    ProgramExerciseDefinition(exerciseName: "Dumbbell Row", trainingMode: .hypertrophy, targetSets: 5, notes: "Assistance: pull"),
+                    ProgramExerciseDefinition(exerciseName: "Ab Wheel Rollout", trainingMode: .hypertrophy, targetSets: 3, notes: "Assistance: core"),
+                ]),
+            ProgramDayDefinition(
+                id: "531bbb-bench", name: "Bench Press",
+                description: "5/3/1 bench, BBB press 5×10, then row and triceps work.",
+                exercises: [
+                    ProgramExerciseDefinition(exerciseName: "Barbell Bench Press", trainingMode: .strength, progressionRule: .wave531, targetSets: 3, restSecondsOverride: 180, notes: mainLiftNote),
+                    ProgramExerciseDefinition(exerciseName: "Overhead Press", trainingMode: .hypertrophy, setScheme: .straight, targetSets: 5, repCap: 10, restSecondsOverride: 90, notes: bbbNote),
+                    ProgramExerciseDefinition(exerciseName: "Barbell Row", trainingMode: .hypertrophy, targetSets: 5, restSecondsOverride: 90, notes: "Assistance: pull"),
+                    ProgramExerciseDefinition(exerciseName: "Tricep Pushdown", trainingMode: .hypertrophy, targetSets: 3, notes: "Assistance: triceps"),
+                ]),
+            ProgramDayDefinition(
+                id: "531bbb-squat", name: "Squat",
+                description: "5/3/1 squat, BBB deadlift 5×10, then hamstring and core work.",
+                exercises: [
+                    ProgramExerciseDefinition(exerciseName: "Barbell Squat", trainingMode: .strength, progressionRule: .wave531, targetSets: 3, restSecondsOverride: 300, notes: mainLiftNote),
+                    ProgramExerciseDefinition(exerciseName: "Deadlift", trainingMode: .hypertrophy, setScheme: .straight, targetSets: 5, repCap: 10, restSecondsOverride: 120, notes: bbbNote),
+                    ProgramExerciseDefinition(exerciseName: "Leg Curls", trainingMode: .hypertrophy, targetSets: 3, notes: "Assistance: hamstrings"),
+                    ProgramExerciseDefinition(exerciseName: "Hanging Leg Raises", trainingMode: .hypertrophy, targetSets: 3, notes: "Assistance: core"),
+                ]),
+        ])
 
     // MARK: - Starting Strength
 

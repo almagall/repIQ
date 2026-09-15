@@ -100,6 +100,10 @@ struct NextPrescription: Sendable {
     let rpe: Double?
     let decision: ProgressionDecision?
     let trainingMode: TrainingMode
+    var reasoning: String? = nil
+    /// A program rule (5/3/1) wrote this row; its reasoning explains the
+    /// prescription and the engine's generic explanation would be wrong.
+    var isProgramRule: Bool = false
 
     var goingUp: Bool {
         decision == .increaseWeight || decision == .increaseReps

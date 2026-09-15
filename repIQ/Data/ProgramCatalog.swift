@@ -9,9 +9,11 @@ enum ProgramCatalog {
         HypertrophyPrograms.arnoldSplit,
         HypertrophyPrograms.broSplit,
         HypertrophyPrograms.fullBody3Day,
-        // Strength (3)
+        // Strength (5)
         StrengthPrograms.startingStrength,
         StrengthPrograms.strongLifts5x5,
+        StrengthPrograms.wendler531,
+        StrengthPrograms.wendler531BBB,
         StrengthPrograms.gzclMethod,
         // Hybrid (3)
         HybridPrograms.phul,

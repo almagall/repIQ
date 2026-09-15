@@ -72,11 +72,18 @@ struct SetLoggerView: View {
                             exerciseNote(notes)
                         }
 
-                        if let set = liveSet, set.setType == .working {
+                        // A 5/3/1 lift with no training max can't be prescribed
+                        // yet: the TM card stands in for the controls until
+                        // it's answered.
+                        if exercise.needsTrainingMax {
+                            TrainingMaxCard(viewModel: viewModel, exerciseIndex: exerciseIndex)
+                        }
+
+                        if let set = liveSet, set.setType == .working, !exercise.needsTrainingMax {
                             targetLastCard(exercise, set: set)
                         }
 
-                        if let set = liveSet {
+                        if let set = liveSet, !exercise.needsTrainingMax {
                             if usesLoad {
                                 weightBlock(exercise, set: set)
                             }
@@ -91,7 +98,7 @@ struct SetLoggerView: View {
                             coachCard(exercise)
                         }
 
-                        if let set = liveSet {
+                        if let set = liveSet, !exercise.needsTrainingMax {
                             logButton(exercise, set: set)
                         }
 
@@ -216,9 +223,11 @@ struct SetLoggerView: View {
                         .rqLabel()
                         .foregroundColor(RQColors.warmup)
                 } else if set.setType == .working {
-                    Text("SET \(workingPosition(of: set, in: exercise) + 1) OF \(workingSets.count)")
+                    let isAMRAP = exercise.waveContext.flatMap { waveStep(exercise, set: set, context: $0) }?.isAMRAP == true
+                    Text("SET \(workingPosition(of: set, in: exercise) + 1) OF \(workingSets.count)"
+                         + (isAMRAP ? " · MAX REPS" : ""))
                         .rqLabel()
-                        .foregroundColor(RQColors.textTertiary)
+                        .foregroundColor(isAMRAP ? RQColors.accent : RQColors.textTertiary)
                 } else {
                     Text(set.setType.rawValue.uppercased())
                         .rqLabel()
@@ -351,20 +360,46 @@ struct SetLoggerView: View {
         let previous = previousWorkingSet(for: set, in: exercise)
 
         VStack(spacing: 0) {
-            if exercise.progressionTarget != nil {
+            if exercise.hasPrescription {
                 HStack(spacing: RQSpacing.sm) {
                     Circle().fill(RQColors.accent).frame(width: 6, height: 6)
                     Text("Target")
                         .font(RQTypography.caption)
                         .foregroundColor(RQColors.textSecondary)
                     Spacer()
-                    Text(targetLine(exercise, weight: set.targetWeight, reps: set.targetReps, rpe: set.targetRPE))
-                        .font(RQTypography.numbersSmall)
-                        .foregroundColor(RQColors.textPrimary)
+                    if let context = exercise.waveContext, let step = waveStep(exercise, set: set, context: context) {
+                        VStack(alignment: .trailing, spacing: 1) {
+                            Text(targetLine(exercise, weight: set.targetWeight, reps: set.targetReps, rpe: nil)
+                                 + (step.isAMRAP ? "+" : ""))
+                                .font(RQTypography.numbersSmall)
+                                .foregroundColor(RQColors.textPrimary)
+                            Text("\(Int((step.percent * 100).rounded()))% of TM \(formatWeight(context.trainingMax))"
+                                 + (step.isAMRAP ? " · AMRAP" : ""))
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundColor(RQColors.textTertiary)
+                        }
+                    } else {
+                        Text(targetLine(exercise, weight: set.targetWeight, reps: set.targetReps, rpe: set.targetRPE))
+                            .font(RQTypography.numbersSmall)
+                            .foregroundColor(RQColors.textPrimary)
+                    }
                     deviationTag(set: set, targetWeight: set.targetWeight, targetReps: set.targetReps)
                 }
                 .padding(.horizontal, RQSpacing.md)
                 .padding(.vertical, RQSpacing.md)
+
+                if let context = exercise.waveContext {
+                    Divider().background(RQColors.hairline)
+                    waveRow(context)
+                    if context.wave.isDeload {
+                        Text("Deload week — light on purpose. Log it as written; the training max is decided when this session ends.")
+                            .font(.system(size: 10))
+                            .foregroundColor(RQColors.textTertiary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, RQSpacing.md)
+                            .padding(.bottom, RQSpacing.md)
+                    }
+                }
             } else {
                 HStack(spacing: RQSpacing.sm) {
                     Image(systemName: "scope")
@@ -405,6 +440,53 @@ struct SetLoggerView: View {
                 .stroke(RQColors.hairline, lineWidth: 0.5)
         )
         .cornerRadius(RQRadius.large)
+    }
+
+    /// Which step of the wave a working set is — by position, since the wave
+    /// is exactly three working rows.
+    private func waveStep(_ exercise: ExerciseLogEntry, set: SetEntry, context: WaveContext) -> WaveProgression.SetPrescription? {
+        guard set.setType == .working else { return nil }
+        let position = workingPosition(of: set, in: exercise)
+        return WaveProgression.prescribe(
+            trainingMax: context.trainingMax, waveIndex: context.waveIndex, equipment: exercise.equipment
+        )[safe: position]
+    }
+
+    /// Where the lift is in its cycle: the four waves as a rail, plus the TM.
+    private func waveRow(_ context: WaveContext) -> some View {
+        HStack(spacing: RQSpacing.sm) {
+            Circle().fill(RQColors.strength).frame(width: 6, height: 6)
+            Text("Wave \(context.waveIndex + 1) of \(WaveProgression.waves.count)")
+                .font(RQTypography.caption)
+                .foregroundColor(RQColors.textSecondary)
+            Spacer()
+            HStack(alignment: .top, spacing: RQSpacing.lg) {
+                ForEach(Array(WaveProgression.waves.enumerated()), id: \.offset) { index, wave in
+                    let isCurrent = index == context.waveIndex
+                    let isDone = index < context.waveIndex
+                    VStack(spacing: 4) {
+                        Circle()
+                            .fill(isCurrent || isDone ? RQColors.accent : Color.clear)
+                            .overlay(Circle().stroke(RQColors.textTertiary, lineWidth: isCurrent || isDone ? 0 : 1))
+                            .frame(width: 6, height: 6)
+                            .background(
+                                Circle().fill(RQColors.accent.opacity(isCurrent ? 0.25 : 0)).frame(width: 12, height: 12)
+                            )
+                        Text(wave.name)
+                            .font(.system(size: 9, weight: isCurrent ? .semibold : .regular, design: .monospaced))
+                            .foregroundColor(isCurrent ? RQColors.textPrimary : RQColors.textTertiary)
+                    }
+                }
+            }
+            Text("TM ")
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundColor(RQColors.textTertiary)
+            + Text(formatWeight(context.trainingMax))
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundColor(RQColors.textPrimary)
+        }
+        .padding(.horizontal, RQSpacing.md)
+        .padding(.vertical, RQSpacing.md)
     }
 
     /// Hypertrophy targets deliberately omit the prescribed RPE: its decisions
@@ -516,8 +598,9 @@ struct SetLoggerView: View {
             }
             .buttonStyle(.plain)
 
-            if set.setType == .working, exercise.progressionTarget != nil {
-                repsStatusNote(reps: set.reps, target: set.targetReps)
+            if set.setType == .working, exercise.hasPrescription {
+                let isAMRAP = exercise.waveContext.flatMap { waveStep(exercise, set: set, context: $0) }?.isAMRAP == true
+                repsStatusNote(reps: set.reps, target: set.targetReps, isAMRAP: isAMRAP)
             }
 
             Spacer()
@@ -543,10 +626,20 @@ struct SetLoggerView: View {
         .cornerRadius(RQRadius.large)
     }
 
+    /// On a + set the target is a floor, so the note says so instead of
+    /// "on target" — a lifter who logs the minimum has missed the point.
     @ViewBuilder
-    private func repsStatusNote(reps: Int, target: Int) -> some View {
+    private func repsStatusNote(reps: Int, target: Int, isAMRAP: Bool = false) -> some View {
         let delta = reps - target
-        if delta == 0 {
+        if isAMRAP, delta == 0 {
+            Text("\(target) is the minimum — log what you get")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(RQColors.accent)
+        } else if isAMRAP, delta > 0 {
+            Text("+\(delta) past the minimum")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(RQColors.stateAdvancing)
+        } else if delta == 0 {
             Text("on target")
                 .font(.system(size: 10, weight: .medium))
                 .foregroundColor(RQColors.stateAdvancing)
@@ -751,7 +844,7 @@ struct SetLoggerView: View {
             }
             .disabled(disabled)
 
-            if set.setType == .working, exercise.progressionTarget != nil {
+            if set.setType == .working, exercise.hasPrescription {
                 Text("PREFILLED FROM YOUR TARGET — ONE TAP IF YOU HIT IT")
                     .font(.system(size: 8, weight: .medium))
                     .tracking(1)
@@ -762,11 +855,15 @@ struct SetLoggerView: View {
 
     private func logButtonTitle(set: SetEntry, isWarmup: Bool) -> String {
         let prefix = isWarmup ? "Log warmup" : "Log"
+        let untouchedAMRAP = exercise.flatMap { ex in
+            ex.waveContext.flatMap { waveStep(ex, set: set, context: $0) }
+        }?.isAMRAP == true && set.reps == set.targetReps
+        let reps = untouchedAMRAP ? "\(set.reps)+" : "\(set.reps)"
         let core: String
         if usesLoad {
-            core = "\(prefix) \(formatWeight(set.weight)) × \(set.reps)"
+            core = "\(prefix) \(formatWeight(set.weight)) × \(reps)"
         } else {
-            core = "\(prefix) \(set.reps) reps"
+            core = "\(prefix) \(reps) reps"
         }
         if set.setType == .working, let rpe = set.rpe {
             return "\(core) @\(formatRPE(rpe))"
@@ -804,12 +901,21 @@ struct SetLoggerView: View {
     /// pre-filled (hard constraint), so Apply inserts empty sets.
     @ViewBuilder
     private func warmupSuggestionCard(_ exercise: ExerciseLogEntry) -> some View {
+        let waveWarmups = viewModel.waveWarmups(exerciseIndex: exerciseIndex)
+        let warmupCount = waveWarmups?.count ?? 2
+
         HStack(spacing: RQSpacing.sm) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("COACH")
                     .rqLabel()
                     .foregroundColor(RQColors.warmup)
-                if let weights = viewModel.suggestedWarmupWeights(exerciseIndex: exerciseIndex) {
+                if let waveWarmups {
+                    let ramp = waveWarmups.map { "\(formatWeight($0.weight)) × \($0.reps)" }.joined(separator: ", ")
+                    Text("Warm up first? 5/3/1 ramps \(ramp) (40 / 50 / 60% of your TM).")
+                        .font(RQTypography.footnote)
+                        .foregroundColor(RQColors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if let weights = viewModel.suggestedWarmupWeights(exerciseIndex: exerciseIndex) {
                     Text("Cold start — warm up first? Try ~\(formatWeight(weights.warmup1)) then ~\(formatWeight(weights.warmup2)).")
                         .font(RQTypography.footnote)
                         .foregroundColor(RQColors.textSecondary)
@@ -825,12 +931,13 @@ struct SetLoggerView: View {
 
             Button {
                 withAnimation {
-                    viewModel.addSet(exerciseIndex: exerciseIndex, setType: .warmup)
-                    viewModel.addSet(exerciseIndex: exerciseIndex, setType: .warmup)
+                    for _ in 0..<warmupCount {
+                        viewModel.addSet(exerciseIndex: exerciseIndex, setType: .warmup)
+                    }
                     warmupSuggestionDismissed = true
                 }
             } label: {
-                Text("Add 2")
+                Text("Add \(warmupCount)")
                     .font(RQTypography.caption)
                     .fontWeight(.semibold)
                     .foregroundColor(RQColors.warmup)
@@ -920,7 +1027,16 @@ struct SetLoggerView: View {
             ledgerBadge(exercise, set: set)
 
             VStack(alignment: .leading, spacing: 1) {
-                ledgerValueLine(set: set)
+                let step = exercise.waveContext.flatMap { waveStep(exercise, set: set, context: $0) }
+                // The "+" marks the prescribed minimum; once the lifter has
+                // edited the reps the row shows what they're about to log.
+                ledgerValueLine(set: set, isAMRAP: step?.isAMRAP == true && !set.isCompleted && set.reps == set.targetReps)
+
+                if let step {
+                    Text("\(Int((step.percent * 100).rounded()))% of TM" + (step.isAMRAP ? " · as many as you can" : ""))
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(RQColors.textTertiary)
+                }
 
                 if let previous {
                     Text("last · \(previousLine(previous))")
@@ -939,7 +1055,7 @@ struct SetLoggerView: View {
             Spacer()
 
             if set.isCompleted {
-                verdictTag(set: set, previous: previous)
+                verdictTag(set: set, previous: previous, isWave: exercise.waveContext != nil)
             } else if isLive {
                 Text("NOW")
                     .rqLabel()
@@ -1003,10 +1119,10 @@ struct SetLoggerView: View {
     }
 
     @ViewBuilder
-    private func ledgerValueLine(set: SetEntry) -> some View {
+    private func ledgerValueLine(set: SetEntry, isAMRAP: Bool = false) -> some View {
         HStack(spacing: 4) {
             if usesLoad {
-                Text("\(formatWeight(set.weight)) \(weightUnit) × \(set.reps)")
+                Text("\(set.weight > 0 ? formatWeight(set.weight) : "—") \(weightUnit) × \(set.reps)\(isAMRAP ? "+" : "")")
                     .font(.system(size: 13, weight: .semibold, design: .monospaced))
                     .foregroundColor(set.isCompleted ? RQColors.textPrimary : RQColors.textSecondary)
             } else {
@@ -1027,9 +1143,16 @@ struct SetLoggerView: View {
     /// BEAT; a lighter or shorter set reads MISS in the backing color — a
     /// fact, not a judgment (the single off-day logic decides what it means).
     @ViewBuilder
-    private func verdictTag(set: SetEntry, previous: WorkoutSet?) -> some View {
+    private func verdictTag(set: SetEntry, previous: WorkoutSet?, isWave: Bool = false) -> some View {
         if set.prType != nil {
             tagPill("PR", color: RQColors.warning)
+        } else if isWave, set.setType == .working, set.targetReps > 0 {
+            // The wave is the comparison: did the set meet its prescription.
+            if set.weight >= set.targetWeight && set.reps >= set.targetReps {
+                tagPill(set.reps > set.targetReps ? "▲ +\(set.reps - set.targetReps)" : "HIT", color: RQColors.stateAdvancing)
+            } else {
+                tagPill("▼ MISS", color: RQColors.stateBacking)
+            }
         } else if let previous, set.setType == .working {
             let beat = set.weight > previous.weight
                 || (abs(set.weight - previous.weight) < 0.001 && set.reps > previous.reps)
@@ -1132,8 +1255,11 @@ struct SetLoggerView: View {
 
     /// Positional comparison: this working set's counterpart from last
     /// session. previousSets is already filtered to working-only at load.
+    /// Positional comparison to last session. Meaningless for a wave lift —
+    /// last session was a different wave at different percentages — so those
+    /// compare to the prescription instead (see `verdictTag`).
     private func previousWorkingSet(for set: SetEntry, in exercise: ExerciseLogEntry) -> WorkoutSet? {
-        guard set.setType == .working else { return nil }
+        guard set.setType == .working, exercise.waveContext == nil else { return nil }
         let position = workingPosition(of: set, in: exercise)
         return exercise.previousSets.first?[safe: position]
     }

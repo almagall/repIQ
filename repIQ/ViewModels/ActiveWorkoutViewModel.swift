@@ -83,6 +83,12 @@ final class ActiveWorkoutViewModel {
     private let progressionService = ProgressionService()
     private let exerciseLibraryService = ExerciseLibraryService()
     private let goalService = GoalService()
+    private let trainingMaxService = TrainingMaxService()
+
+    // MARK: - Training Max (5/3/1 lifts)
+    /// Best e1RM on record for wave lifts that have no TM yet, so the TM card
+    /// opens prefilled. Keyed by exercise id.
+    var trainingMaxEstimates: [UUID: TrainingMaxService.OneRepMaxEstimate] = [:]
     private var timerTask: Task<Void, Never>?
     private var restTimerTask: Task<Void, Never>?
     private var autoSaveTask: Task<Void, Never>?
@@ -273,7 +279,8 @@ final class ActiveWorkoutViewModel {
             estimatedOneRM: target.estimatedOneRM,
             mesocycleRPEOffset: target.mesocycleRPEOffset,
             rpeFatigueDetected: target.rpeFatigueDetected,
-            e1rmConfidence: target.e1rmConfidence
+            e1rmConfidence: target.e1rmConfidence,
+            programWeek: target.programWeek
         )
     }
 
@@ -752,6 +759,34 @@ final class ActiveWorkoutViewModel {
             let previousData = try await previousDataTask
             let targets = (try? await targetsTask) ?? [:]
 
+            // 3a. Wave (5/3/1) lifts prescribe from a training max, not the
+            //     stored target. Load the TMs, and an e1RM estimate for any
+            //     lift that has none yet so the TM card opens prefilled.
+            //     TMs are loaded for every lift on the day: a supplemental lift
+            //     with no history (BBB's 5×10) seeds from 50% of its TM.
+            let waveExerciseIds = dayExercises.filter { $0.progressionRule == .wave531 }.map(\.exerciseId)
+            let trainingMaxes = (try? await trainingMaxService.fetchLatest(userId: userId, exerciseIds: exerciseIds)) ?? [:]
+            //     BBB's opposite lift can come before its own main day (press
+            //     day carries bench), so a barbell lift on a 5/3/1 day with no
+            //     TM and no history estimates one the same way the TM card does.
+            let bbbCandidateIds = waveExerciseIds.isEmpty ? [] : dayExercises.filter {
+                $0.progressionRule == .autoregulated && $0.trainingMode == .hypertrophy
+                    && $0.exercise?.equipment == "barbell"
+                    && (previousData[$0.exerciseId] ?? []).isEmpty && targets[$0.exerciseId] == nil
+            }.map(\.exerciseId)
+            for exerciseId in Set(waveExerciseIds + bbbCandidateIds) where trainingMaxes[exerciseId] == nil {
+                if let estimate = try? await trainingMaxService.estimateOneRepMax(userId: userId, exerciseId: exerciseId) {
+                    trainingMaxEstimates[exerciseId] = estimate
+                }
+            }
+            var waveContexts: [UUID: WaveContext] = [:]
+            for dayExercise in dayExercises where dayExercise.progressionRule == .wave531 {
+                guard let tm = trainingMaxes[dayExercise.exerciseId] else { continue }
+                waveContexts[dayExercise.exerciseId] = await waveContext(
+                    for: dayExercise, trainingMax: tm, latestTarget: targets[dayExercise.exerciseId], userId: userId
+                )
+            }
+
             // 3b. Fetch current PRs for inline PR detection
             for exerciseId in exerciseIds {
                 if let baseline = try? await progressionService.fetchPRBaseline(userId: userId, exerciseId: exerciseId) {
@@ -785,26 +820,58 @@ final class ActiveWorkoutViewModel {
                 // Pre-fill sets: compute per-set targets from progression decision + previous set data
                 let equipmentType = dayExercise.exercise?.equipment ?? ""
                 var sets: [SetEntry] = []
-                for i in 1...dayExercise.targetSets {
-                    let prev = prevSets[safe: i - 1]
-                    let (w, r, expectedRPE) = Self.perSetTarget(
-                        decision: target,
-                        previousSet: prev,
-                        trainingMode: dayExercise.trainingMode,
-                        setScheme: dayExercise.setScheme,
-                        setPosition: i - 1,
-                        totalSets: dayExercise.targetSets,
+                let waveContext = waveContexts[dayExercise.exerciseId]
+                if dayExercise.progressionRule == .wave531 {
+                    // The wave owns the layout: three sets from TM × percent.
+                    // With no TM yet the rows exist but stay empty until the
+                    // lifter sets one (needsTrainingMax).
+                    sets = Self.waveSetEntries(
+                        context: waveContext,
+                        waveIndex: waveContext?.waveIndex ?? target?.programWeek ?? 0,
                         equipment: equipmentType
                     )
-                    sets.append(SetEntry(
-                        setNumber: i,
-                        setType: .working,
-                        weight: w,
-                        reps: r,
-                        targetWeight: w,
-                        targetReps: r,
-                        targetRPE: expectedRPE
-                    ))
+                } else {
+                    // Boring But Big: a hypertrophy lift with no history on this
+                    // day but a TM on record starts at 50% of it — the book's
+                    // starting point — and the engine takes over from there.
+                    let bbbSeed: (weight: Double, reps: Int)? = {
+                        guard target == nil, prevSets.isEmpty, dayExercise.trainingMode == .hypertrophy else { return nil }
+                        let tm = trainingMaxes[dayExercise.exerciseId]?.value
+                            ?? trainingMaxEstimates[dayExercise.exerciseId].map {
+                                WaveProgression.trainingMax(fromOneRepMax: $0.oneRepMax, equipment: equipmentType)
+                            }
+                        guard let tm else { return nil }
+                        let increment = ProgressionService.weightIncrement(for: equipmentType)
+                        return (WaveProgression.round(tm * 0.5, to: increment), min(10, dayExercise.effectiveRepMax))
+                    }()
+                    for i in 1...dayExercise.targetSets {
+                        if let bbbSeed {
+                            sets.append(SetEntry(
+                                setNumber: i, setType: .working, weight: bbbSeed.weight, reps: bbbSeed.reps,
+                                targetWeight: bbbSeed.weight, targetReps: bbbSeed.reps
+                            ))
+                            continue
+                        }
+                        let prev = prevSets[safe: i - 1]
+                        let (w, r, expectedRPE) = Self.perSetTarget(
+                            decision: target,
+                            previousSet: prev,
+                            trainingMode: dayExercise.trainingMode,
+                            setScheme: dayExercise.setScheme,
+                            setPosition: i - 1,
+                            totalSets: dayExercise.targetSets,
+                            equipment: equipmentType
+                        )
+                        sets.append(SetEntry(
+                            setNumber: i,
+                            setType: .working,
+                            weight: w,
+                            reps: r,
+                            targetWeight: w,
+                            targetReps: r,
+                            targetRPE: expectedRPE
+                        ))
+                    }
                 }
 
                 return ExerciseLogEntry(
@@ -815,6 +882,8 @@ final class ActiveWorkoutViewModel {
                     equipment: dayExercise.exercise?.equipment ?? "",
                     trainingMode: dayExercise.trainingMode,
                     setScheme: dayExercise.setScheme,
+                    progressionRule: dayExercise.progressionRule,
+                    waveContext: waveContext,
                     targetSets: dayExercise.targetSets,
                     restSeconds: restSeconds,
                     sortOrder: dayExercise.sortOrder,
@@ -839,7 +908,10 @@ final class ActiveWorkoutViewModel {
             // 8. Detect performance-based deload targets and offer a choice.
             //    These were baked in at the previous session's completion; rather
             //    than apply the lighter weights silently, prompt the user.
+            //    A wave lift's `.deload` is a programmed TM reset, not the
+            //    engine's opinion — it applies as written and is not offered.
             let deloadIndices = exercises.indices.filter { i in
+                guard exercises[i].progressionRule == .autoregulated else { return false }
                 switch exercises[i].progressionTarget?.decision {
                 case .deload, .deloadVolume: return true
                 default: return false
@@ -876,7 +948,9 @@ final class ActiveWorkoutViewModel {
 
     func applyDeloadToAllExercises() {
         for i in exercises.indices {
-            guard let target = exercises[i].progressionTarget else { continue }
+            // A 5/3/1 lift has its own deload week; leave its wave alone.
+            guard exercises[i].progressionRule == .autoregulated,
+                  let target = exercises[i].progressionTarget else { continue }
             let deloadWeight = (target.targetWeight * 0.9).rounded()
             let increment = ProgressionService.weightIncrement(for: exercises[i].equipment)
             let roundedWeight = increment > 0
@@ -984,6 +1058,178 @@ final class ActiveWorkoutViewModel {
         pushActivityUpdate()
     }
 
+    // MARK: - Wave (5/3/1) Lifts
+
+    /// Where this lift is in its cycle. The last row it wrote names the wave
+    /// to run next (`programWeek`); a lift switched to 5/3/1 mid-history has an
+    /// autoregulated row there and starts at the 5s week. A cycle-end verdict
+    /// that departed from the book is surfaced for review until a session has
+    /// been completed on it — a `.wave` row is only ever written afterwards.
+    private func waveContext(
+        for dayExercise: WorkoutDayExercise,
+        trainingMax: TrainingMax,
+        latestTarget: ProgressionTarget?,
+        userId: UUID
+    ) async -> WaveContext {
+        let waveIndex = latestTarget?.programWeek ?? 0
+
+        var review: PendingTrainingMaxReview?
+        if trainingMax.source.deviatesFromBook,
+           let latestTarget, latestTarget.decision != .wave, latestTarget.programWeek == 0 {
+            let history = (try? await trainingMaxService.fetchHistory(userId: userId, exerciseId: dayExercise.exerciseId)) ?? []
+            if let previous = history.dropLast().last {
+                let bump = WaveProgression.cycleBump(
+                    exerciseName: dayExercise.exercise?.name ?? "",
+                    muscleGroup: dayExercise.exercise?.muscleGroup ?? "",
+                    equipment: dayExercise.exercise?.equipment ?? ""
+                )
+                review = PendingTrainingMaxReview(
+                    source: trainingMax.source,
+                    previousTrainingMax: previous.value,
+                    bookAlternative: previous.value + bump,
+                    reasoning: latestTarget.reasoning
+                )
+            }
+        }
+        return WaveContext(trainingMax: trainingMax.value, waveIndex: waveIndex, pendingReview: review)
+    }
+
+    /// Three working rows from TM × wave percent. Without a context the rows
+    /// carry the wave's reps and no weight, which is what the ledger shows
+    /// while the TM card is up. The + set's target is its minimum; RPE is not
+    /// prescribed (5/3/1 doesn't use it), so the target snapshot leaves it nil.
+    static func waveSetEntries(context: WaveContext?, waveIndex: Int, equipment: String) -> [SetEntry] {
+        if let context {
+            return WaveProgression.prescribe(
+                trainingMax: context.trainingMax, waveIndex: context.waveIndex, equipment: equipment
+            ).enumerated().map { i, p in
+                SetEntry(setNumber: i + 1, setType: .working, weight: p.weight, reps: p.reps,
+                         targetWeight: p.weight, targetReps: p.reps)
+            }
+        }
+        return WaveProgression.wave(at: waveIndex).steps.enumerated().map { i, step in
+            SetEntry(setNumber: i + 1, setType: .working, weight: 0, reps: step.reps)
+        }
+    }
+
+    /// Replaces the not-yet-completed working rows with the current wave's
+    /// prescription; warm-ups and logged sets are untouched.
+    private func rebuildWaveSets(exerciseIndex: Int) {
+        guard let context = exercises[exerciseIndex].waveContext else { return }
+        let fresh = Self.waveSetEntries(context: context, waveIndex: context.waveIndex, equipment: exercises[exerciseIndex].equipment)
+        var sets = exercises[exerciseIndex].sets
+        let workingIndices = sets.indices.filter { sets[$0].setType == .working }
+        for (position, index) in workingIndices.enumerated() where !sets[index].isCompleted {
+            guard let p = fresh[safe: position] else { continue }
+            sets[index] = SetEntry(
+                setNumber: sets[index].setNumber, setType: .working,
+                weight: p.weight, reps: p.reps, rpe: sets[index].rpe,
+                targetWeight: p.targetWeight, targetReps: p.targetReps
+            )
+        }
+        exercises[exerciseIndex].sets = sets
+    }
+
+    /// First time on a 5/3/1 lift: record the TM and fill in this session's sets.
+    func setTrainingMax(exerciseIndex: Int, value: Double, source: TrainingMax.Source) async {
+        guard exercises.indices.contains(exerciseIndex), value > 0,
+              let userId = try? await supabase.auth.session.user.id else { return }
+        let exercise = exercises[exerciseIndex]
+        do {
+            try await trainingMaxService.insert(userId: userId, exerciseId: exercise.exerciseId, value: value, source: source)
+        } catch {
+            errorMessage = "Couldn't save your training max: \(error.localizedDescription)"
+            return
+        }
+        let waveIndex = exercise.progressionTarget?.programWeek ?? 0
+        exercises[exerciseIndex].waveContext = WaveContext(trainingMax: value, waveIndex: waveIndex, pendingReview: nil)
+        trainingMaxEstimates[exercise.exerciseId] = nil
+        rebuildWaveSets(exerciseIndex: exerciseIndex)
+        saveWorkoutState()
+        pushActivityUpdate()
+    }
+
+    /// Answer to the cycle-end review banner. Keeping the verdict just clears
+    /// it; taking the book's alternative writes that TM and rebuilds the sets.
+    func resolveTrainingMaxReview(exerciseIndex: Int, useBookAlternative: Bool) async {
+        guard exercises.indices.contains(exerciseIndex),
+              var context = exercises[exerciseIndex].waveContext,
+              let review = context.pendingReview else { return }
+        if useBookAlternative, let userId = try? await supabase.auth.session.user.id {
+            let exercise = exercises[exerciseIndex]
+            do {
+                try await trainingMaxService.insert(
+                    userId: userId, exerciseId: exercise.exerciseId,
+                    value: review.bookAlternative, source: .bump
+                )
+            } catch {
+                errorMessage = "Couldn't update your training max: \(error.localizedDescription)"
+                return
+            }
+            context.trainingMax = review.bookAlternative
+        }
+        context.pendingReview = nil
+        exercises[exerciseIndex].waveContext = context
+        rebuildWaveSets(exerciseIndex: exerciseIndex)
+        saveWorkoutState()
+        pushActivityUpdate()
+    }
+
+    /// Writes the journal row for a completed wave session and, when the
+    /// deload week just finished, the cycle-end verdict and its TM row. The
+    /// AMRAP results of the cycle's first three waves are read back from the
+    /// rows those sessions wrote.
+    private func recordWaveSession(
+        _ exercise: ExerciseLogEntry,
+        context: WaveContext,
+        completedWorking: [SetEntry],
+        userId: UUID
+    ) async -> ProgressionTarget? {
+        let topSet = completedWorking.max(by: { $0.weight < $1.weight })
+        let amrap = topSet.map {
+            WaveProgression.AMRAPResult(waveIndex: context.waveIndex, weight: $0.weight, reps: $0.reps)
+        }
+
+        var verdict: WaveProgression.Verdict?
+        var nextTrainingMax = context.trainingMax
+        if context.wave.isDeload {
+            let rows = (try? await progressionService.fetchRecentTargets(
+                userId: userId, exerciseId: exercise.exerciseId,
+                workoutDayId: currentWorkoutDayId, limit: 3
+            )) ?? []
+            // Each row names the wave that followed it, so the wave it graded
+            // is one earlier. Only this cycle's three + sets count.
+            let amrapSets: [WaveProgression.AMRAPResult] = rows.compactMap { row in
+                guard row.decision == .wave, let next = row.programWeek, (1...3).contains(next),
+                      let w = row.previousWeight, let r = row.previousReps else { return nil }
+                return WaveProgression.AMRAPResult(waveIndex: next - 1, weight: w, reps: r)
+            }
+            let bump = WaveProgression.cycleBump(
+                exerciseName: exercise.exerciseName, muscleGroup: exercise.muscleGroup, equipment: exercise.equipment
+            )
+            let v = WaveProgression.cycleVerdict(
+                trainingMax: context.trainingMax, amrapSets: amrapSets, bump: bump, equipment: exercise.equipment
+            )
+            verdict = v
+            nextTrainingMax = v.newTrainingMax
+            try? await trainingMaxService.insert(
+                userId: userId, exerciseId: exercise.exerciseId, value: v.newTrainingMax, source: v.source
+            )
+        }
+
+        let target = WaveProgression.nextTarget(
+            exerciseId: exercise.exerciseId,
+            completedWaveIndex: context.waveIndex,
+            trainingMax: context.trainingMax,
+            nextTrainingMax: nextTrainingMax,
+            amrap: amrap,
+            verdict: verdict,
+            equipment: exercise.equipment
+        )
+        try? await progressionService.saveTarget(target, userId: userId, workoutDayId: currentWorkoutDayId)
+        return target
+    }
+
     func completeWorkout() async {
         guard let sessionId else { return }
 
@@ -1089,6 +1335,23 @@ final class ActiveWorkoutViewModel {
                     }
                 }
 
+                // A wave lift's next prescription is its next wave, not the
+                // engine's read of recent sessions.
+                if exercise.progressionRule == .wave531, let context = exercise.waveContext {
+                    if let target = await recordWaveSession(
+                        exercise, context: context, completedWorking: completedWorking, userId: userId
+                    ) {
+                        allDecisions.append(ProgressionSummary(
+                            exerciseName: exercise.exerciseName,
+                            decision: target.decision,
+                            targetWeight: target.targetWeight,
+                            targetReps: target.targetRepRangeDisplay,
+                            reasoning: target.reasoning
+                        ))
+                    }
+                    continue
+                }
+
                 // Calculate next targets — scoped to this workout day so the same
                 // exercise on different days has independent progression.
                 // The current session is already marked completed, so
@@ -1153,7 +1416,11 @@ final class ActiveWorkoutViewModel {
             )
 
             // Count baseline exercises (no progression target = first time logging)
-            let baselineExercises = exercises.filter { $0.progressionTarget == nil && $0.sets.contains(where: { $0.isCompleted && $0.setType == .working }) }
+            // A wave lift's first session is fully prescribed from its TM, not a baseline.
+            let baselineExercises = exercises.filter {
+                $0.progressionTarget == nil && $0.waveContext == nil
+                    && $0.sets.contains(where: { $0.isCompleted && $0.setType == .working })
+            }
             summary.baselineHypertrophyCount = baselineExercises.filter { $0.trainingMode == .hypertrophy }.count
             summary.baselineStrengthCount = baselineExercises.filter { $0.trainingMode == .strength }.count
 
@@ -1285,6 +1552,7 @@ final class ActiveWorkoutViewModel {
 
         // Check for inline PRs (weight PR and rep PR)
         let completedSet = exercises[exerciseIndex].sets[setIndex]
+        carryForwardIfBlank(exerciseIndex: exerciseIndex, from: completedSet)
         if completedSet.isCompleted && completedSet.setType == .working
             && completedSet.weight > 0 && completedSet.reps > 0 {
             let exerciseId = exercises[exerciseIndex].exerciseId
@@ -1482,11 +1750,19 @@ final class ActiveWorkoutViewModel {
         guard !dismissedWarmupSuggestions.contains(exerciseIndex) else { return false }
         guard let exercise = exercises[safe: exerciseIndex] else { return false }
         let isCompound = exercise.equipment == "barbell" || exercise.equipment == "smith_machine"
-        let isHypertrophy = exercise.trainingMode == .hypertrophy
+        // Ramped strength warms up on its own ascent; hypertrophy and a 5/3/1
+        // wave (which starts at 65% of TM) both start cold.
+        let startsCold = exercise.trainingMode == .hypertrophy || exercise.waveContext != nil
         let hasNoWarmups = !exercise.sets.contains(where: { $0.setType == .warmup })
         let hasWorkingWeight = exercise.sets.first(where: { $0.setType == .working })?.weight ?? 0 > 0
             || exercise.progressionTarget?.targetWeight ?? 0 > 0
-        return isCompound && isHypertrophy && hasNoWarmups && hasWorkingWeight
+        return isCompound && startsCold && hasNoWarmups && hasWorkingWeight
+    }
+
+    /// The book's 40/50/60% ramp for a wave lift. Guidance only.
+    func waveWarmups(exerciseIndex: Int) -> [WaveProgression.SetPrescription]? {
+        guard let exercise = exercises[safe: exerciseIndex], let context = exercise.waveContext else { return nil }
+        return WaveProgression.warmups(trainingMax: context.trainingMax, equipment: exercise.equipment)
     }
 
     func dismissWarmupSuggestion(exerciseIndex: Int) {
@@ -1669,7 +1945,9 @@ final class ActiveWorkoutViewModel {
                 repCap: exercise.repCap,
                 restSeconds: exercise.restSeconds,
                 notes: exercise.notes,
-                useAddedWeight: exercise.useAddedWeight
+                useAddedWeight: exercise.useAddedWeight,
+                progressionRule: exercise.progressionRule,
+                waveContext: exercise.waveContext
             )
         }
 
@@ -1702,6 +1980,8 @@ final class ActiveWorkoutViewModel {
                 equipment: saved.equipment,
                 trainingMode: saved.trainingMode,
                 setScheme: saved.setScheme ?? .ramped,
+                progressionRule: saved.progressionRule ?? .autoregulated,
+                waveContext: saved.waveContext,
                 targetSets: saved.targetSets,
                 restSeconds: saved.restSeconds ?? AppConstants.Defaults.restTimerSeconds,
                 sortOrder: saved.sortOrder,
@@ -1777,7 +2057,27 @@ final class ActiveWorkoutViewModel {
                     repCap: exercises[i].repCap
                 )
             }
+            // A wave lift recovered before its TM was set still needs the
+            // estimate the TM card opens with.
+            if exercises[i].needsTrainingMax,
+               let estimate = try? await trainingMaxService.estimateOneRepMax(userId: userId, exerciseId: exerciseId) {
+                trainingMaxEstimates[exerciseId] = estimate
+            }
         }
+    }
+
+    /// A first-session working set has no prescription, so the rows after it
+    /// start at 0 × 0. Once the lifter has picked a weight, the next blank
+    /// working set takes the same values as its pending numbers — pending
+    /// only, never the GOAL snapshot, so nothing is persisted as a target the
+    /// set trivially meets. Warm-ups stay blank by design.
+    private func carryForwardIfBlank(exerciseIndex: Int, from completed: SetEntry) {
+        guard completed.setType == .working, completed.weight > 0, completed.reps > 0 else { return }
+        guard let next = exercises[exerciseIndex].sets.firstIndex(where: {
+            !$0.isCompleted && $0.setType == .working && $0.weight <= 0 && $0.reps <= 0 && $0.targetReps <= 0
+        }) else { return }
+        exercises[exerciseIndex].sets[next].weight = completed.weight
+        exercises[exerciseIndex].sets[next].reps = completed.reps
     }
 
     /// Public entry point for starting auto-save (used by recovery flow).
@@ -1856,6 +2156,10 @@ final class ActiveWorkoutViewModel {
         exercises[exerciseIndex].equipment = newExercise.equipment
         exercises[exerciseIndex].previousSets = previousSets.isEmpty ? [] : [previousSets]
         exercises[exerciseIndex].progressionTarget = nil // No carryover
+        // The wave belongs to the lift, not the slot: a stand-in has no TM
+        // and runs autoregulated for the session.
+        exercises[exerciseIndex].progressionRule = .autoregulated
+        exercises[exerciseIndex].waveContext = nil
 
         // Remove uncompleted sets and add new ones
         let completedSets = original.sets.filter(\.isCompleted)

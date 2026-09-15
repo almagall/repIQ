@@ -279,6 +279,15 @@ struct SetFeedbackEngine {
             return "Well below the maintain target. If this continues, the app may schedule a deload."
         case (.wellBelow, .deload), (.wellBelow, .deloadVolume):
             return "Under the deload target. Consider whether recovery outside the gym needs attention (sleep, nutrition)."
+
+        // 5/3/1: the wave is fixed, so a set's outcome only informs the
+        // training max at the end of the cycle.
+        case (.exceeded, .wave):
+            return "Reps beyond the minimum on a + set are what move your training max at the end of the cycle."
+        case (.onTarget, .wave):
+            return "Prescribed reps done. On a + set, every rep past the minimum counts toward the cycle-end review."
+        case (.slightlyBelow, .wave), (.wellBelow, .wave):
+            return "Under the wave's prescription. A missed + set resets the training max at the end of the cycle, as the program prescribes."
         }
     }
 

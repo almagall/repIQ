@@ -42,12 +42,32 @@ enum SetScheme: String, Codable, CaseIterable, Sendable {
     }
 }
 
+/// Who decides an exercise's numbers each session. The engine is the default;
+/// a program rule is added only when a program's identity *is* its rule and the
+/// engine can't express it. A non-autoregulated rule owns the set layout, so
+/// `setScheme`, `targetSets` and `repCap` are ignored under it.
+enum ProgressionRule: String, Codable, CaseIterable, Sendable {
+    /// `ProgressionService.calculateTarget` — reactive double progression.
+    case autoregulated
+    /// Wendler's 5/3/1: three sets at percentages of a training max, a
+    /// four-session wave cycle, and the TM moves only at the cycle boundary.
+    case wave531 = "wave_531"
+
+    var displayName: String {
+        switch self {
+        case .autoregulated: return "Autoregulated"
+        case .wave531: return "5/3/1"
+        }
+    }
+}
+
 struct WorkoutDayExercise: Codable, Identifiable, Sendable {
     let id: UUID
     var workoutDayId: UUID
     var exerciseId: UUID
     var trainingMode: TrainingMode
     var setScheme: SetScheme
+    var progressionRule: ProgressionRule
     var targetSets: Int
     var sortOrder: Int
     var restSecondsOverride: Int?
@@ -75,6 +95,7 @@ struct WorkoutDayExercise: Codable, Identifiable, Sendable {
         case exerciseId = "exercise_id"
         case trainingMode = "training_mode"
         case setScheme = "set_scheme"
+        case progressionRule = "progression_rule"
         case targetSets = "target_sets"
         case sortOrder = "sort_order"
         case restSecondsOverride = "rest_seconds_override"
@@ -85,9 +106,9 @@ struct WorkoutDayExercise: Codable, Identifiable, Sendable {
         case exercise = "exercises"
     }
 
-    // set_scheme arrived in 20260910_set_scheme.sql. Decoding it leniently means
-    // a client that ships ahead of the migration still loads templates instead
-    // of failing every fetch.
+    // set_scheme (20260910) and progression_rule (20260914) are decoded
+    // leniently so a client that ships ahead of a migration still loads
+    // templates instead of failing every fetch.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(UUID.self, forKey: .id)
@@ -95,6 +116,7 @@ struct WorkoutDayExercise: Codable, Identifiable, Sendable {
         exerciseId = try c.decode(UUID.self, forKey: .exerciseId)
         trainingMode = try c.decode(TrainingMode.self, forKey: .trainingMode)
         setScheme = try c.decodeIfPresent(SetScheme.self, forKey: .setScheme) ?? .ramped
+        progressionRule = try c.decodeIfPresent(ProgressionRule.self, forKey: .progressionRule) ?? .autoregulated
         targetSets = try c.decode(Int.self, forKey: .targetSets)
         sortOrder = try c.decode(Int.self, forKey: .sortOrder)
         restSecondsOverride = try c.decodeIfPresent(Int.self, forKey: .restSecondsOverride)

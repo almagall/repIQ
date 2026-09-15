@@ -106,6 +106,27 @@ struct SetEntry: Identifiable {
     }
 }
 
+/// What a 5/3/1 lift is running this session. Lives on the entry (and in the
+/// crash-recovery snapshot) because the prescription is derived from it, not
+/// from `progression_log`.
+struct WaveContext: Codable, Sendable {
+    var trainingMax: Double
+    var waveIndex: Int
+    /// A cycle-end verdict that departed from the book and hasn't been
+    /// answered yet — the banner offers the book's alternative.
+    var pendingReview: PendingTrainingMaxReview?
+
+    var wave: WaveProgression.Wave { WaveProgression.wave(at: waveIndex) }
+}
+
+struct PendingTrainingMaxReview: Codable, Sendable {
+    let source: TrainingMax.Source
+    let previousTrainingMax: Double
+    /// What the book would have done: the previous TM plus the standard bump.
+    let bookAlternative: Double
+    let reasoning: String
+}
+
 /// Represents one exercise in the active workout with its mutable sets.
 struct ExerciseLogEntry: Identifiable {
     let id: UUID // matches WorkoutDayExercise.id
@@ -115,7 +136,19 @@ struct ExerciseLogEntry: Identifiable {
     var equipment: String
     let trainingMode: TrainingMode
     var setScheme: SetScheme = .ramped
+    var progressionRule: ProgressionRule = .autoregulated
+    var waveContext: WaveContext?
+    /// A 5/3/1 lift with no training max yet: sets stay empty and the logger
+    /// asks for one before anything can be logged.
+    var needsTrainingMax: Bool { progressionRule == .wave531 && waveContext == nil }
     let targetSets: Int
+    /// Whether this session's working sets were prescribed rather than left
+    /// for the lifter to pick: an engine target, a wave, or a seeded start
+    /// (BBB at 50% of TM). Drives the Target card and the log-button hint.
+    var hasPrescription: Bool {
+        progressionTarget != nil || waveContext != nil
+            || sets.contains(where: { $0.setType == .working && $0.targetReps > 0 })
+    }
     let restSeconds: Int
     let sortOrder: Int
     var sets: [SetEntry]

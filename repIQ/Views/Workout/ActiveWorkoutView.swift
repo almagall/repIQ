@@ -216,6 +216,14 @@ struct ActiveWorkoutView: View {
                 deloadSuggestionBanner(suggestion)
             }
 
+            // 5/3/1 cycle-end verdict that departed from the book: offered
+            // back with the book's alternative, on the lift it concerns.
+            if let exercise = viewModel.currentExercise,
+               let context = exercise.waveContext,
+               let review = context.pendingReview {
+                trainingMaxReviewBanner(exercise, context: context, review: review)
+            }
+
             // Exercise selector with integrated navigation + rest timer
             if !viewModel.exercises.isEmpty {
                 exerciseSelector
@@ -377,6 +385,88 @@ struct ActiveWorkoutView: View {
         }
         .padding(RQSpacing.md)
         .background(RQColors.warning.opacity(0.08))
+        .cornerRadius(RQRadius.large)
+        .padding(.horizontal, RQSpacing.screenHorizontal)
+        .padding(.top, RQSpacing.sm)
+        .transition(.move(edge: .top).combined(with: .opacity))
+    }
+
+    // MARK: - Training Max Review Banner
+
+    private func trainingMaxReviewBanner(
+        _ exercise: ExerciseLogEntry,
+        context: WaveContext,
+        review: PendingTrainingMaxReview
+    ) -> some View {
+        let tm = WaveProgression.format(context.trainingMax)
+        let alternative = WaveProgression.format(review.bookAlternative)
+        let headline: String
+        let keepLabel: String
+        switch review.source {
+        case .hold:
+            headline = "Held your \(exercise.exerciseName.lowercased()) training max at \(tm) instead of bumping to \(alternative)."
+            keepLabel = "Keep \(tm)"
+        default:
+            headline = "Recalibrated your \(exercise.exerciseName.lowercased()) training max to \(tm) instead of the standard bump to \(alternative)."
+            keepLabel = "Keep \(tm)"
+        }
+
+        return VStack(alignment: .leading, spacing: RQSpacing.sm) {
+            HStack(spacing: RQSpacing.sm) {
+                Image(systemName: "flag.fill")
+                    .font(.system(size: 13))
+                    .foregroundColor(RQColors.stateHolding)
+                Text("TRAINING MAX REVIEW")
+                    .rqLabel()
+                    .foregroundColor(RQColors.stateHolding)
+                Spacer()
+                Text("cycle done")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundColor(RQColors.textTertiary)
+            }
+
+            Text(headline)
+                .font(RQTypography.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(RQColors.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(review.reasoning)
+                .font(RQTypography.caption)
+                .foregroundColor(RQColors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: RQSpacing.md) {
+                Button {
+                    Task { await viewModel.resolveTrainingMaxReview(exerciseIndex: viewModel.currentExerciseIndex, useBookAlternative: false) }
+                } label: {
+                    Text(keepLabel)
+                        .font(.system(size: 13, weight: .bold, design: .monospaced))
+                        .foregroundColor(RQColors.background)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, RQSpacing.md)
+                        .background(RQColors.stateHolding)
+                        .clipShape(Capsule())
+                }
+
+                Button {
+                    Task { await viewModel.resolveTrainingMaxReview(exerciseIndex: viewModel.currentExerciseIndex, useBookAlternative: true) }
+                } label: {
+                    Text("Bump to \(alternative) anyway")
+                        .font(.system(size: 13, weight: .bold, design: .monospaced))
+                        .foregroundColor(RQColors.textPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, RQSpacing.md)
+                        .overlay(Capsule().stroke(RQColors.textSecondary, lineWidth: 1))
+                }
+            }
+        }
+        .padding(RQSpacing.md)
+        .background(RQColors.surfacePrimary)
+        .overlay(
+            RoundedRectangle(cornerRadius: RQRadius.large, style: .continuous)
+                .stroke(RQColors.stateHolding.opacity(0.4), lineWidth: 0.5)
+        )
         .cornerRadius(RQRadius.large)
         .padding(.horizontal, RQSpacing.screenHorizontal)
         .padding(.top, RQSpacing.sm)

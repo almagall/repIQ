@@ -84,6 +84,7 @@ final class ProgramBrowserViewModel {
                         exerciseId: resolved.id,
                         trainingMode: exercise.trainingMode,
                         setScheme: exercise.setScheme,
+                        progressionRule: exercise.progressionRule,
                         targetSets: exercise.targetSets,
                         sortOrder: exIndex,
                         restSecondsOverride: exercise.restSecondsOverride,

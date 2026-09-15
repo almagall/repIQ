@@ -93,6 +93,7 @@ struct TargetAdherenceService {
             current: current,
             prior: prior,
             latest: log.latest,
+            latestVerdict: log.latestVerdict,
             exerciseNames: names,
             dayNames: dayNames
         )
@@ -201,7 +202,9 @@ struct TargetAdherenceService {
                     reps: $0.reps,
                     rpe: nil,
                     decision: $0.decision,
-                    trainingMode: $0.mode
+                    trainingMode: $0.mode,
+                    reasoning: $0.reasoning,
+                    isProgramRule: $0.isProgramRule
                 )
             }
         )
@@ -281,6 +284,7 @@ struct TargetAdherenceService {
         current: [GroupKey: [SessionAdherence]],
         prior: [GroupKey: [SessionAdherence]],
         latest: [GroupKey: Prescription],
+        latestVerdict: [GroupKey: Prescription],
         exerciseNames: [UUID: String],
         dayNames: [UUID: String]
     ) -> [DayAdherence] {
@@ -294,7 +298,7 @@ struct TargetAdherenceService {
                     workoutDayId: key.workoutDayId,
                     exerciseName: exerciseNames[key.exerciseId] ?? "Exercise",
                     trainingMode: latest[key]?.mode ?? .hypertrophy,
-                    latestDecision: latest[key]?.decision,
+                    latestDecision: latestVerdict[key]?.decision,
                     sessions: sessions.sorted { $0.date < $1.date }
                 )
             }
@@ -410,6 +414,8 @@ struct TargetAdherenceService {
             let target_weight: Double
             let target_reps_low: Int
             let created_at: String
+            let reasoning: String?
+            let mesocycle_week: Int?
         }
 
         // Reach back beyond the comparison window: a lift trained infrequently
@@ -418,7 +424,7 @@ struct TargetAdherenceService {
         let reach = Calendar.current.date(byAdding: .day, value: -120, to: since) ?? since
 
         let rows: [Row] = try await supabase.from("progression_log")
-            .select("exercise_id,workout_day_id,decision,training_mode,target_weight,target_reps_low,created_at")
+            .select("exercise_id,workout_day_id,decision,training_mode,target_weight,target_reps_low,created_at,reasoning,mesocycle_week")
             .eq("user_id", value: userId.uuidString)
             .gte("created_at", value: iso.string(from: reach))
             .order("created_at", ascending: true)
@@ -439,7 +445,9 @@ struct TargetAdherenceService {
                     weight: row.target_weight,
                     reps: row.target_reps_low,
                     mode: TrainingMode(rawValue: row.training_mode) ?? .hypertrophy,
-                    decision: ProgressionDecision(rawValue: row.decision)
+                    decision: ProgressionDecision(rawValue: row.decision),
+                    reasoning: row.reasoning,
+                    isProgramRule: row.mesocycle_week != nil
                 )
             )
         }
@@ -491,6 +499,10 @@ struct TargetAdherenceService {
         let reps: Int
         let mode: TrainingMode
         let decision: ProgressionDecision?
+        let reasoning: String?
+        /// Written by a program rule (5/3/1 stamps the wave index), whose
+        /// reasoning is the honest explanation rather than the engine's.
+        let isProgramRule: Bool
     }
 
     private struct ProgressionHistory {
@@ -507,6 +519,15 @@ struct TargetAdherenceService {
 
         var latest: [GroupKey: Prescription] {
             byKey.compactMapValues(\.last)
+        }
+
+        /// The last row that said something about direction. A 5/3/1 lift's
+        /// mid-cycle rows are `.wave` (neutral), so its verdict is the last
+        /// cycle-end row — the same rule the Progress hero applies.
+        var latestVerdict: [GroupKey: Prescription] {
+            byKey.compactMapValues { rows in
+                rows.last { $0.decision?.isVerdict ?? true } ?? rows.last
+            }
         }
     }
 

@@ -168,7 +168,7 @@ struct ProgramDetailView: View {
                                             ? RQColors.hypertrophy
                                             : RQColors.strength
                                     )
-                                Text(schemeSummary(mode: exercise.trainingMode, scheme: exercise.setScheme, repCap: exercise.repCap))
+                                Text(schemeSummary(mode: exercise.trainingMode, scheme: exercise.setScheme, rule: exercise.progressionRule, repCap: exercise.repCap))
                                     .font(RQTypography.caption)
                                     .foregroundColor(RQColors.textTertiary)
                             }

@@ -6,6 +6,10 @@ enum ProgressionDecision: String, Codable, Sendable {
     case maintain
     case deload
     case deloadVolume = "deload_volume"
+    /// A program rule moved to its next scheduled step. Neutral: it is neither
+    /// progress nor a hold, so progression-rate reads skip it and use the last
+    /// real decision (a 5/3/1 lifter's TM bump or reset at the cycle boundary).
+    case wave
 
     var displayName: String {
         switch self {
@@ -14,8 +18,12 @@ enum ProgressionDecision: String, Codable, Sendable {
         case .maintain: return "Maintain"
         case .deload: return "Deload"
         case .deloadVolume: return "Reduce Volume"
+        case .wave: return "Next Wave"
         }
     }
+
+    /// Decisions that say something about strength direction. `.wave` does not.
+    var isVerdict: Bool { self != .wave }
 }
 
 struct ProgressionTarget: Sendable {
@@ -42,6 +50,11 @@ struct ProgressionTarget: Sendable {
     // e1RM confidence factor (1.0 = high confidence at low reps, lower at high reps)
     let e1rmConfidence: Double
 
+    /// For program rules with a schedule: the step the *next* session should
+    /// run (5/3/1: wave index 0-3). Persisted in `progression_log.mesocycle_week`.
+    /// Nil for the autoregulated engine.
+    let programWeek: Int?
+
     init(
         exerciseId: UUID,
         trainingMode: TrainingMode,
@@ -57,7 +70,8 @@ struct ProgressionTarget: Sendable {
         estimatedOneRM: Double? = nil,
         mesocycleRPEOffset: Double = 0,
         rpeFatigueDetected: Bool = false,
-        e1rmConfidence: Double = 1.0
+        e1rmConfidence: Double = 1.0,
+        programWeek: Int? = nil
     ) {
         self.exerciseId = exerciseId
         self.trainingMode = trainingMode
@@ -74,6 +88,7 @@ struct ProgressionTarget: Sendable {
         self.mesocycleRPEOffset = mesocycleRPEOffset
         self.rpeFatigueDetected = rpeFatigueDetected
         self.e1rmConfidence = e1rmConfidence
+        self.programWeek = programWeek
     }
 
     var targetRepRangeDisplay: String {

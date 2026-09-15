@@ -98,6 +98,7 @@ struct TemplateService: Sendable {
         exerciseId: UUID,
         trainingMode: TrainingMode,
         setScheme: SetScheme = .ramped,
+        progressionRule: ProgressionRule = .autoregulated,
         targetSets: Int,
         sortOrder: Int,
         restSecondsOverride: Int? = nil,
@@ -109,6 +110,7 @@ struct TemplateService: Sendable {
             let exercise_id: UUID
             let training_mode: String
             let set_scheme: String
+            let progression_rule: String
             let target_sets: Int
             let sort_order: Int
             let rest_seconds_override: Int?
@@ -121,6 +123,7 @@ struct TemplateService: Sendable {
                 exercise_id: exerciseId,
                 training_mode: trainingMode.rawValue,
                 set_scheme: setScheme.rawValue,
+                progression_rule: progressionRule.rawValue,
                 target_sets: targetSets,
                 sort_order: sortOrder,
                 rest_seconds_override: restSecondsOverride,
@@ -137,12 +140,14 @@ struct TemplateService: Sendable {
         id: UUID,
         trainingMode: TrainingMode,
         setScheme: SetScheme,
+        progressionRule: ProgressionRule = .autoregulated,
         targetSets: Int,
         repCap: Int? = nil
     ) async throws {
         struct ExerciseUpdate: Encodable {
             let training_mode: String
             let set_scheme: String
+            let progression_rule: String
             let target_sets: Int
             let rep_cap: Int?
 
@@ -152,18 +157,20 @@ struct TemplateService: Sendable {
                 var c = encoder.container(keyedBy: CodingKeys.self)
                 try c.encode(training_mode, forKey: .training_mode)
                 try c.encode(set_scheme, forKey: .set_scheme)
+                try c.encode(progression_rule, forKey: .progression_rule)
                 try c.encode(target_sets, forKey: .target_sets)
                 try c.encode(rep_cap, forKey: .rep_cap)
             }
 
             enum CodingKeys: String, CodingKey {
-                case training_mode, set_scheme, target_sets, rep_cap
+                case training_mode, set_scheme, progression_rule, target_sets, rep_cap
             }
         }
         try await supabase.from("workout_day_exercises")
             .update(ExerciseUpdate(
                 training_mode: trainingMode.rawValue,
                 set_scheme: setScheme.rawValue,
+                progression_rule: progressionRule.rawValue,
                 target_sets: targetSets,
                 rep_cap: repCap
             ))

@@ -209,15 +209,19 @@ final class TemplateEditorViewModel {
         _ dayExercise: WorkoutDayExercise,
         trainingMode: TrainingMode,
         setScheme: SetScheme? = nil,
+        progressionRule: ProgressionRule? = nil,
         targetSets: Int,
         repCap: Int? = nil
     ) async {
         let scheme = setScheme ?? dayExercise.setScheme
+        // A program rule is strength-only; switching the mode drops it.
+        let rule = trainingMode == .strength ? (progressionRule ?? dayExercise.progressionRule) : .autoregulated
         do {
             try await templateService.updateDayExercise(
                 id: dayExercise.id,
                 trainingMode: trainingMode,
                 setScheme: scheme,
+                progressionRule: rule,
                 targetSets: targetSets,
                 repCap: repCap
             )
@@ -225,6 +229,7 @@ final class TemplateEditorViewModel {
                 if let exIndex = workoutDays[dayIndex].exercises?.firstIndex(where: { $0.id == dayExercise.id }) {
                     workoutDays[dayIndex].exercises?[exIndex].trainingMode = trainingMode
                     workoutDays[dayIndex].exercises?[exIndex].setScheme = scheme
+                    workoutDays[dayIndex].exercises?[exIndex].progressionRule = rule
                     workoutDays[dayIndex].exercises?[exIndex].targetSets = targetSets
                     workoutDays[dayIndex].exercises?[exIndex].repCap = repCap
                 }

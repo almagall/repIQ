@@ -45,6 +45,7 @@ struct ProgramExerciseDefinition: Identifiable {
     let exerciseName: String
     let trainingMode: TrainingMode
     let setScheme: SetScheme
+    let progressionRule: ProgressionRule
     let targetSets: Int
     let repCap: Int?
     let restSecondsOverride: Int?
@@ -54,6 +55,7 @@ struct ProgramExerciseDefinition: Identifiable {
         exerciseName: String,
         trainingMode: TrainingMode,
         setScheme: SetScheme = .ramped,
+        progressionRule: ProgressionRule = .autoregulated,
         targetSets: Int,
         repCap: Int? = nil,
         restSecondsOverride: Int? = nil,
@@ -63,7 +65,8 @@ struct ProgramExerciseDefinition: Identifiable {
         self.exerciseName = exerciseName
         self.trainingMode = trainingMode
         self.setScheme = setScheme
-        self.targetSets = targetSets
+        self.progressionRule = progressionRule
+        self.targetSets = progressionRule == .wave531 ? WaveProgression.setsPerWave : targetSets
         self.repCap = repCap
         self.restSecondsOverride = restSecondsOverride
         self.notes = notes

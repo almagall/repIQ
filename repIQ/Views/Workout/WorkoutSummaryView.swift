@@ -453,7 +453,7 @@ struct WorkoutSummaryView: View {
                         .font(RQTypography.caption)
                         .foregroundColor(RQColors.textTertiary)
 
-                    Text("\(formatWeight(progression.targetWeight)) lbs for \(progression.targetReps) reps")
+                    Text("\(formatWeight(progression.targetWeight)) lbs for \(progression.targetReps) \(progression.targetReps == "1" ? "rep" : "reps")")
                         .font(RQTypography.numbersSmall)
                         .foregroundColor(RQColors.textPrimary)
                 }
@@ -471,6 +471,7 @@ struct WorkoutSummaryView: View {
         case .increaseReps: return "arrow.up.right.circle.fill"
         case .maintain: return "arrow.right.circle.fill"
         case .deload, .deloadVolume: return "arrow.down.circle.fill"
+        case .wave: return "arrow.forward.circle.fill"
         }
     }
 
@@ -480,6 +481,7 @@ struct WorkoutSummaryView: View {
         case .increaseReps: return RQColors.success
         case .maintain: return RQColors.warning
         case .deload, .deloadVolume: return RQColors.error
+        case .wave: return RQColors.accent
         }
     }
 

@@ -173,6 +173,9 @@ struct ExerciseTargetView: View {
     }
 
     private func decisionExplanation(_ next: NextPrescription) -> String {
+        if next.isProgramRule, let reasoning = next.reasoning, !reasoning.isEmpty {
+            return reasoning
+        }
         switch next.decision {
         case .increaseWeight:
             return "You earned more load — the engine moved the weight up."
@@ -184,6 +187,8 @@ struct ExerciseTargetView: View {
                 : "Holding this weight until every set hits its rep goal."
         case .deload, .deloadVolume:
             return "Eased back on purpose. A lighter week is part of the plan, not a setback."
+        case .wave:
+            return "Next wave of the 5/3/1 cycle. The training max moves when the cycle ends."
         case nil:
             return "Prescription carried over from your last session."
         }
