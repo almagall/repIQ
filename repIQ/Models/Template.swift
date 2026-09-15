@@ -25,4 +25,20 @@ struct Template: Codable, Identifiable, Sendable, Hashable {
         case workoutDays = "workout_days"
         case sourceProgram = "source_program"
     }
+
+    // Same reason as WorkoutDay: the embedded days arrive unordered.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        userId = try c.decode(UUID.self, forKey: .userId)
+        name = try c.decode(String.self, forKey: .name)
+        description = try c.decodeIfPresent(String.self, forKey: .description)
+        isActive = try c.decode(Bool.self, forKey: .isActive)
+        sortOrder = try c.decode(Int.self, forKey: .sortOrder)
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        updatedAt = try c.decode(Date.self, forKey: .updatedAt)
+        workoutDays = try c.decodeIfPresent([WorkoutDay].self, forKey: .workoutDays)?
+            .sorted { $0.sortOrder < $1.sortOrder }
+        sourceProgram = try c.decodeIfPresent(String.self, forKey: .sourceProgram)
+    }
 }
